@@ -1,3 +1,4 @@
+mod token;
 fn main() {
-    println!("Hello, world!");
+    token::parse_token();    
 }
