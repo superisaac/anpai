@@ -1,3 +1,4 @@
+use lazy_static::lazy_static;
 use regex::Regex;
 use std::fmt;
 
@@ -32,15 +33,8 @@ struct TokenMatcher {
     reg: Option<Regex>,
 }
 
-//#[derive(Clone)]
-struct TokenScanner<'a> {
-    input: &'a str,
-    cursor: usize,
-    matchers: Vec<TokenMatcher>,
-}
-
-impl TokenScanner<'_> {
-    pub fn new<'a>(input: &str) -> TokenScanner {
+lazy_static! {
+    static ref TOKEN_MATCHERS: Vec<TokenMatcher> = {
         let mut matchers: Vec<TokenMatcher> = Vec::new();
         matchers.push(TokenMatcher {
             token: "space",
@@ -88,8 +82,19 @@ impl TokenScanner<'_> {
             reg: Some(Regex::new(r"[a-zA-Z_\$\p{Han}\p{Greek}\p{Bopomofo}\p{Hangul}][a-zA-Z_\$0-9\p{Han}\p{Greek}}\p{Bopomofo}\p{Hangul}]*").unwrap()),
         });
 
+        matchers
+    };
+}
+
+//#[derive(Clone)]
+struct TokenScanner<'a> {
+    input: &'a str,
+    cursor: usize,
+}
+
+impl TokenScanner<'_> {
+    pub fn new<'a>(input: &str) -> TokenScanner {
         return TokenScanner {
-            matchers,
             cursor: 0,
             input: input.clone(),
         };
@@ -108,7 +113,7 @@ impl TokenScanner<'_> {
             });
         }
         let rest = &self.input[self.cursor..];
-        for matcher in self.matchers.iter() {
+        for matcher in TOKEN_MATCHERS.iter() {
             if let Some(reg) = &matcher.reg {
                 if let Some(m) = reg.find(rest) {
                     assert_eq!(0, m.start());
