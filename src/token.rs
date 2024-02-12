@@ -117,7 +117,7 @@ impl TokenScanner<'_> {
                     assert_eq!(0, m.start());
                     let token = Token {
                         token: String::from(pattern.token),
-                        value: m.as_str().to_string(),
+                        value: m.as_str().to_owned(),
                         position: self.cursor,
                     };
                     self.cursor += token.value.len();
