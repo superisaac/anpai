@@ -33,13 +33,13 @@ struct TokenMatcher {
 }
 
 //#[derive(Clone)]
-struct TokenScanner {
-    input: String,
+struct TokenScanner<'a> {
+    input: &'a str,
     cursor: usize,
     matchers: Vec<TokenMatcher>,
 }
 
-impl TokenScanner {
+impl TokenScanner<'_> {
     pub fn new<'a>(input: &str) -> TokenScanner {
         let mut matchers: Vec<TokenMatcher> = Vec::new();
         matchers.push(TokenMatcher {
@@ -91,7 +91,7 @@ impl TokenScanner {
         return TokenScanner {
             matchers,
             cursor: 0,
-            input: input.to_owned(),
+            input: input.clone(),
         };
     }
 
@@ -107,7 +107,7 @@ impl TokenScanner {
                 position: self.cursor,
             });
         }
-        let rest = &self.input.as_str()[self.cursor..];
+        let rest = &self.input[self.cursor..];
         for matcher in self.matchers.iter() {
             if let Some(reg) = &matcher.reg {
                 if let Some(m) = reg.find(rest) {
