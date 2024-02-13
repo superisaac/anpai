@@ -23,13 +23,40 @@ impl fmt::Display for Token {
 }
 
 impl Token {
-    pub fn expect(&self, kind: String) -> bool {
-        self.kind == kind
+    pub fn expect(&self, kinds: &[&str]) -> bool {
+        let self_kind = self.kind.as_str();
+        kinds.into_iter().any(|kind| self_kind == *kind)
     }
 
-    pub fn expect_keyword(&self, keyword: String) -> bool {
-        self.kind == "keyword".to_owned() && self.value == keyword
+    pub fn expect_keywords(&self, keywords: &[&str]) -> bool {
+        if self.kind != "keyword".to_owned() {
+            return false;
+        }
+        let self_keyword = self.value.as_str();
+        keywords.into_iter().any(|kw| self_keyword == *kw)
     }
+}
+
+#[test]
+fn test_token_expect() {
+    let token = Token {
+        kind: "abc".to_owned(),
+        value: "xyz".to_owned(),
+        position: 0,
+    };
+    assert!(token.expect(&["abc", "kkk"]));
+    assert!(!token.expect(&["abcdef", "kkk"]));
+}
+
+#[test]
+fn test_token_expect_keywords() {
+    let token = Token {
+        kind: "keyword".to_owned(),
+        value: "xyz".to_owned(),
+        position: 0,
+    };
+    assert!(!token.expect_keywords(&["abc", "kkk"]));
+    assert!(token.expect_keywords(&["xyz", "kkk"]));
 }
 
 #[derive(Clone)]
@@ -131,12 +158,18 @@ impl TokenScanner<'_> {
     }
 
     // expect the current token to be one of the kinds
-    pub fn expect(&self, kind: String) -> bool {
-        self.current.clone().map(|t| t.expect(kind)).unwrap_or(false)
+    pub fn expect(&self, kinds: &[&str]) -> bool {
+        self.current
+            .clone()
+            .map(|t| t.expect(kinds))
+            .unwrap_or(false)
     }
 
-    pub fn expect_keyword(&self, keyword: String) -> bool {
-        self.current.clone().map(|t| t.expect_keyword(keyword)).unwrap_or(false)
+    pub fn expect_keywords(&self, keywords: &[&str]) -> bool {
+        self.current
+            .clone()
+            .map(|t| t.expect_keywords(keywords))
+            .unwrap_or(false)
     }
 
     pub fn next_token(&mut self) -> Result<(), &'static str> {
@@ -145,7 +178,7 @@ impl TokenScanner<'_> {
                 self.current = Some(token.clone());
                 Ok(())
             }
-            Err(err) => Err(err)
+            Err(err) => Err(err),
         }
     }
 
