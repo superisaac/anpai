@@ -3,8 +3,8 @@ use regex::Regex;
 use std::fmt;
 
 #[derive(Clone)]
-struct Token {
-    token: String,
+pub struct Token {
+    kind: String,
     value: String,
     position: usize,
 }
@@ -16,9 +16,19 @@ impl fmt::Display for Token {
             "[{}..{}] {} '{}'",
             self.position,
             self.value.len() + self.position,
-            self.token,
+            self.kind,
             self.value
         )
+    }
+}
+
+impl Token {
+    pub fn expect(&self, kind: String) -> bool {
+        self.kind == kind
+    }
+
+    pub fn expect_keyword(&self, keyword: String) -> bool {
+        self.kind == "keyword".to_owned() && self.value == keyword
     }
 }
 
@@ -84,28 +94,65 @@ lazy_static! {
     };
 }
 
-//#[derive(Clone)]
+//#[derive(Clone, Copy)]
 struct TokenScanner<'a> {
+    // input text
     input: &'a str,
+    // current scan position
     cursor: usize,
+
+    // current abtained token
+    current: Option<Token>,
 }
 
 impl TokenScanner<'_> {
+    // constructor
     pub fn new<'a>(input: &str) -> TokenScanner {
         return TokenScanner {
             cursor: 0,
+            current: None,
             input: input.clone(),
         };
     }
 
+    // if the scan reached the end of input
     pub fn is_eof(&self) -> bool {
         self.cursor >= self.input.len()
     }
 
-    pub fn next_token(&mut self) -> Result<Token, &'static str> {
+    // returns current token
+    pub fn current_token(&self) -> Option<Token> {
+        self.current.clone()
+    }
+
+    // returns the current token unwrapped
+    pub fn unwrap_current_token(&self) -> Token {
+        self.current.clone().unwrap()
+    }
+
+    // expect the current token to be one of the kinds
+    pub fn expect(&self, kind: String) -> bool {
+        self.current.clone().map(|t| t.expect(kind)).unwrap_or(false)
+    }
+
+    pub fn expect_keyword(&self, keyword: String) -> bool {
+        self.current.clone().map(|t| t.expect_keyword(keyword)).unwrap_or(false)
+    }
+
+    pub fn next_token(&mut self) -> Result<(), &'static str> {
+        match self.find_next_token() {
+            Ok(token) => {
+                self.current = Some(token.clone());
+                Ok(())
+            }
+            Err(err) => Err(err)
+        }
+    }
+
+    fn find_next_token(&mut self) -> Result<Token, &'static str> {
         if self.is_eof() {
             return Ok(Token {
-                token: "eof".to_owned(),
+                kind: "eof".to_owned(),
                 value: "".to_owned(),
                 position: self.cursor,
             });
@@ -116,7 +163,7 @@ impl TokenScanner<'_> {
                 if let Some(m) = reg.find(rest) {
                     assert_eq!(0, m.start());
                     let token = Token {
-                        token: String::from(pattern.token),
+                        kind: String::from(pattern.token),
                         value: m.as_str().to_owned(),
                         position: self.cursor,
                     };
@@ -125,7 +172,7 @@ impl TokenScanner<'_> {
                 }
             } else if rest.starts_with(pattern.token) {
                 let token = Token {
-                    token: String::from(pattern.token),
+                    kind: String::from(pattern.token),
                     value: String::from(pattern.token),
                     position: self.cursor,
                 };
@@ -140,8 +187,8 @@ impl TokenScanner<'_> {
         let mut token_vecs: Vec<Token> = Vec::new();
         while !self.is_eof() {
             match self.next_token() {
-                Ok(token) => {
-                    token_vecs.push(token);
+                Ok(_) => {
+                    token_vecs.push(self.unwrap_current_token());
                 }
                 Err(msg) => return Err(msg),
             }
