@@ -1,3 +1,4 @@
+use crate::ast::Node::*;
 use std::fmt;
 
 #[derive(Clone)]
@@ -80,7 +81,7 @@ pub enum Node {
 
     Null,
 
-    String {
+    Str {
         value: String,
     },
 
@@ -139,21 +140,21 @@ pub enum Node {
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Node::Binop { op, left, right } => write!(f, "({} {} {})", op, left, right),
-            Node::DotOp { left, attr } => write!(f, "(. {} {})", left, attr),
-            Node::FuncCall { func_ref, args } => write!(f, "(call {} ", func_ref)
+            Binop { op, left, right } => write!(f, "({} {} {})", op, left, right),
+            DotOp { left, attr } => write!(f, "(. {} {})", left, attr),
+            FuncCall { func_ref, args } => write!(f, "(call {} ", func_ref)
                 .and_then(|_| fmt_vec(f, args))
                 .and_then(|_| write!(f, ")")),
-            Node::FuncDef { args, body } => write!(f, "(function [")
+            FuncDef { args, body } => write!(f, "(function [")
                 .and_then(|_| fmt_vec(f, args))
                 .and_then(|_| write!(f, "] {})", body)),
-            Node::Var { name } => write!(f, "{}", name),
-            Node::Number { value } => write!(f, "{}", value),
-            Node::Bool { value } => write!(f, "{}", value),
-            Node::Null => write!(f, "null"),
-            Node::String { value } => write!(f, "\"{}\"", value),
-            Node::Temporal { value } => write!(f, "{}", value),
-            Node::Range {
+            Var { name } => write!(f, "{}", name),
+            Number { value } => write!(f, "{}", value),
+            Bool { value } => write!(f, "{}", value),
+            Null => write!(f, "null"),
+            Str { value } => write!(f, "\"{}\"", value),
+            Temporal { value } => write!(f, "{}", value),
+            Range {
                 start_open,
                 start,
                 end_open,
@@ -163,19 +164,19 @@ impl fmt::Display for Node {
                 let end_bra = if *end_open { ")" } else { "]" };
                 write!(f, "{}{}..{}{}", start_bra, start, end, end_bra)
             }
-            Node::Array { elements } => fmt_vec(f, elements),
-            Node::Map { items } => fmt_vec(f, items),
-            Node::IfExpr {
+            Array { elements } => fmt_vec(f, elements),
+            Map { items } => fmt_vec(f, items),
+            IfExpr {
                 condition,
                 then_branch,
                 else_branch,
             } => write!(f, "(if {} {} {})", condition, then_branch, else_branch),
-            Node::ForExpr {
+            ForExpr {
                 var_name,
                 list_expr,
                 return_expr,
             } => write!(f, "(for {} in {} {})", var_name, list_expr, return_expr),
-            Node::SomeExpr {
+            SomeExpr {
                 var_name,
                 list_expr,
                 filter_expr,
@@ -184,7 +185,7 @@ impl fmt::Display for Node {
                 "(some {} in {} satisfies {})",
                 var_name, list_expr, filter_expr
             ),
-            Node::EveryExpr {
+            EveryExpr {
                 var_name,
                 list_expr,
                 filter_expr,
@@ -193,8 +194,8 @@ impl fmt::Display for Node {
                 "(every {} in {} satisfies {})",
                 var_name, list_expr, filter_expr
             ),
-            Node::ExprList { elements } => fmt_vec(f, elements),
-            Node::MultiTests { elements } => fmt_vec(f, elements),
+            ExprList { elements } => fmt_vec(f, elements),
+            MultiTests { elements } => fmt_vec(f, elements),
         }
     }
 }
