@@ -1,4 +1,4 @@
-use crate::ast::{Node, Node::*};
+use crate::ast::{FuncCallArg, Node, Node::*};
 use crate::token::Scanner;
 
 type NodeResult = Result<Box<Node>, &'static str>;
@@ -119,7 +119,75 @@ impl Parser<'_> {
     }
 
     fn parse_mul_or_div(&mut self) -> NodeResult {
-        self.parse_binop_kinds(&["*", "/", "%"], Parser::parse_single_element)
+        self.parse_binop_kinds(&["*", "/", "%"], Parser::parse_funccall_or_index_or_dot)
+    }
+
+    fn parse_funccall_or_index_or_dot(&mut self) -> NodeResult {
+        let mut node = match self.parse_single_element() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+        loop {
+            match self.scanner.unwrap_current_token().kind {
+                "(" => {
+                    node = match self.parse_funccall_rest(node) {
+                        Ok(node) => node,
+                        Err(err) => return Err(err),
+                    };
+                }
+                _ => break,
+            }
+        }
+        Ok(node)
+    }
+
+    fn parse_funccall_rest(&mut self, func_expr: Box<Node>) -> NodeResult {
+        goahead!(self); // skip "("
+        let mut args: Vec<FuncCallArg> = Vec::new();
+        while !self.scanner.expect(")") {
+            match self.parse_funcall_arg() {
+                Ok(arg) => {
+                    args.push(arg);
+                }
+                Err(err) => return Err(err),
+            };
+            if self.scanner.expect(",") {
+                goahead!(self);
+            } else if self.scanner.expect(")") {
+                return Err("unexpected, expect ',', ')' ");
+            }
+        }
+        Ok(Box::new(FuncCall {
+            func_ref: func_expr,
+            args,
+        }))
+    }
+
+    fn parse_funcall_arg(&mut self) -> Result<FuncCallArg, &'static str> {
+        let arg = match self.parse_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+        if self.scanner.expect(":") {
+            if let Var { name } = *arg {
+                goahead!(self); // skip ":"
+                let arg_value = match self.parse_expression() {
+                    Ok(node) => node,
+                    Err(err) => return Err(err),
+                };
+                return Ok(FuncCallArg {
+                    arg_name: name,
+                    arg: arg_value,
+                });
+            } else {
+                return Err("unexpected var");
+            }
+        } else {
+            return Ok(FuncCallArg {
+                arg_name: "_".to_owned(),
+                arg,
+            });
+        }
     }
 
     // single element

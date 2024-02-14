@@ -10,7 +10,7 @@ fn main() {
     };
     println!("{}", n);
 
-    let mut p = parse::Parser::new("8+1");
+    let mut p = parse::Parser::new("8+1*a(5,9)");
     match p.parse() {
         Ok(node) => println!("P: {}", node),
         Err(err) => panic!("{}", err),

@@ -2,9 +2,9 @@ use crate::ast::Node::*;
 use std::fmt;
 
 #[derive(Clone)]
-struct FuncCallArg {
-    arg_name: String,
-    arg: Box<Node>,
+pub struct FuncCallArg {
+    pub arg_name: String,
+    pub arg: Box<Node>,
 }
 
 impl fmt::Display for FuncCallArg {
@@ -31,9 +31,9 @@ fn fmt_vec<T: fmt::Display>(f: &mut fmt::Formatter, vec: &Vec<T>) -> fmt::Result
 }
 
 #[derive(Clone)]
-struct MapItem {
-    name: String,
-    value: Box<Node>,
+pub struct MapItem {
+    pub name: String,
+    pub value: Box<Node>,
 }
 impl fmt::Display for MapItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
