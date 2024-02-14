@@ -4,9 +4,9 @@ use std::fmt;
 
 #[derive(Clone)]
 pub struct Token {
-    kind: String,
-    value: String,
-    position: usize,
+    pub kind: &'static str,
+    pub value: String,
+    pub position: usize,
 }
 
 impl fmt::Display for Token {
@@ -23,13 +23,16 @@ impl fmt::Display for Token {
 }
 
 impl Token {
-    pub fn expect(&self, kinds: &[&str]) -> bool {
-        let self_kind = self.kind.as_str();
-        kinds.into_iter().any(|kind| self_kind == *kind)
+    pub fn expect(&self, kind: &str) -> bool {
+        self.kind == kind
+    }
+
+    pub fn expect_kinds(&self, kinds: &[&str]) -> bool {
+        kinds.into_iter().any(|kind| self.expect(*kind))
     }
 
     pub fn expect_keywords(&self, keywords: &[&str]) -> bool {
-        if self.kind != "keyword".to_owned() {
+        if self.kind != "keyword" {
             return false;
         }
         let self_keyword = self.value.as_str();
@@ -40,18 +43,18 @@ impl Token {
 #[test]
 fn test_token_expect() {
     let token = Token {
-        kind: "abc".to_owned(),
+        kind: "abc",
         value: "xyz".to_owned(),
         position: 0,
     };
-    assert!(token.expect(&["abc", "kkk"]));
-    assert!(!token.expect(&["abcdef", "kkk"]));
+    assert!(token.expect_kinds(&["abc", "kkk"]));
+    assert!(!token.expect_kinds(&["abcdef", "kkk"]));
 }
 
 #[test]
 fn test_token_expect_keywords() {
     let token = Token {
-        kind: "keyword".to_owned(),
+        kind: "keyword",
         value: "xyz".to_owned(),
         position: 0,
     };
@@ -122,7 +125,7 @@ lazy_static! {
 }
 
 //#[derive(Clone, Copy)]
-struct TokenScanner<'a> {
+pub struct Scanner<'a> {
     // input text
     input: &'a str,
     // current scan position
@@ -132,14 +135,14 @@ struct TokenScanner<'a> {
     current: Option<Token>,
 }
 
-impl TokenScanner<'_> {
+impl Scanner<'_> {
     // constructor
-    pub fn new<'a>(input: &str) -> TokenScanner {
-        return TokenScanner {
+    pub fn new(input: &str) -> Scanner {
+        Scanner {
             cursor: 0,
             current: None,
             input: input.clone(),
-        };
+        }
     }
 
     // if the scan reached the end of input
@@ -157,11 +160,19 @@ impl TokenScanner<'_> {
         self.current.clone().unwrap()
     }
 
-    // expect the current token to be one of the kinds
-    pub fn expect(&self, kinds: &[&str]) -> bool {
+    // expect the current token to be kind
+    pub fn expect(&self, kind: &str) -> bool {
         self.current
             .clone()
-            .map(|t| t.expect(kinds))
+            .map(|t| t.expect(kind))
+            .unwrap_or(false)
+    }
+
+    // expect the current token to be one of the kinds
+    pub fn expect_kinds(&self, kinds: &[&str]) -> bool {
+        self.current
+            .clone()
+            .map(|t| t.expect_kinds(kinds))
             .unwrap_or(false)
     }
 
@@ -174,6 +185,16 @@ impl TokenScanner<'_> {
 
     pub fn next_token(&mut self) -> Result<(), &'static str> {
         match self.find_next_token() {
+            Ok(Token {
+                kind: "comment_singleline",
+                value: _,
+                position: _,
+            }) => self.next_token(),
+            Ok(Token {
+                kind: "comment_multiline",
+                value: _,
+                position: _,
+            }) => self.next_token(),
             Ok(token) => {
                 self.current = Some(token.clone());
                 Ok(())
@@ -185,7 +206,7 @@ impl TokenScanner<'_> {
     fn find_next_token(&mut self) -> Result<Token, &'static str> {
         if self.is_eof() {
             return Ok(Token {
-                kind: "eof".to_owned(),
+                kind: "eof",
                 value: "".to_owned(),
                 position: self.cursor,
             });
@@ -196,7 +217,7 @@ impl TokenScanner<'_> {
                 if let Some(m) = reg.find(rest) {
                     assert_eq!(0, m.start());
                     let token = Token {
-                        kind: String::from(pattern.token),
+                        kind: pattern.token,
                         value: m.as_str().to_owned(),
                         position: self.cursor,
                     };
@@ -205,7 +226,7 @@ impl TokenScanner<'_> {
                 }
             } else if rest.starts_with(pattern.token) {
                 let token = Token {
-                    kind: String::from(pattern.token),
+                    kind: pattern.token,
                     value: String::from(pattern.token),
                     position: self.cursor,
                 };
@@ -219,12 +240,10 @@ impl TokenScanner<'_> {
     pub fn find_tokens(&mut self) -> Result<Vec<Token>, &'static str> {
         let mut token_vecs: Vec<Token> = Vec::new();
         while !self.is_eof() {
-            match self.next_token() {
-                Ok(_) => {
-                    token_vecs.push(self.unwrap_current_token());
-                }
-                Err(msg) => return Err(msg),
+            if let Err(err) = self.next_token() {
+                return Err(err);
             }
+            token_vecs.push(self.unwrap_current_token());
         }
         Ok(token_vecs)
     }
@@ -232,15 +251,10 @@ impl TokenScanner<'_> {
 
 pub fn parse_token() {
     let input = "1 world我 but(a+b) true";
-    let mut scanner = TokenScanner::new(input);
-    match scanner.find_tokens() {
-        Ok(tokens) => {
-            for token in tokens {
-                println!("{}", token);
-            }
-        }
-        Err(err) => {
-            panic!("{}", err);
+    let mut scanner = Scanner::new(input);
+    if let Ok(tokens) = scanner.find_tokens() {
+        for token in tokens {
+            println!("{}", token);
         }
     }
 }
