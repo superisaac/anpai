@@ -36,9 +36,10 @@ fn fmt_vec<T: fmt::Display>(f: &mut fmt::Formatter, vec: &Vec<T>) -> fmt::Result
 
 #[derive(Clone)]
 pub struct MapNodeItem {
-    pub name: String,
+    pub name: Box<Node>,
     pub value: Box<Node>,
 }
+
 impl fmt::Display for MapNodeItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}:{}", self.name, self.value)

@@ -376,15 +376,11 @@ impl Parser<'_> {
         Ok(Box::new(Map { items }))
     }
 
-    fn parse_map_key(&mut self) -> Result<String, String> {
+    fn parse_map_key(&mut self) -> NodeResult {
         if self.scanner.expect("name") {
-            return self.parse_name(None);
+            self.parse_var()
         } else if self.scanner.expect("string") {
-            let strvalue = match self.parse_string() {
-                Ok(node) => node.content(),
-                Err(err) => return Err(err),
-            };
-            return Ok(strvalue);
+            self.parse_string()
         } else {
             return Err(self.unexpect("name or string"));
         }
