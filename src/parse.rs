@@ -1,7 +1,8 @@
 use crate::ast::{FuncCallArg, Node, Node::*};
 use crate::token::Scanner;
+use std::fmt::format;
 
-type NodeResult = Result<Box<Node>, &'static str>;
+type NodeResult = Result<Box<Node>, String>;
 
 pub struct Parser<'a> {
     scanner: Box<Scanner<'a>>,
@@ -22,6 +23,14 @@ impl Parser<'_> {
         Parser {
             scanner: Box::new(scanner),
         }
+    }
+
+    fn unexpect(&self, expects: &str) -> String {
+        format!(
+            "unexpected token {}, expect {}",
+            self.scanner.unwrap_current_token().kind,
+            expects
+        )
     }
 
     pub fn parse(&mut self) -> NodeResult {
@@ -153,9 +162,12 @@ impl Parser<'_> {
             };
             if self.scanner.expect(",") {
                 goahead!(self);
-            } else if self.scanner.expect(")") {
-                return Err("unexpected, expect ',', ')' ");
+            } else if !self.scanner.expect(")") {
+                return Err(self.unexpect(") and ,"));
             }
+        }
+        if self.scanner.expect(")") {
+            goahead!(self);
         }
         Ok(Box::new(FuncCall {
             func_ref: func_expr,
@@ -163,12 +175,13 @@ impl Parser<'_> {
         }))
     }
 
-    fn parse_funcall_arg(&mut self) -> Result<FuncCallArg, &'static str> {
+    fn parse_funcall_arg(&mut self) -> Result<FuncCallArg, String> {
         let arg = match self.parse_expression() {
             Ok(node) => node,
             Err(err) => return Err(err),
         };
         if self.scanner.expect(":") {
+            goahead!(self);
             if let Var { name } = *arg {
                 goahead!(self); // skip ":"
                 let arg_value = match self.parse_expression() {
@@ -180,11 +193,11 @@ impl Parser<'_> {
                     arg: arg_value,
                 });
             } else {
-                return Err("unexpected var");
+                return Err(self.unexpect("'var'"));
             }
         } else {
             return Ok(FuncCallArg {
-                arg_name: "_".to_owned(),
+                arg_name: "".to_owned(),
                 arg,
             });
         }
@@ -195,10 +208,7 @@ impl Parser<'_> {
         match self.scanner.unwrap_current_token().kind {
             "number" => self.parse_number(),
             "name" => self.parse_var(),
-            _ => {
-                println!("unexpected => {}", self.scanner.unwrap_current_token());
-                return Err("unexpected token");
-            }
+            _ => return Err(self.unexpect("name, number")),
         }
     }
 

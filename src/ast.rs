@@ -9,7 +9,11 @@ pub struct FuncCallArg {
 
 impl fmt::Display for FuncCallArg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}:{}", self.arg_name, self.arg)
+        if self.arg_name == "" {
+            write!(f, "{}", self.arg)
+        } else {
+            write!(f, "{}:{}", self.arg_name, self.arg)
+        }
     }
 }
 

@@ -183,19 +183,15 @@ impl Scanner<'_> {
             .unwrap_or(false)
     }
 
-    pub fn next_token(&mut self) -> Result<(), &'static str> {
+    pub fn next_token(&mut self) -> Result<(), String> {
         match self.find_next_token() {
-            Ok(Token {
-                kind: "comment_singleline",
-                value: _,
-                position: _,
-            }) => self.next_token(),
-            Ok(Token {
-                kind: "comment_multiline",
-                value: _,
-                position: _,
-            }) => self.next_token(),
             Ok(token) => {
+                if token.kind == "comment_singleline"
+                    || token.kind == "comment_multiline"
+                    || token.kind == "space"
+                {
+                    return self.next_token();
+                }
                 self.current = Some(token.clone());
                 Ok(())
             }
@@ -203,7 +199,7 @@ impl Scanner<'_> {
         }
     }
 
-    fn find_next_token(&mut self) -> Result<Token, &'static str> {
+    fn find_next_token(&mut self) -> Result<Token, String> {
         if self.is_eof() {
             return Ok(Token {
                 kind: "eof",
@@ -234,10 +230,10 @@ impl Scanner<'_> {
                 return Ok(token);
             }
         }
-        Err("fail to find token")
+        Err("fail to find token".to_owned())
     }
 
-    pub fn find_tokens(&mut self) -> Result<Vec<Token>, &'static str> {
+    pub fn find_tokens(&mut self) -> Result<Vec<Token>, String> {
         let mut token_vecs: Vec<Token> = Vec::new();
         while !self.is_eof() {
             if let Err(err) = self.next_token() {
