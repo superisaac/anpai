@@ -244,7 +244,7 @@ impl Parser<'_> {
     fn parse_dot_rest(&mut self, left: Box<Node>) -> NodeResult {
         goahead!(self); // skip "."
 
-        let attr = match self.parse_name() {
+        let attr = match self.parse_name(None) {
             Ok(node) => node,
             Err(err) => return Err(err),
         };
@@ -261,19 +261,39 @@ impl Parser<'_> {
                 "true" | "false" => self.parse_bool(),
                 "null" => self.parse_null(),
                 "if" => self.parse_if_expression(),
+                "for" => self.parse_for_expression(),
+                "some" | "every" => self.parse_some_or_every_expression(),
                 _ => return Err(self.unexpect_keyword("true, false")),
             },
             _ => return Err(self.unexpect("name, number")),
         }
     }
 
-    fn parse_name(&mut self) -> Result<String, String> {
-        if self.scanner.expect("name") {
+    fn parse_name(&mut self, stop_keywords: Option<&[&str]>) -> Result<String, String> {
+        let mut names: Vec<String> = Vec::new();
+
+        while self.scanner.expect_kinds(&["name", "keyword"]) {
             let token = self.scanner.unwrap_current_token();
+            if let ("keyword", Some(stop_keywords)) = (token.kind, stop_keywords) {
+                let token_keyword = token.value.as_str();
+                if stop_keywords.into_iter().any(|x| *x == token_keyword) {
+                    break;
+                }
+            }
+            names.push(token.value);
             goahead!(self);
-            Ok(token.value)
+        }
+        if names.len() > 0 {
+            let mut name_buffer = String::new();
+            for (i, name) in names.iter().enumerate() {
+                if i > 0 {
+                    name_buffer.push_str(" ");
+                }
+                name_buffer.push_str(name.as_str());
+            }
+            Ok(name_buffer)
         } else {
-            Err(self.unexpect("name"))
+            Err(self.unexpect("names"))
         }
     }
 
@@ -344,4 +364,77 @@ impl Parser<'_> {
             else_branch,
         }))
     }
+
+    fn parse_for_expression(&mut self) -> NodeResult {
+        goahead!(self); // skip 'for'
+        let var_name = match self.parse_name(Some(&["in", "for"])) {
+            Ok(var_name) => var_name,
+            Err(err) => return Err(err),
+        };
+
+        if !self.scanner.expect_keyword("in") {
+            return Err(self.unexpect_keyword("in"));
+        }
+        goahead!(self); // skip 'in'
+
+        let list_expr = match self.parse_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+
+        if self.scanner.expect(",") {
+            // recursively call for parser
+            let return_expr = match self.parse_for_expression() {
+                Ok(node) => node,
+                Err(err) => return Err(err),
+            };
+            return Ok(Box::new(ForExpr { var_name, list_expr, return_expr }));
+        }
+        
+        if !self.scanner.expect_keyword("return") {
+            return Err(self.unexpect_keyword("return"));
+        }
+        goahead!(self); // skip 'return'
+
+        let return_expr = match self.parse_for_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+        Ok(Box::new(ForExpr { var_name, list_expr, return_expr }))
+    }
+
+    fn parse_some_or_every_expression(&mut self) -> NodeResult {
+        let cmd = self.scanner.unwrap_current_token().value;
+        goahead!(self); // skip 'for'
+        let var_name = match self.parse_name(Some(&["in"])) {
+            Ok(var_name) => var_name,
+            Err(err) => return Err(err),
+        };
+
+        if !self.scanner.expect_keyword("in") {
+            return Err(self.unexpect_keyword("in"));
+        }
+        goahead!(self); // skip 'in'
+
+        let list_expr = match self.parse_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+        
+        if !self.scanner.expect_keyword("satisfies") {
+            return Err(self.unexpect_keyword("satisfies"));
+        }
+        goahead!(self); // skip 'satisfies'
+
+        let filter_expr = match self.parse_for_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+        if cmd == "some".to_owned() {
+            Ok(Box::new(SomeExpr { var_name, list_expr, filter_expr }))
+        } else {
+            Ok(Box::new(EveryExpr { var_name, list_expr, filter_expr }))
+        }
+    }
+
 }
