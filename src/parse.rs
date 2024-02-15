@@ -263,6 +263,7 @@ impl Parser<'_> {
                 "if" => self.parse_if_expression(),
                 "for" => self.parse_for_expression(),
                 "some" | "every" => self.parse_some_or_every_expression(),
+                "function" => self.parse_function_defination(),
                 _ => return Err(self.unexpect_keyword("true, false")),
             },
             _ => return Err(self.unexpect("name, number")),
@@ -388,9 +389,13 @@ impl Parser<'_> {
                 Ok(node) => node,
                 Err(err) => return Err(err),
             };
-            return Ok(Box::new(ForExpr { var_name, list_expr, return_expr }));
+            return Ok(Box::new(ForExpr {
+                var_name,
+                list_expr,
+                return_expr,
+            }));
         }
-        
+
         if !self.scanner.expect_keyword("return") {
             return Err(self.unexpect_keyword("return"));
         }
@@ -400,7 +405,11 @@ impl Parser<'_> {
             Ok(node) => node,
             Err(err) => return Err(err),
         };
-        Ok(Box::new(ForExpr { var_name, list_expr, return_expr }))
+        Ok(Box::new(ForExpr {
+            var_name,
+            list_expr,
+            return_expr,
+        }))
     }
 
     fn parse_some_or_every_expression(&mut self) -> NodeResult {
@@ -420,7 +429,7 @@ impl Parser<'_> {
             Ok(node) => node,
             Err(err) => return Err(err),
         };
-        
+
         if !self.scanner.expect_keyword("satisfies") {
             return Err(self.unexpect_keyword("satisfies"));
         }
@@ -431,10 +440,53 @@ impl Parser<'_> {
             Err(err) => return Err(err),
         };
         if cmd == "some".to_owned() {
-            Ok(Box::new(SomeExpr { var_name, list_expr, filter_expr }))
+            Ok(Box::new(SomeExpr {
+                var_name,
+                list_expr,
+                filter_expr,
+            }))
         } else {
-            Ok(Box::new(EveryExpr { var_name, list_expr, filter_expr }))
+            Ok(Box::new(EveryExpr {
+                var_name,
+                list_expr,
+                filter_expr,
+            }))
         }
     }
 
+    fn parse_function_defination(&mut self) -> NodeResult {
+        goahead!(self); // skip 'function'
+        if !self.scanner.expect("(") {
+            return Err(self.unexpect("'('"));
+        }
+        goahead!(self); // skip '('
+
+        let mut arg_names = Vec::new();
+        while !self.scanner.expect(")") {
+            let arg_name = match self.parse_name(None) {
+                Ok(name) => name,
+                Err(err) => return Err(err),
+            };
+            arg_names.push(arg_name);
+            if self.scanner.expect(",") {
+                goahead!(self); // skip ','
+            } else if !self.scanner.expect(")") {
+                return Err(self.unexpect("')'"));
+            }
+        }
+        // TODO: check duplicate names
+        if !self.scanner.expect(")") {
+            return Err(self.unexpect("')'"));
+        }
+        goahead!(self); // skip ')'
+
+        let exp = match self.parse_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+        Ok(Box::new(FuncDef {
+            args: arg_names,
+            body: exp,
+        }))
+    }
 }
