@@ -33,6 +33,14 @@ impl Parser<'_> {
         )
     }
 
+    fn unexpect_keyword(&self, expects: &str) -> String {
+        format!(
+            "unexpected keyword {}, expect {}",
+            self.scanner.unwrap_current_token().value,
+            expects
+        )
+    }
+
     pub fn parse(&mut self) -> NodeResult {
         let mut exprs: Vec<Node> = Vec::new();
 
@@ -248,6 +256,11 @@ impl Parser<'_> {
         match self.scanner.unwrap_current_token().kind {
             "number" => self.parse_number(),
             "name" => self.parse_var(),
+            "string" => self.parse_string(),
+            "keyword" => match self.scanner.unwrap_current_token().value.as_str() {
+                "true" | "false" => self.parse_bool(),
+                _ => return Err(self.unexpect_keyword("true, false")),
+            },
             _ => return Err(self.unexpect("name, number")),
         }
     }
@@ -272,5 +285,21 @@ impl Parser<'_> {
         let token = self.scanner.unwrap_current_token();
         goahead!(self);
         Ok(Box::new(Number { value: token.value }))
+    }
+
+    fn parse_string(&mut self) -> NodeResult {
+        let token = self.scanner.unwrap_current_token();
+        goahead!(self);
+        Ok(Box::new(Str { value: token.value }))
+    }
+
+    fn parse_bool(&mut self) -> NodeResult {
+        let boolValue = match self.scanner.unwrap_current_token().value.as_str() {
+            "true" => true,
+            "false" => false,
+            _ => return Err(self.unexpect_keyword("true, false")),
+        };
+        goahead!(self);
+        Ok(Box::new(Bool { value: boolValue }))
     }
 }
