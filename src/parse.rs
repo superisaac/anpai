@@ -262,10 +262,11 @@ impl Parser<'_> {
             "string" => self.parse_string(),
             "{" => self.parse_map(),
             "(" => self.parse_bracket_or_range(),
+            "[" => self.parse_range_or_array(),
             "?" => {
                 return Ok(Box::new(Var {
                     name: "?".to_owned(),
-                }))
+                }));
             }
             "keyword" => match self.scanner.unwrap_current_token().value.as_str() {
                 "true" | "false" => self.parse_bool(),
@@ -388,7 +389,34 @@ impl Parser<'_> {
         }
     }
 
-    //
+    fn parse_range_given_start(&mut self, start_open: bool, start_exp: Box<Node>) -> NodeResult {
+        let end_exp = match self.parse_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+        if self.scanner.expect(")") {
+            // open end range
+            goahead!(self); //skip ')'
+            return Ok(Box::new(Range {
+                start_open,
+                start: start_exp,
+                end_open: true,
+                end: end_exp,
+            }));
+        } else if self.scanner.expect("]") {
+            // close end range
+            goahead!(self); //skip ')'
+            return Ok(Box::new(Range {
+                start_open,
+                start: start_exp,
+                end_open: false,
+                end: end_exp,
+            }));
+        } else {
+            return Err(self.unexpect("')', ']'"));
+        }
+    }
+
     fn parse_bracket_or_range(&mut self) -> NodeResult {
         goahead!(self); // skip '('
         let aexp = match self.parse_expression() {
@@ -398,37 +426,55 @@ impl Parser<'_> {
         if self.scanner.expect("..") {
             // is range
             goahead!(self); // skip '..'
-            let bexp = match self.parse_expression() {
-                Ok(node) => node,
-                Err(err) => return Err(err),
-            };
-            if self.scanner.expect(")") {
-                // open end range
-                goahead!(self); //skip ')'
-                return Ok(Box::new(Range {
-                    start_open: true,
-                    start: aexp,
-                    end_open: true,
-                    end: bexp,
-                }));
-            } else if self.scanner.expect("]") {
-                // close end range
-                goahead!(self); //skip ')'
-                return Ok(Box::new(Range {
-                    start_open: true,
-                    start: aexp,
-                    end_open: false,
-                    end: bexp,
-                }));
-            } else {
-                return Err(self.unexpect("')', ']'"));
-            }
+            return self.parse_range_given_start(true, aexp);
         } else if self.scanner.expect(")") {
             goahead!(self); // skip ')'
             return Ok(aexp);
         } else {
             return Err(self.unexpect("')', '..'"));
         }
+    }
+
+    fn parse_range_or_array(&mut self) -> NodeResult {
+        goahead!(self); // skip '['
+        if self.scanner.expect("]") {
+            goahead!(self); // skip ']'
+            return Ok(Box::new(Array {
+                elements: Vec::new(),
+            }));
+        }
+        let aexp = match self.parse_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+        if self.scanner.expect_kinds(&[",", "]"]) {
+            return self.parse_array_given_first(aexp);
+        }
+
+        if !self.scanner.expect("..") {
+            return Err(self.unexpect("'..'"));
+        }
+        goahead!(self); // skip '..'
+
+        return self.parse_range_given_start(false, aexp);
+    }
+
+    fn parse_array_given_first(&mut self, first_element: Box<Node>) -> NodeResult {
+        let mut elements = Vec::new();
+        elements.push(*first_element);
+        while self.scanner.expect(",") {
+            goahead!(self); // skip ','
+            let elem = match self.parse_expression() {
+                Ok(node) => node,
+                Err(err) => return Err(err),
+            };
+            elements.push(*elem);
+        }
+        if !self.scanner.expect("]") {
+            return Err(self.unexpect("']'"));
+        }
+        goahead!(self); // skip ']'
+        Ok(Box::new(Array { elements }))
     }
 
     // if expression
