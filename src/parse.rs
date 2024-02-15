@@ -86,9 +86,9 @@ impl Parser<'_> {
     fn parse_binop_kinds(
         &mut self,
         kinds: &[&str],
-        sub_func: fn(&mut Self) -> NodeResult,
+        sub_parse: fn(&mut Self) -> NodeResult,
     ) -> NodeResult {
-        let mut left = match sub_func(self) {
+        let mut left = match sub_parse(self) {
             Ok(node) => node,
             Err(err) => return Err(err),
         };
@@ -97,7 +97,7 @@ impl Parser<'_> {
             let op = self.scanner.unwrap_current_token().value;
             goahead!(self);
 
-            let right = match sub_func(self) {
+            let right = match sub_parse(self) {
                 Ok(node) => node,
                 Err(err) => return Err(err),
             };
@@ -144,13 +144,25 @@ impl Parser<'_> {
                         Err(err) => return Err(err),
                     };
                 }
+                "[" => {
+                    node = match self.parse_index_rest(node) {
+                        Ok(node) => node,
+                        Err(err) => return Err(err),
+                    };
+                }
+                "." => {
+                    node = match self.parse_dot_rest(node) {
+                        Ok(node) => node,
+                        Err(err) => return Err(err),
+                    };
+                }
                 _ => break,
             }
         }
         Ok(node)
     }
 
-    fn parse_funccall_rest(&mut self, func_expr: Box<Node>) -> NodeResult {
+    fn parse_funccall_rest(&mut self, func_node: Box<Node>) -> NodeResult {
         goahead!(self); // skip "("
         let mut args: Vec<FuncCallArg> = Vec::new();
         while !self.scanner.expect(")") {
@@ -170,7 +182,7 @@ impl Parser<'_> {
             goahead!(self);
         }
         Ok(Box::new(FuncCall {
-            func_ref: func_expr,
+            func_ref: func_node,
             args,
         }))
     }
@@ -203,12 +215,50 @@ impl Parser<'_> {
         }
     }
 
+    fn parse_index_rest(&mut self, left: Box<Node>) -> NodeResult {
+        goahead!(self); // skip "["
+
+        let at = match self.parse_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+        if !self.scanner.expect("]") {
+            return Err(self.unexpect("]"));
+        }
+        goahead!(self);
+        return Ok(Box::new(Binop {
+            op: "[]".to_owned(),
+            left,
+            right: at,
+        }));
+    }
+
+    fn parse_dot_rest(&mut self, left: Box<Node>) -> NodeResult {
+        goahead!(self); // skip "."
+
+        let attr = match self.parse_name() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+        return Ok(Box::new(DotOp { left, attr }));
+    }
+
     // single element
     fn parse_single_element(&mut self) -> NodeResult {
         match self.scanner.unwrap_current_token().kind {
             "number" => self.parse_number(),
             "name" => self.parse_var(),
             _ => return Err(self.unexpect("name, number")),
+        }
+    }
+
+    fn parse_name(&mut self) -> Result<String, String> {
+        if self.scanner.expect("name") {
+            let token = self.scanner.unwrap_current_token();
+            goahead!(self);
+            Ok(token.value)
+        } else {
+            Err(self.unexpect("name"))
         }
     }
 

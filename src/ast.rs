@@ -146,9 +146,9 @@ impl fmt::Display for Node {
         match self {
             Binop { op, left, right } => write!(f, "({} {} {})", op, left, right),
             DotOp { left, attr } => write!(f, "(. {} {})", left, attr),
-            FuncCall { func_ref, args } => write!(f, "(call {} ", func_ref)
+            FuncCall { func_ref, args } => write!(f, "(call {} [", func_ref)
                 .and_then(|_| fmt_vec(f, args))
-                .and_then(|_| write!(f, ")")),
+                .and_then(|_| write!(f, "])")),
             FuncDef { args, body } => write!(f, "(function [")
                 .and_then(|_| fmt_vec(f, args))
                 .and_then(|_| write!(f, "] {})", body)),
