@@ -31,6 +31,13 @@ impl Token {
         kinds.into_iter().any(|kind| self.expect(*kind))
     }
 
+    pub fn expect_keyword(&self, keyword: &str) -> bool {
+        if self.kind != "keyword" {
+            return false;
+        }
+        self.value.as_str() == keyword
+    }
+
     pub fn expect_keywords(&self, keywords: &[&str]) -> bool {
         if self.kind != "keyword" {
             return false;
@@ -173,6 +180,13 @@ impl Scanner<'_> {
         self.current
             .clone()
             .map(|t| t.expect_kinds(kinds))
+            .unwrap_or(false)
+    }
+
+    pub fn expect_keyword(&self, keyword: &str) -> bool {
+        self.current
+            .clone()
+            .map(|t| t.expect_keyword(keyword))
             .unwrap_or(false)
     }
 

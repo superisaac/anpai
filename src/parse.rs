@@ -260,6 +260,7 @@ impl Parser<'_> {
             "keyword" => match self.scanner.unwrap_current_token().value.as_str() {
                 "true" | "false" => self.parse_bool(),
                 "null" => self.parse_null(),
+                "if" => self.parse_if_expression(),
                 _ => return Err(self.unexpect_keyword("true, false")),
             },
             _ => return Err(self.unexpect("name, number")),
@@ -305,7 +306,42 @@ impl Parser<'_> {
     }
 
     fn parse_null(&mut self) -> NodeResult {
-        goahead!(self);
+        goahead!(self); // skip 'null'
         Ok(Box::new(Null))
+    }
+
+    // if expression
+    fn parse_if_expression(&mut self) -> NodeResult {
+        goahead!(self); // skip 'if'
+        let cond = match self.parse_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+
+        if !self.scanner.expect_keyword("then") {
+            return Err(self.unexpect_keyword("then"));
+        }
+        goahead!(self); // skip 'then'
+
+        let then_branch = match self.parse_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+
+        if !self.scanner.expect_keyword("else") {
+            return Err(self.unexpect_keyword("else"));
+        }
+        goahead!(self); // skip 'else'
+
+        let else_branch = match self.parse_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+
+        Ok(Box::new(IfExpr {
+            condition: cond,
+            then_branch,
+            else_branch,
+        }))
     }
 }
