@@ -259,6 +259,7 @@ impl Parser<'_> {
             "string" => self.parse_string(),
             "keyword" => match self.scanner.unwrap_current_token().value.as_str() {
                 "true" | "false" => self.parse_bool(),
+                "null" => self.parse_null(),
                 _ => return Err(self.unexpect_keyword("true, false")),
             },
             _ => return Err(self.unexpect("name, number")),
@@ -294,12 +295,17 @@ impl Parser<'_> {
     }
 
     fn parse_bool(&mut self) -> NodeResult {
-        let boolValue = match self.scanner.unwrap_current_token().value.as_str() {
+        let bool_value = match self.scanner.unwrap_current_token().value.as_str() {
             "true" => true,
             "false" => false,
             _ => return Err(self.unexpect_keyword("true, false")),
         };
         goahead!(self);
-        Ok(Box::new(Bool { value: boolValue }))
+        Ok(Box::new(Bool { value: bool_value }))
+    }
+
+    fn parse_null(&mut self) -> NodeResult {
+        goahead!(self);
+        Ok(Box::new(Null))
     }
 }
