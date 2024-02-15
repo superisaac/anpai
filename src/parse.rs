@@ -261,6 +261,7 @@ impl Parser<'_> {
             "name" => self.parse_var(),
             "string" => self.parse_string(),
             "{" => self.parse_map(),
+            "(" => self.parse_bracket_or_range(),
             "?" => {
                 return Ok(Box::new(Var {
                     name: "?".to_owned(),
@@ -340,6 +341,7 @@ impl Parser<'_> {
         Ok(Box::new(Null))
     }
 
+    // parse map/context defination
     fn parse_map(&mut self) -> NodeResult {
         goahead!(self); // skip '{'
         let mut items = Vec::new();
@@ -383,6 +385,49 @@ impl Parser<'_> {
             self.parse_string()
         } else {
             return Err(self.unexpect("name or string"));
+        }
+    }
+
+    //
+    fn parse_bracket_or_range(&mut self) -> NodeResult {
+        goahead!(self); // skip '('
+        let aexp = match self.parse_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+        if self.scanner.expect("..") {
+            // is range
+            goahead!(self); // skip '..'
+            let bexp = match self.parse_expression() {
+                Ok(node) => node,
+                Err(err) => return Err(err),
+            };
+            if self.scanner.expect(")") {
+                // open end range
+                goahead!(self); //skip ')'
+                return Ok(Box::new(Range {
+                    start_open: true,
+                    start: aexp,
+                    end_open: true,
+                    end: bexp,
+                }));
+            } else if self.scanner.expect("]") {
+                // close end range
+                goahead!(self); //skip ')'
+                return Ok(Box::new(Range {
+                    start_open: true,
+                    start: aexp,
+                    end_open: false,
+                    end: bexp,
+                }));
+            } else {
+                return Err(self.unexpect("')', ']'"));
+            }
+        } else if self.scanner.expect(")") {
+            goahead!(self); // skip ')'
+            return Ok(aexp);
+        } else {
+            return Err(self.unexpect("')', '..'"));
         }
     }
 
