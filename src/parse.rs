@@ -1,4 +1,7 @@
-use crate::ast::{FuncCallArg, Node, Node::*};
+use crate::ast::{
+    FuncCallArg, MapNodeItem,
+    Node::{self, *},
+};
 use crate::token::Scanner;
 use std::fmt::format;
 
@@ -257,6 +260,12 @@ impl Parser<'_> {
             "number" => self.parse_number(),
             "name" => self.parse_var(),
             "string" => self.parse_string(),
+            "{" => self.parse_map(),
+            "?" => {
+                return Ok(Box::new(Var {
+                    name: "?".to_owned(),
+                }))
+            }
             "keyword" => match self.scanner.unwrap_current_token().value.as_str() {
                 "true" | "false" => self.parse_bool(),
                 "null" => self.parse_null(),
@@ -329,6 +338,56 @@ impl Parser<'_> {
     fn parse_null(&mut self) -> NodeResult {
         goahead!(self); // skip 'null'
         Ok(Box::new(Null))
+    }
+
+    fn parse_map(&mut self) -> NodeResult {
+        goahead!(self); // skip '{'
+        let mut items = Vec::new();
+        while !self.scanner.expect("}") {
+            let mapkey = match self.parse_map_key() {
+                Ok(key) => key,
+                Err(err) => return Err(err),
+            };
+
+            if !self.scanner.expect(":") {
+                return Err(self.unexpect(":"));
+            }
+            goahead!(self); // skip ':'
+
+            let exp = match self.parse_expression() {
+                Ok(node) => node,
+                Err(err) => return Err(err),
+            };
+            items.push(MapNodeItem {
+                name: mapkey,
+                value: exp,
+            });
+
+            if self.scanner.expect(",") {
+                goahead!(self); // skip ','
+            } else if !self.scanner.expect("}") {
+                return Err(self.unexpect("'}', ','"));
+            }
+        }
+
+        if self.scanner.expect("}") {
+            goahead!(self); // skip '}'
+        }
+        Ok(Box::new(Map { items }))
+    }
+
+    fn parse_map_key(&mut self) -> Result<String, String> {
+        if self.scanner.expect("name") {
+            return self.parse_name(None);
+        } else if self.scanner.expect("string") {
+            let strvalue = match self.parse_string() {
+                Ok(node) => node.content(),
+                Err(err) => return Err(err),
+            };
+            return Ok(strvalue);
+        } else {
+            return Err(self.unexpect("name or string"));
+        }
     }
 
     // if expression

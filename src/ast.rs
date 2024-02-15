@@ -35,11 +35,11 @@ fn fmt_vec<T: fmt::Display>(f: &mut fmt::Formatter, vec: &Vec<T>) -> fmt::Result
 }
 
 #[derive(Clone)]
-pub struct MapItem {
+pub struct MapNodeItem {
     pub name: String,
     pub value: Box<Node>,
 }
-impl fmt::Display for MapItem {
+impl fmt::Display for MapNodeItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}:{}", self.name, self.value)
     }
@@ -98,7 +98,7 @@ pub enum Node {
     },
 
     Map {
-        items: Vec<MapItem>,
+        items: Vec<MapNodeItem>,
     },
 
     Range {
@@ -200,6 +200,15 @@ impl fmt::Display for Node {
             ),
             ExprList { elements } => fmt_vec(f, elements),
             MultiTests { elements } => fmt_vec(f, elements),
+        }
+    }
+}
+
+impl Node {
+    pub fn content(&self) -> String {
+        match self {
+            Str { value } => String::from(&value[1..(value.len() - 1)]),
+            _ => String::from(""),
         }
     }
 }
