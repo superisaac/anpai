@@ -1,5 +1,5 @@
 use crate::ast::Node::*;
-use std::fmt;
+use std::{env::consts::DLL_SUFFIX, fmt};
 
 #[derive(Clone)]
 pub struct FuncCallArg {
@@ -17,7 +17,16 @@ impl fmt::Display for FuncCallArg {
     }
 }
 
-fn fmt_vec<T: fmt::Display>(f: &mut fmt::Formatter, vec: &Vec<T>) -> fmt::Result {
+fn fmt_vec<T: fmt::Display>(
+    f: &mut fmt::Formatter,
+    vec: &Vec<T>,
+    prefix: &str,
+    suffix: &str,
+) -> fmt::Result {
+    match write!(f, "{}", prefix) {
+        Err(err) => return Err(err),
+        _ => (),
+    }
     for (i, arg) in vec.iter().enumerate() {
         if i > 0 {
             match write!(f, ", {}", arg) {
@@ -31,6 +40,10 @@ fn fmt_vec<T: fmt::Display>(f: &mut fmt::Formatter, vec: &Vec<T>) -> fmt::Result
             }
         }
     }
+    match write!(f, "{}", suffix) {
+        Err(err) => return Err(err),
+        _ => (),
+    }
     Ok(())
 }
 
@@ -42,7 +55,7 @@ pub struct MapNodeItem {
 
 impl fmt::Display for MapNodeItem {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}:{}", self.name, self.value)
+        write!(f, "{}: {}", self.name, self.value)
     }
 }
 
@@ -147,17 +160,17 @@ impl fmt::Display for Node {
         match self {
             Binop { op, left, right } => write!(f, "({} {} {})", op, left, right),
             DotOp { left, attr } => write!(f, "(. {} {})", left, attr),
-            FuncCall { func_ref, args } => write!(f, "(call {} [", func_ref)
-                .and_then(|_| fmt_vec(f, args))
-                .and_then(|_| write!(f, "])")),
-            FuncDef { args, body } => write!(f, "(function [")
-                .and_then(|_| fmt_vec(f, args))
-                .and_then(|_| write!(f, "] {})", body)),
+            FuncCall { func_ref, args } => write!(f, "(call {} ", func_ref)
+                .and_then(|_| fmt_vec(f, args, "[", "]"))
+                .and_then(|_| write!(f, "{}", ")")),
+            FuncDef { args, body } => write!(f, "(function ")
+                .and_then(|_| fmt_vec(f, args, "[", "]"))
+                .and_then(|_| write!(f, " {})", body)),
             Var { name } => write!(f, "{}", name),
             Number { value } => write!(f, "{}", value),
             Bool { value } => write!(f, "{}", value),
             Null => write!(f, "null"),
-            Str { value } => write!(f, "\"{}\"", value),
+            Str { value } => write!(f, "{}", value),
             Temporal { value } => write!(f, "{}", value),
             Range {
                 start_open,
@@ -169,8 +182,8 @@ impl fmt::Display for Node {
                 let end_bra = if *end_open { ")" } else { "]" };
                 write!(f, "{}{}..{}{}", start_bra, start, end, end_bra)
             }
-            Array { elements } => fmt_vec(f, elements),
-            Map { items } => fmt_vec(f, items),
+            Array { elements } => fmt_vec(f, elements, "[", "]"),
+            Map { items } => fmt_vec(f, items, "{", "}"),
             IfExpr {
                 condition,
                 then_branch,
@@ -199,8 +212,8 @@ impl fmt::Display for Node {
                 "(every {} in {} satisfies {})",
                 var_name, list_expr, filter_expr
             ),
-            ExprList { elements } => fmt_vec(f, elements),
-            MultiTests { elements } => fmt_vec(f, elements),
+            ExprList { elements } => fmt_vec(f, elements, "", ""),
+            MultiTests { elements } => fmt_vec(f, elements, "", ""),
         }
     }
 }

@@ -636,3 +636,22 @@ impl Parser<'_> {
         }))
     }
 }
+
+pub fn parse(input: &str) -> NodeResult {
+    let mut parser = Parser::new(input);
+    parser.parse()
+}
+
+#[test]
+fn test_parse_result() {
+    let testcases = [
+        ("a + b(4, 9)", "(+ a (call b [4, 9]))"),
+        ("if a > 6 then true else false", "(if (> a 6) true false)"),
+        ("{a: 1, \"bbb\": [2, 1]}", r#"{a: 1, "bbb": [2, 1]}"#),
+    ];
+
+    for (input, output) in testcases {
+        let node = parse(input).unwrap();
+        assert_eq!(format!("{}", *node), output);
+    }
+}
