@@ -1,5 +1,5 @@
 use crate::ast::Node::*;
-use std::{env::consts::DLL_SUFFIX, fmt};
+use std::fmt;
 
 #[derive(Clone)]
 pub struct FuncCallArg {
