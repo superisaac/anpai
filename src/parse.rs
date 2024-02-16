@@ -52,7 +52,7 @@ impl Parser<'_> {
             if self.scanner.expect(";") {
                 goahead!(self);
             } else {
-                match self.parse_expression() {
+                match self.parse_multi_tests() {
                     Ok(node) => exprs.push(*node),
                     Err(err) => return Err(err),
                 }
@@ -62,6 +62,53 @@ impl Parser<'_> {
             return Ok(Box::new(exprs[0].clone()));
         } else {
             return Ok(Box::new(ExprList { elements: exprs }));
+        }
+    }
+
+    fn parse_multi_tests_element(&mut self) -> NodeResult {
+        if self
+            .scanner
+            .expect_kinds(&[">", ">=", "<", "<=", "!=", "="])
+        {
+            // unary tests
+            let op = self.scanner.unwrap_current_token().kind;
+            goahead!(self); // skip op
+            let right = match self.parse_expression() {
+                Ok(node) => node,
+                Err(err) => return Err(err),
+            };
+            let left = Box::new(Var {
+                name: "?".to_owned(),
+            });
+            Ok(Box::new(Binop {
+                op: op.to_string(),
+                left,
+                right,
+            }))
+        } else {
+            self.parse_expression()
+        }
+    }
+
+    fn parse_multi_tests(&mut self) -> NodeResult {
+        let elem = match self.parse_multi_tests_element() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+        if self.scanner.expect(",") {
+            let mut elements = Vec::new();
+            elements.push(*elem);
+            while self.scanner.expect(",") {
+                goahead!(self); // skip ','
+                let elem1 = match self.parse_multi_tests_element() {
+                    Ok(node) => node,
+                    Err(err) => return Err(err),
+                };
+                elements.push(*elem1);
+            }
+            Ok(Box::new(MultiTests { elements }))
+        } else {
+            Ok(elem)
         }
     }
 
@@ -650,11 +697,12 @@ pub fn parse(input: &str) -> NodeResult {
 }
 
 #[test]
-fn test_parse_result() {
+fn test_parse_results() {
     let testcases = [
         ("a + b(4, 9)", "(+ a (call b [4, 9]))"),
         ("if a > 6 then true else false", "(if (> a 6) true false)"),
         ("{a: 1, \"bbb\": [2, 1]}", r#"{a: 1, "bbb": [2, 1]}"#),
+        ("> 2, <= 1, a>8", "(> ? 2), (<= ? 1), (> a 8)"),
     ];
 
     for (input, output) in testcases {
