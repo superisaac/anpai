@@ -116,7 +116,7 @@ lazy_static! {
 
         patterns.push(TokenPattern {
             token: "number",
-            reg: Some(Regex::new(r#"^\-?[0-9]+(\.[0-9]+)?\b"#).unwrap()),
+            reg: Some(Regex::new(r#"^[0-9]+(\.[0-9]+)?\b"#).unwrap()),
         });
     
         patterns.push(TokenPattern{

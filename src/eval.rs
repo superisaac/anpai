@@ -1,5 +1,4 @@
-use std::backtrace;
-use std::collections::btree_set::Intersection;
+use std::ops::Neg;
 
 use crate::ast::{Node, Node::*};
 use crate::value::{Value, Value::*, DECIMAL_PLACES};
@@ -30,6 +29,7 @@ impl Intepreter {
 
     pub fn eval(&mut self, node: Box<Node>) -> ValueResult {
         match *node {
+            Neg(value) => self.eval_neg(value),
             Number { value } => Ok(Box::new(NumberV(string_to_dec(value)))),
             Binop { op, left, right } => self.eval_binop(op, left, right),
             _ => Err(format!("eval not supported {}", *node)),
@@ -49,6 +49,18 @@ impl Intepreter {
             "+" => self.eval_binop_add(left_value, right_value),
             "-" => self.eval_binop_sub(left_value, right_value),
             _ => return Err(format!("unknown op {}", op))
+        }
+    }
+
+    fn eval_neg(&mut self, node: Box<Node>) -> ValueResult {
+        let pv =  match self.eval(node) {
+            Ok(v) => v,
+            Err(err) => return Err(err),
+        };
+        match *pv {
+            IntV(v) => Ok(Box::new(IntV(-v))),
+            NumberV(v) => Ok(Box::new(NumberV(v.neg()))),
+            _ => return Err(format!("cannot neg {}", pv.data_type())),
         }
     }
 
@@ -117,7 +129,7 @@ impl Intepreter {
 fn test_parse_and_eval() {
     let testcases = [
         ("2+ 4", "6"),
-        ("2-5", "-3"),
+        ("2 -5", "-3"),
     ];
 
     for (input, output) in testcases {

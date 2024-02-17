@@ -107,6 +107,8 @@ pub enum Node {
         value: String,
     },
 
+    Neg(Box<Node>),
+
     Array {
         elements: Vec<Node>,
     },
@@ -172,6 +174,7 @@ impl fmt::Display for Node {
             Null => write!(f, "null"),
             Str { value } => write!(f, "{}", value),
             Temporal { value } => write!(f, "{}", value),
+            Neg(value) => write!(f, "(- {})", value),
             Range {
                 start_open,
                 start,

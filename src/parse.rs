@@ -308,6 +308,7 @@ impl Parser<'_> {
             "name" => self.parse_var(),
             "string" => self.parse_string(),
             "temporal" => self.parse_temporal(),
+            "-" => self.parse_neg(),
             "{" => self.parse_map(),
             "(" => self.parse_bracket_or_range(),
             "[" => self.parse_range_or_array(),
@@ -367,6 +368,15 @@ impl Parser<'_> {
         let token = self.scanner.unwrap_current_token();
         goahead!(self);
         Ok(Box::new(Number { value: token.value }))
+    }
+    
+    fn parse_neg(&mut self) -> NodeResult {
+        goahead!(self); // skip '-'
+        let value = match self.parse_expression() {
+            Ok(node) => node,
+            Err(err) => return Err(err),
+        };
+        Ok(Box::new(Neg(value)))
     }
 
     fn parse_string(&mut self) -> NodeResult {
