@@ -102,10 +102,6 @@ lazy_static! {
             token: "string",
             reg: Some(Regex::new(r#"^"(\\.|[^"])*""#).unwrap()),
         });
-        patterns.push(TokenPattern {
-            token: "number",
-            reg: Some(Regex::new(r#"^\-?[0-9]+(\.[0-9]+)?\b"#).unwrap()),
-        });
 
         let ops = [
             "?", "..", ".", ",", ";", ">=", ">", "=", "<=", "<", "!=", "!", "(", ")", "[", "]",
@@ -118,6 +114,11 @@ lazy_static! {
             });
         }
 
+        patterns.push(TokenPattern {
+            token: "number",
+            reg: Some(Regex::new(r#"^\-?[0-9]+(\.[0-9]+)?\b"#).unwrap()),
+        });
+    
         patterns.push(TokenPattern{
             token: "name",
             //reg: Some(Regex::new(r"^[a-zA-Z_][a-zA-Z_0-9]*( +[a-zA-Z_][a-zA-Z_0-9]*)*").unwrap()),

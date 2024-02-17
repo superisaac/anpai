@@ -3,6 +3,10 @@ mod token;
 
 mod parse;
 
+mod value;
+
+mod eval;
+
 fn main() {
     token::parse_token();
     let n = ast::Node::Number {
