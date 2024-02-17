@@ -35,8 +35,8 @@ impl Intepreter {
         }
     }
     fn eval_number(&mut self, number_str: String) -> ValueResult {
-        if let Ok(v) = number_str.parse::<i64>() {
-            Ok(Box::new(IntV(v)))
+        if let Ok(v) = number_str.parse::<i32>() {
+            Ok(Box::new(IntV(v as i64)))
         } else {
             match Decimal::from_str_exact(number_str.as_str()) {
                 Ok(d) => Ok(Box::new(NumberV(d))),
@@ -44,6 +44,19 @@ impl Intepreter {
             }
         }
     }
+    fn eval_neg(&mut self, node: Box<Node>) -> ValueResult {
+        let pv = match self.eval(node) {
+            Ok(v) => v,
+            Err(err) => return Err(err),
+        };
+        match *pv {
+            IntV(v) => Ok(Box::new(IntV(-v))),
+            NumberV(v) => Ok(Box::new(NumberV(v.neg()))),
+            _ => return Err(format!("cannot neg {}", pv.data_type())),
+        }
+    }
+
+    // binary ops
     fn eval_binop(&mut self, op: String, left: Box<Node>, right: Box<Node>) -> ValueResult {
         let left_value = match self.eval(left) {
             Ok(v) => v,
@@ -56,19 +69,9 @@ impl Intepreter {
         match op.as_str() {
             "+" => self.eval_binop_add(left_value, right_value),
             "-" => self.eval_binop_sub(left_value, right_value),
+            "*" => self.eval_binop_mul(left_value, right_value),
+            "/" => self.eval_binop_div(left_value, right_value),
             _ => return Err(format!("unknown op {}", op)),
-        }
-    }
-
-    fn eval_neg(&mut self, node: Box<Node>) -> ValueResult {
-        let pv = match self.eval(node) {
-            Ok(v) => v,
-            Err(err) => return Err(err),
-        };
-        match *pv {
-            IntV(v) => Ok(Box::new(IntV(-v))),
-            NumberV(v) => Ok(Box::new(NumberV(v.neg()))),
-            _ => return Err(format!("cannot neg {}", pv.data_type())),
         }
     }
 
@@ -122,6 +125,46 @@ impl Intepreter {
             },
             _ => Err(format!(
                 "canot sub {} and {}",
+                left_value.data_type(),
+                right_value.data_type()
+            )),
+        }
+    }
+
+    fn eval_binop_mul(&mut self, left_value: Box<Value>, right_value: Box<Value>) -> ValueResult {
+        match *left_value {
+            IntV(a) => match *right_value {
+                IntV(b) => Ok(Box::new(NumberV(int_to_dec(a) * int_to_dec(b)))),
+                NumberV(b) => Ok(Box::new(NumberV(int_to_dec(a) * b))),
+                _ => Err(format!("canot * int and {}", right_value.data_type())),
+            },
+            NumberV(a) => match *right_value {
+                IntV(b) => Ok(Box::new(NumberV(a * int_to_dec(b)))),
+                NumberV(b) => Ok(Box::new(NumberV(a * b))),
+                _ => Err(format!("canot * int and {}", right_value.data_type())),
+            },
+            _ => Err(format!(
+                "canot * {} and {}",
+                left_value.data_type(),
+                right_value.data_type()
+            )),
+        }
+    }
+
+    fn eval_binop_div(&mut self, left_value: Box<Value>, right_value: Box<Value>) -> ValueResult {
+        match *left_value {
+            IntV(a) => match *right_value {
+                IntV(b) => Ok(Box::new(NumberV(int_to_dec(a) / int_to_dec(b)))),
+                NumberV(b) => Ok(Box::new(NumberV(int_to_dec(a) / b))),
+                _ => Err(format!("canot div int and {}", right_value.data_type())),
+            },
+            NumberV(a) => match *right_value {
+                IntV(b) => Ok(Box::new(NumberV(a / int_to_dec(b)))),
+                NumberV(b) => Ok(Box::new(NumberV(a / b))),
+                _ => Err(format!("canot div int and {}", right_value.data_type())),
+            },
+            _ => Err(format!(
+                "canot * {} and {}",
                 left_value.data_type(),
                 right_value.data_type()
             )),
