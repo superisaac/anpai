@@ -89,9 +89,7 @@ pub enum Node {
         name: String,
     },
 
-    Number {
-        value: String,
-    },
+    Number(String),
 
     Bool {
         value: bool,
@@ -169,7 +167,7 @@ impl fmt::Display for Node {
                 .and_then(|_| fmt_vec(f, args, "[", "]"))
                 .and_then(|_| write!(f, " {})", body)),
             Var { name } => write!(f, "{}", name),
-            Number { value } => write!(f, "{}", value),
+            Number(value) => write!(f, "{}", value),
             Bool { value } => write!(f, "{}", value),
             Null => write!(f, "null"),
             Str { value } => write!(f, "{}", value),

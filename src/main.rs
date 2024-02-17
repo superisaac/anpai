@@ -1,3 +1,5 @@
+#![feature(assert_matches)]
+
 mod ast;
 mod token;
 
@@ -9,9 +11,7 @@ mod eval;
 
 fn main() {
     token::parse_token();
-    let n = ast::Node::Number {
-        value: "123".to_owned(),
-    };
+    let n = ast::Node::Number("123".to_owned());
     println!("{}", n);
 
     let mut p = parse::Parser::new("a(5,9)");

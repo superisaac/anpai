@@ -367,9 +367,9 @@ impl Parser<'_> {
     fn parse_number(&mut self) -> NodeResult {
         let token = self.scanner.unwrap_current_token();
         goahead!(self);
-        Ok(Box::new(Number { value: token.value }))
+        Ok(Box::new(Number(token.value)))
     }
-    
+
     fn parse_neg(&mut self) -> NodeResult {
         goahead!(self); // skip '-'
         let value = match self.parse_expression() {
