@@ -2,7 +2,10 @@ use core::assert_matches::assert_matches;
 use std::ops::Neg;
 
 use crate::ast::{Node, Node::*};
-use crate::value::{Value, Value::*};
+use crate::value::{
+    self,
+    Value::{self, *},
+};
 // use std::fmt::format;
 use crate::parse::parse;
 use rust_decimal::prelude::*;
@@ -19,9 +22,11 @@ impl Intepreter {
 
     pub fn eval(&mut self, node: Box<Node>) -> ValueResult {
         match *node {
-            Neg(value) => self.eval_neg(value),
+            Null => Ok(Box::new(NullV)),
+            Bool(value) => Ok(Box::new(BoolV(value))),
             Number(value) => self.eval_number(value),
             Str(value) => self.eval_string(value),
+            Neg(value) => self.eval_neg(value),
             Binop { op, left, right } => self.eval_binop(op, left, right),
             _ => Err(format!("eval not supported {}", *node)),
         }

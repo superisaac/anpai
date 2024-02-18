@@ -397,7 +397,7 @@ impl Parser<'_> {
             _ => return Err(self.unexpect_keyword("true, false")),
         };
         goahead!(self);
-        Ok(Box::new(Bool { value: bool_value }))
+        Ok(Box::new(Bool(bool_value)))
     }
 
     fn parse_null(&mut self) -> NodeResult {
