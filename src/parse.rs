@@ -3,7 +3,6 @@ use crate::ast::{
     Node::{self, *},
 };
 use crate::token::Scanner;
-use std::fmt::format;
 
 type NodeResult = Result<Box<Node>, String>;
 

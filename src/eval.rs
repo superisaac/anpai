@@ -2,21 +2,12 @@ use core::assert_matches::assert_matches;
 use std::ops::Neg;
 
 use crate::ast::{Node, Node::*};
-use crate::value::{Value, Value::*, DECIMAL_PLACES};
+use crate::value::{Value, Value::*};
 // use std::fmt::format;
 use crate::parse::parse;
 use rust_decimal::prelude::*;
-use rust_decimal_macros::dec;
 
 pub type ValueResult = Result<Box<Value>, String>;
-
-fn int_to_dec(iv: i64) -> Decimal {
-    Decimal::from_str_exact(iv.to_string().as_str()).unwrap()
-}
-
-fn string_to_dec(sv: String) -> Decimal {
-    Decimal::from_str_exact(sv.as_str()).unwrap()
-}
 
 #[derive(Clone)]
 pub struct Intepreter {}
@@ -63,9 +54,9 @@ impl Intepreter {
         };
         match op.as_str() {
             "+" => self.eval_binop_add(left_value, right_value),
-            "-" => self.eval_binop_sub(left_value, right_value),
-            "*" => self.eval_binop_mul(left_value, right_value),
-            "/" => self.eval_binop_div(left_value, right_value),
+            "-" => self.eval_binop_number(op, left_value, right_value, |a, b| a - b),
+            "*" => self.eval_binop_number(op, left_value, right_value, |a, b| a * b),
+            "/" => self.eval_binop_number(op, left_value, right_value, |a, b| a / b),
             _ => return Err(format!("unknown op {}", op)),
         }
     }
@@ -91,42 +82,25 @@ impl Intepreter {
         }
     }
 
-    fn eval_binop_sub(&mut self, left_value: Box<Value>, right_value: Box<Value>) -> ValueResult {
+    fn eval_binop_number(
+        &mut self,
+        op: String,
+        left_value: Box<Value>,
+        right_value: Box<Value>,
+        opfunc: fn(a: Decimal, b: Decimal) -> Decimal,
+    ) -> ValueResult {
         match *left_value {
             NumberV(a) => match *right_value {
-                NumberV(b) => Ok(Box::new(NumberV(a - b))),
-                _ => Err(format!("canot sub int and {}", right_value.data_type())),
+                NumberV(b) => Ok(Box::new(NumberV(opfunc(a, b)))),
+                _ => Err(format!(
+                    "canot {} number and {}",
+                    op,
+                    right_value.data_type()
+                )),
             },
             _ => Err(format!(
-                "canot sub {} and {}",
-                left_value.data_type(),
-                right_value.data_type()
-            )),
-        }
-    }
-
-    fn eval_binop_mul(&mut self, left_value: Box<Value>, right_value: Box<Value>) -> ValueResult {
-        match *left_value {
-            NumberV(a) => match *right_value {
-                NumberV(b) => Ok(Box::new(NumberV(a * b))),
-                _ => Err(format!("canot * int and {}", right_value.data_type())),
-            },
-            _ => Err(format!(
-                "canot * {} and {}",
-                left_value.data_type(),
-                right_value.data_type()
-            )),
-        }
-    }
-
-    fn eval_binop_div(&mut self, left_value: Box<Value>, right_value: Box<Value>) -> ValueResult {
-        match *left_value {
-            NumberV(a) => match *right_value {
-                NumberV(b) => Ok(Box::new(NumberV(a / b))),
-                _ => Err(format!("canot div int and {}", right_value.data_type())),
-            },
-            _ => Err(format!(
-                "canot div {} and {}",
+                "canot {} {} and {}",
+                op,
                 left_value.data_type(),
                 right_value.data_type()
             )),
@@ -142,7 +116,7 @@ fn test_number_parse() {
 
 #[test]
 fn test_parse_and_eval() {
-    let testcases = [("2+ 4", "6"), ("2 -5", "-3")];
+    let testcases = [("2+ 4", "6"), ("2 -5", "-3"), ("4 * 9 + 1", "37")];
 
     for (input, output) in testcases {
         let node = parse(input).unwrap();
