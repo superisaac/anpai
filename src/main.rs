@@ -1,5 +1,7 @@
 #![feature(assert_matches)]
 
+use crate::eval::Intepreter;
+
 mod ast;
 mod token;
 
@@ -18,5 +20,11 @@ fn main() {
     match p.parse() {
         Ok(node) => println!("P: {}", node),
         Err(err) => panic!("{}", err),
+    }
+
+    let mut intp = Intepreter::new();
+    if let Ok(n) = parse::parse("5 + 8") {
+        let r = intp.eval(n).unwrap();
+        println!("{}", r);
     }
 }
