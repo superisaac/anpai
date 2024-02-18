@@ -381,7 +381,7 @@ impl Parser<'_> {
     fn parse_string(&mut self) -> NodeResult {
         let token = self.scanner.unwrap_current_token();
         goahead!(self);
-        Ok(Box::new(Str { value: token.value }))
+        Ok(Box::new(Str(token.value)))
     }
 
     fn parse_temporal(&mut self) -> NodeResult {

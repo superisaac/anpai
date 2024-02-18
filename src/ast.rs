@@ -97,9 +97,7 @@ pub enum Node {
 
     Null,
 
-    Str {
-        value: String,
-    },
+    Str(String),
 
     Temporal {
         value: String,
@@ -170,7 +168,7 @@ impl fmt::Display for Node {
             Number(value) => write!(f, "{}", value),
             Bool { value } => write!(f, "{}", value),
             Null => write!(f, "null"),
-            Str { value } => write!(f, "{}", value),
+            Str(value) => write!(f, "{}", value),
             Temporal { value } => write!(f, "{}", value),
             Neg(value) => write!(f, "(- {})", value),
             Range {
@@ -215,15 +213,6 @@ impl fmt::Display for Node {
             ),
             ExprList { elements } => fmt_vec(f, elements, "", ""),
             MultiTests { elements } => fmt_vec(f, elements, "", ""),
-        }
-    }
-}
-
-impl Node {
-    pub fn content(&self) -> String {
-        match self {
-            Str { value } => String::from(&value[1..(value.len() - 1)]),
-            _ => String::from(""),
         }
     }
 }

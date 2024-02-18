@@ -21,10 +21,17 @@ impl Intepreter {
         match *node {
             Neg(value) => self.eval_neg(value),
             Number(value) => self.eval_number(value),
+            Str(value) => self.eval_string(value),
             Binop { op, left, right } => self.eval_binop(op, left, right),
             _ => Err(format!("eval not supported {}", *node)),
         }
     }
+
+    fn eval_string(&mut self, value: String) -> ValueResult {
+        let content = String::from(&value[1..(value.len() - 1)]);
+        Ok(Box::new(StrV(content)))
+    }
+
     fn eval_number(&mut self, number_str: String) -> ValueResult {
         match Decimal::from_str_exact(number_str.as_str()) {
             Ok(d) => Ok(Box::new(NumberV(d))),
@@ -116,7 +123,12 @@ fn test_number_parse() {
 
 #[test]
 fn test_parse_and_eval() {
-    let testcases = [("2+ 4", "6"), ("2 -5", "-3"), ("4 * 9 + 1", "37")];
+    let testcases = [
+        ("2+ 4", "6"),
+        ("2 -5", "-3"),
+        ("4 * 9 + 1", "37"),
+        (r#""abc" + "def""#, r#""abcdef""#),
+    ];
 
     for (input, output) in testcases {
         let node = parse(input).unwrap();

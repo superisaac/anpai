@@ -158,9 +158,9 @@ impl Scanner<'_> {
     }
 
     // returns current token
-    pub fn current_token(&self) -> Option<Token> {
-        self.current.clone()
-    }
+    // pub fn current_token(&self) -> Option<Token> {
+    //     self.current.clone()
+    // }
 
     // returns the current token unwrapped
     pub fn unwrap_current_token(&self) -> Token {
