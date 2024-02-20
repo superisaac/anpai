@@ -110,11 +110,13 @@ impl Intepreter {
         }
     }
 
+    #[inline(always)]
     fn eval_string(&mut self, value: String) -> ValueResult {
         let content = String::from(&value[1..(value.len() - 1)]);
         Ok(StrV(content))
     }
 
+    #[inline(always)]
     fn eval_number(&mut self, number_str: String) -> ValueResult {
         match Decimal::from_str_exact(number_str.as_str()) {
             Ok(d) => Ok(NumberV(d)),
@@ -122,6 +124,7 @@ impl Intepreter {
         }
     }
 
+    #[inline(always)]
     fn eval_array(&mut self, elements: &Vec<Node>) -> ValueResult {
         let mut results = Vec::new();
         for elem in elements.iter() {
@@ -134,6 +137,7 @@ impl Intepreter {
         Ok(ArrayV(results))
     }
 
+    #[inline(always)]
     fn eval_map(&mut self, items: &Vec<MapNodeItem>) -> ValueResult {
         let mut value_map: BTreeMap<String, Value> = BTreeMap::new();
         for item in items.iter() {
@@ -150,6 +154,7 @@ impl Intepreter {
         Ok(MapV(value_map))
     }
 
+    #[inline(always)]
     fn eval_neg(&mut self, node: Box<Node>) -> ValueResult {
         let pv = match self.eval(node) {
             Ok(v) => v,
@@ -162,6 +167,7 @@ impl Intepreter {
     }
 
     // binary ops
+    #[inline(always)]
     fn eval_binop(&mut self, op: String, left: Box<Node>, right: Box<Node>) -> ValueResult {
         let left_value = match self.eval(left) {
             Ok(v) => v,
