@@ -6,24 +6,24 @@ use crate::parse::parse;
 use crate::value::Value::{self, *};
 use rust_decimal::prelude::*;
 
-pub type ValueResult = Result<Box<Value>, String>;
+pub type ValueResult = Result<Value, String>;
 
 #[derive(Clone)]
 pub struct Intepreter {}
 
 macro_rules! ev_binop_add {
     ($self:ident, $op:expr, $left_value:expr, $right_value:expr) => {
-        match *$left_value {
-            NumberV(a) => match *$right_value {
-                NumberV(b) => Ok(Box::new(NumberV(a + b))),
+        match $left_value {
+            NumberV(a) => match $right_value {
+                NumberV(b) => Ok(NumberV(a + b)),
                 _ => Err(format!(
                     "canot {} number and {}",
                     $op,
                     $right_value.data_type()
                 )),
             },
-            StrV(a) => match *$right_value {
-                StrV(b) => Ok(Box::new(StrV(a + &b))),
+            StrV(a) => match $right_value {
+                StrV(b) => Ok(StrV(a + &b)),
                 _ => Err(format!(
                     "canot {} string and {}",
                     $op,
@@ -42,9 +42,9 @@ macro_rules! ev_binop_add {
 
 macro_rules! ev_binop_number {
     ($self:ident, $op:expr, $left_value:expr, $right_value:expr, $numop:tt) => {
-        match *$left_value {
-            NumberV(numa) => match *$right_value {
-                NumberV(numb) => Ok(Box::new(NumberV(numa $numop numb))),
+        match $left_value {
+            NumberV(numa) => match $right_value {
+                NumberV(numb) => Ok(NumberV(numa $numop numb)),
                 _ => Err(format!(
                     "canot {} number and {}",
                     $op,
@@ -63,17 +63,17 @@ macro_rules! ev_binop_number {
 
 macro_rules! ev_binop_comparation {
     ($self:ident, $op:expr, $left_value:expr, $right_value:expr, $nativeop:tt) => {
-        match *$left_value {
-            NumberV(a) => match *$right_value {
-                NumberV(b) => Ok(Box::new(BoolV(a $nativeop b))),
+        match $left_value {
+            NumberV(a) => match $right_value {
+                NumberV(b) => Ok(BoolV(a $nativeop b)),
                 _ => Err(format!(
                     "canot {} number and {}",
                     $op,
                     $right_value.data_type()
                 )),
             },
-            StrV(a) => match *$right_value {
-                StrV(b) => Ok(Box::new(BoolV(a $nativeop b))),
+            StrV(a) => match $right_value {
+                StrV(b) => Ok(BoolV(a $nativeop b)),
                 _ => Err(format!(
                     "canot {} string and {}",
                     $op,
@@ -97,8 +97,8 @@ impl Intepreter {
 
     pub fn eval(&mut self, node: Box<Node>) -> ValueResult {
         match *node {
-            Null => Ok(Box::new(NullV)),
-            Bool(value) => Ok(Box::new(BoolV(value))),
+            Null => Ok(NullV),
+            Bool(value) => Ok(BoolV(value)),
             Number(value) => self.eval_number(value),
             Str(value) => self.eval_string(value),
             Neg(value) => self.eval_neg(value),
@@ -109,12 +109,12 @@ impl Intepreter {
 
     fn eval_string(&mut self, value: String) -> ValueResult {
         let content = String::from(&value[1..(value.len() - 1)]);
-        Ok(Box::new(StrV(content)))
+        Ok(StrV(content))
     }
 
     fn eval_number(&mut self, number_str: String) -> ValueResult {
         match Decimal::from_str_exact(number_str.as_str()) {
-            Ok(d) => Ok(Box::new(NumberV(d))),
+            Ok(d) => Ok(NumberV(d)),
             Err(err) => return Err(err.to_string()),
         }
     }
@@ -123,8 +123,8 @@ impl Intepreter {
             Ok(v) => v,
             Err(err) => return Err(err),
         };
-        match *pv {
-            NumberV(v) => Ok(Box::new(NumberV(v.neg()))),
+        match pv {
+            NumberV(v) => Ok(NumberV(v.neg())),
             _ => return Err(format!("cannot neg {}", pv.data_type())),
         }
     }
