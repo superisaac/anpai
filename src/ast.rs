@@ -102,9 +102,7 @@ pub enum Node {
 
     Neg(Box<Node>),
 
-    Array {
-        elements: Vec<Node>,
-    },
+    Array(Vec<Node>),
 
     Map {
         items: Vec<MapNodeItem>,
@@ -179,7 +177,7 @@ impl fmt::Display for Node {
                 let end_bra = if *end_open { ")" } else { "]" };
                 write!(f, "{}{}..{}{}", start_bra, start, end, end_bra)
             }
-            Array { elements } => fmt_vec(f, elements, "[", "]"),
+            Array(elements) => fmt_vec(f, elements, "[", "]"),
             Map { items } => fmt_vec(f, items, "{", "}"),
             IfExpr {
                 condition,

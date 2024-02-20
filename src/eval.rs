@@ -103,6 +103,7 @@ impl Intepreter {
             Str(value) => self.eval_string(value),
             Neg(value) => self.eval_neg(value),
             Binop { op, left, right } => self.eval_binop(op, left, right),
+            Array(elements) => self.eval_array(&elements),
             _ => Err(format!("eval not supported {}", *node)),
         }
     }
@@ -118,6 +119,19 @@ impl Intepreter {
             Err(err) => return Err(err.to_string()),
         }
     }
+
+    fn eval_array(&mut self, elements: &Vec<Node>) -> ValueResult {
+        let mut results = Vec::new();
+        for elem in elements.iter() {
+            let res = match self.eval(Box::new(elem.clone())) {
+                Ok(v) => v,
+                Err(err) => return Err(err),
+            };
+            results.push(res);
+        }
+        Ok(ArrayV(results))
+    }
+
     fn eval_neg(&mut self, node: Box<Node>) -> ValueResult {
         let pv = match self.eval(node) {
             Ok(v) => v,
@@ -173,6 +187,7 @@ fn test_parse_and_eval() {
         (r#""abc" + "def""#, r#""abcdef""#),
         ("2 < 3 - 1", "false"),
         (r#""abc" <= "abd""#, "true"),
+        ("[2, 8,false,true]", "[2, 8, false, true]"),
     ];
 
     for (input, output) in testcases {

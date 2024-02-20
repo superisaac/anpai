@@ -499,9 +499,7 @@ impl Parser<'_> {
         goahead!(self); // skip '['
         if self.scanner.expect("]") {
             goahead!(self); // skip ']'
-            return Ok(Box::new(Array {
-                elements: Vec::new(),
-            }));
+            return Ok(Box::new(Array(Vec::new())));
         }
         let aexp = match self.parse_expression() {
             Ok(node) => node,
@@ -534,7 +532,7 @@ impl Parser<'_> {
             return Err(self.unexpect("']'"));
         }
         goahead!(self); // skip ']'
-        Ok(Box::new(Array { elements }))
+        Ok(Box::new(Array(elements)))
     }
 
     // if expression

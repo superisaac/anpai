@@ -7,6 +7,37 @@ pub enum Value {
     BoolV(bool),
     NumberV(Decimal),
     StrV(String),
+    ArrayV(Vec<Value>),
+}
+
+fn fmt_vec<T: fmt::Display>(
+    f: &mut fmt::Formatter,
+    vec: &Vec<T>,
+    prefix: &str,
+    suffix: &str,
+) -> fmt::Result {
+    match write!(f, "{}", prefix) {
+        Err(err) => return Err(err),
+        _ => (),
+    }
+    for (i, v) in vec.iter().enumerate() {
+        if i > 0 {
+            match write!(f, ", {}", v) {
+                Err(err) => return Err(err),
+                _ => (),
+            }
+        } else {
+            match write!(f, "{}", v) {
+                Err(err) => return Err(err),
+                _ => (),
+            }
+        }
+    }
+    match write!(f, "{}", suffix) {
+        Err(err) => return Err(err),
+        _ => (),
+    }
+    Ok(())
 }
 
 impl fmt::Display for Value {
@@ -16,6 +47,7 @@ impl fmt::Display for Value {
             Value::BoolV(v) => write!(f, "{}", v),
             Value::NumberV(v) => write!(f, "{}", v.normalize()),
             Value::StrV(v) => write!(f, "\"{}\"", v),
+            Value::ArrayV(arr) => fmt_vec(f, arr, "[", "]"),
         }
     }
 }
@@ -27,6 +59,7 @@ impl Value {
             Value::BoolV(_) => "boolean".to_owned(),
             Value::NumberV(_) => "number".to_owned(),
             Value::StrV(_) => "string".to_owned(),
+            Value::ArrayV(_) => "array".to_owned(),
         }
     }
 }
