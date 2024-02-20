@@ -76,9 +76,7 @@ impl Parser<'_> {
                 Ok(node) => node,
                 Err(err) => return Err(err),
             };
-            let left = Box::new(Var {
-                name: "?".to_owned(),
-            });
+            let left = Box::new(Var("?".to_owned()));
             Ok(Box::new(Binop {
                 op: op.to_string(),
                 left,
@@ -251,7 +249,7 @@ impl Parser<'_> {
         };
         if self.scanner.expect(":") {
             goahead!(self);
-            if let Var { name } = *arg {
+            if let Var(name) = *arg {
                 goahead!(self); // skip ":"
                 let arg_value = match self.parse_expression() {
                     Ok(node) => node,
@@ -311,11 +309,7 @@ impl Parser<'_> {
             "{" => self.parse_map(),
             "(" => self.parse_bracket_or_range(),
             "[" => self.parse_range_or_array(),
-            "?" => {
-                return Ok(Box::new(Var {
-                    name: "?".to_owned(),
-                }));
-            }
+            "?" => Ok(Box::new(Var("?".to_owned()))),
             "keyword" => match self.scanner.unwrap_current_token().value.as_str() {
                 "true" | "false" => self.parse_bool(),
                 "null" => self.parse_null(),
@@ -360,7 +354,7 @@ impl Parser<'_> {
     fn parse_var(&mut self) -> NodeResult {
         let token = self.scanner.unwrap_current_token();
         goahead!(self);
-        Ok(Box::new(Var { name: token.value }))
+        Ok(Box::new(Var(token.value)))
     }
 
     fn parse_number(&mut self) -> NodeResult {
@@ -387,7 +381,7 @@ impl Parser<'_> {
     fn parse_temporal(&mut self) -> NodeResult {
         let token = self.scanner.unwrap_current_token();
         goahead!(self);
-        Ok(Box::new(Temporal { value: token.value }))
+        Ok(Box::new(Temporal(token.value)))
     }
 
     fn parse_bool(&mut self) -> NodeResult {
@@ -444,7 +438,10 @@ impl Parser<'_> {
 
     fn parse_map_key(&mut self) -> NodeResult {
         if self.scanner.expect("name") {
-            self.parse_var()
+            match self.parse_name(None) {
+                Ok(name) => Ok(Box::new(Ident(name))),
+                Err(err) => Err(err),
+            }
         } else if self.scanner.expect("string") {
             self.parse_string()
         } else {

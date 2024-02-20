@@ -85,9 +85,10 @@ pub enum Node {
     },
 
     // variable
-    Var {
-        name: String,
-    },
+    Var(String),
+
+    // ident, used in map key
+    Ident(String),
 
     Number(String),
 
@@ -97,9 +98,7 @@ pub enum Node {
 
     Str(String),
 
-    Temporal {
-        value: String,
-    },
+    Temporal(String),
 
     Neg(Box<Node>),
 
@@ -162,12 +161,13 @@ impl fmt::Display for Node {
             FuncDef { args, body } => write!(f, "(function ")
                 .and_then(|_| fmt_vec(f, args, "[", "]"))
                 .and_then(|_| write!(f, " {})", body)),
-            Var { name } => write!(f, "{}", name),
+            Var(name) => write!(f, "{}", name),
+            Ident(name) => write!(f, "{}", name),
             Number(value) => write!(f, "{}", value),
             Bool(value) => write!(f, "{}", value),
             Null => write!(f, "null"),
             Str(value) => write!(f, "{}", value),
-            Temporal { value } => write!(f, "{}", value),
+            Temporal(value) => write!(f, "{}", value),
             Neg(value) => write!(f, "(- {})", value),
             Range {
                 start_open,
