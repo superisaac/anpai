@@ -2,12 +2,8 @@ use core::assert_matches::assert_matches;
 use std::ops::Neg;
 
 use crate::ast::{Node, Node::*};
-use crate::value::{
-    self,
-    Value::{self, *},
-};
-// use std::fmt::format;
 use crate::parse::parse;
+use crate::value::Value::{self, *};
 use rust_decimal::prelude::*;
 
 pub type ValueResult = Result<Box<Value>, String>;
@@ -69,29 +65,60 @@ impl Intepreter {
             "-" => self.eval_binop_number(op, left_value, right_value, |a, b| a - b),
             "*" => self.eval_binop_number(op, left_value, right_value, |a, b| a * b),
             "/" => self.eval_binop_number(op, left_value, right_value, |a, b| a / b),
+            ">" => self.eval_binop_number_string(
+                op,
+                left_value,
+                right_value,
+                |a, b| Ok(Box::new(BoolV(a > b))),
+                |a, b| Ok(Box::new(BoolV(a > b))),
+            ),
+            ">=" => self.eval_binop_number_string(
+                op,
+                left_value,
+                right_value,
+                |a, b| Ok(Box::new(BoolV(a >= b))),
+                |a, b| Ok(Box::new(BoolV(a >= b))),
+            ),
+            "<" => self.eval_binop_number_string(
+                op,
+                left_value,
+                right_value,
+                |a, b| Ok(Box::new(BoolV(a < b))),
+                |a, b| Ok(Box::new(BoolV(a < b))),
+            ),
+            "<=" => self.eval_binop_number_string(
+                op,
+                left_value,
+                right_value,
+                |a, b| Ok(Box::new(BoolV(a <= b))),
+                |a, b| Ok(Box::new(BoolV(a <= b))),
+            ),
+            "!="|"<>" => self.eval_binop_number_string(
+                op,
+                left_value,
+                right_value,
+                |a, b| Ok(Box::new(BoolV(a != b))),
+                |a, b| Ok(Box::new(BoolV(a != b))),
+            ),
+            "=" => self.eval_binop_number_string(
+                op,
+                left_value,
+                right_value,
+                |a, b| Ok(Box::new(BoolV(a == b))),
+                |a, b| Ok(Box::new(BoolV(a == b))),
+            ),
             _ => return Err(format!("unknown op {}", op)),
         }
     }
 
     fn eval_binop_add(&mut self, left_value: Box<Value>, right_value: Box<Value>) -> ValueResult {
-        match *left_value {
-            NumberV(a) => match *right_value {
-                NumberV(b) => Ok(Box::new(NumberV(a + b))),
-                _ => Err(format!("canot add number and {}", right_value.data_type())),
-            },
-            StrV(a) => {
-                if let StrV(b) = *right_value {
-                    Ok(Box::new(StrV(a + &b)))
-                } else {
-                    Err(format!("canot add string and {}", right_value.data_type()))
-                }
-            }
-            _ => Err(format!(
-                "canot add {} and {}",
-                left_value.data_type(),
-                right_value.data_type()
-            )),
-        }
+        self.eval_binop_number_string(
+            "+".to_owned(),
+            left_value,
+            right_value,
+            |a, b| Ok(Box::new(NumberV(a + b))),
+            |a, b| Ok(Box::new(StrV(a + &b))),
+        )
     }
 
     fn eval_binop_number(
@@ -106,6 +133,40 @@ impl Intepreter {
                 NumberV(b) => Ok(Box::new(NumberV(opfunc(a, b)))),
                 _ => Err(format!(
                     "canot {} number and {}",
+                    op,
+                    right_value.data_type()
+                )),
+            },
+            _ => Err(format!(
+                "canot {} {} and {}",
+                op,
+                left_value.data_type(),
+                right_value.data_type()
+            )),
+        }
+    }
+
+    fn eval_binop_number_string(
+        &mut self,
+        op: String,
+        left_value: Box<Value>,
+        right_value: Box<Value>,
+        number_func: fn(a: Decimal, b: Decimal) -> ValueResult,
+        string_func: fn(a: String, b: String) -> ValueResult,
+    ) -> ValueResult {
+        match *left_value {
+            NumberV(a) => match *right_value {
+                NumberV(b) => number_func(a, b),
+                _ => Err(format!(
+                    "canot {} number and {}",
+                    op,
+                    right_value.data_type()
+                )),
+            },
+            StrV(a) => match *right_value {
+                StrV(b) => string_func(a, b),
+                _ => Err(format!(
+                    "canot {} string and {}",
                     op,
                     right_value.data_type()
                 )),
@@ -133,6 +194,8 @@ fn test_parse_and_eval() {
         ("2 -5", "-3"),
         ("4 * 9 + 1", "37"),
         (r#""abc" + "def""#, r#""abcdef""#),
+        ("2 < 3 - 1", "false"),
+        (r#""abc" <= "abd""#, "true"),
     ];
 
     for (input, output) in testcases {
