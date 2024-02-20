@@ -1,8 +1,8 @@
-use core::assert_matches::assert_matches;
+use std::collections::BTreeMap;
 use std::ops::Neg;
 
-use crate::ast::{Node, Node::*};
-use crate::parse::parse;
+use crate::ast::{MapNodeItem, Node, Node::*};
+
 use crate::value::Value::{self, *};
 use rust_decimal::prelude::*;
 
@@ -101,9 +101,11 @@ impl Intepreter {
             Bool(value) => Ok(BoolV(value)),
             Number(value) => self.eval_number(value),
             Str(value) => self.eval_string(value),
+            Ident(value) => Ok(StrV(value)),
             Neg(value) => self.eval_neg(value),
             Binop { op, left, right } => self.eval_binop(op, left, right),
             Array(elements) => self.eval_array(&elements),
+            Map(items) => self.eval_map(&items),
             _ => Err(format!("eval not supported {}", *node)),
         }
     }
@@ -130,6 +132,22 @@ impl Intepreter {
             results.push(res);
         }
         Ok(ArrayV(results))
+    }
+
+    fn eval_map(&mut self, items: &Vec<MapNodeItem>) -> ValueResult {
+        let mut value_map: BTreeMap<String, Value> = BTreeMap::new();
+        for item in items.iter() {
+            let key = match self.eval(item.name.clone()) {
+                Ok(k) => k.to_string(),
+                Err(err) => return Err(err),
+            };
+            let val = match self.eval(item.value.clone()) {
+                Ok(v) => v,
+                Err(err) => return Err(err),
+            };
+            value_map.insert(key, val);
+        }
+        Ok(MapV(value_map))
     }
 
     fn eval_neg(&mut self, node: Box<Node>) -> ValueResult {
@@ -169,31 +187,37 @@ impl Intepreter {
     }
 }
 
-#[test]
-fn test_number_parse() {
-    let a = "2342404820143892034890".parse::<i64>();
-    assert_matches!(a, Err(_));
-}
+#[cfg(test)]
+mod test {
+    use crate::parse::parse;
+    use core::assert_matches::assert_matches;
+    #[test]
+    fn test_number_parse() {
+        let a = "2342404820143892034890".parse::<i64>();
+        assert_matches!(a, Err(_));
+    }
 
-#[test]
-fn test_parse_and_eval() {
-    let testcases = [
-        ("2+ 4", "6"),
-        ("2 -5", "-3"),
-        ("8 - 2", "6"),
-        ("7 / 2", "3.5"), // decimal display outputs normalized string
-        ("10 / 3", "3.3333333333333333333333333333"), // precision is up to 28
-        ("4 * 9 + 1", "37"),
-        (r#""abc" + "def""#, r#""abcdef""#),
-        ("2 < 3 - 1", "false"),
-        (r#""abc" <= "abd""#, "true"),
-        ("[2, 8,false,true]", "[2, 8, false, true]"),
-    ];
+    #[test]
+    fn test_parse_and_eval() {
+        let testcases = [
+            ("2+ 4", "6"),
+            ("2 -5", "-3"),
+            ("8 - 2", "6"),
+            ("7 / 2", "3.5"), // decimal display outputs normalized string
+            ("10 / 3", "3.3333333333333333333333333333"), // precision is up to 28
+            ("4 * 9 + 1", "37"),
+            (r#""abc" + "def""#, r#""abcdef""#),
+            ("2 < 3 - 1", "false"),
+            (r#""abc" <= "abd""#, "true"),
+            ("[2, 8,false,true]", "[2, 8, false, true]"),
+            ("{a: 1, b: 2}", r#"{"a":1, "b":2}"#),
+        ];
 
-    for (input, output) in testcases {
-        let node = parse(input).unwrap();
-        let mut intp = Intepreter::new();
-        let v = intp.eval(node).unwrap();
-        assert_eq!(v.to_string(), output);
+        for (input, output) in testcases {
+            let node = parse(input).unwrap();
+            let mut intp = super::Intepreter::new();
+            let v = intp.eval(node).unwrap();
+            assert_eq!(v.to_string(), output);
+        }
     }
 }

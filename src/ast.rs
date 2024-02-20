@@ -104,9 +104,7 @@ pub enum Node {
 
     Array(Vec<Node>),
 
-    Map {
-        items: Vec<MapNodeItem>,
-    },
+    Map(Vec<MapNodeItem>),
 
     Range {
         start_open: bool,
@@ -178,7 +176,7 @@ impl fmt::Display for Node {
                 write!(f, "{}{}..{}{}", start_bra, start, end, end_bra)
             }
             Array(elements) => fmt_vec(f, elements, "[", "]"),
-            Map { items } => fmt_vec(f, items, "{", "}"),
+            Map(items) => fmt_vec(f, items, "{", "}"),
             IfExpr {
                 condition,
                 then_branch,

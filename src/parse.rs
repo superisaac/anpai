@@ -433,7 +433,7 @@ impl Parser<'_> {
         if self.scanner.expect("}") {
             goahead!(self); // skip '}'
         }
-        Ok(Box::new(Map { items }))
+        Ok(Box::new(Map(items)))
     }
 
     fn parse_map_key(&mut self) -> NodeResult {

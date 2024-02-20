@@ -1,4 +1,5 @@
 use rust_decimal::prelude::*;
+use std::collections::BTreeMap;
 use std::fmt;
 
 #[derive(Clone)]
@@ -8,6 +9,7 @@ pub enum Value {
     NumberV(Decimal),
     StrV(String),
     ArrayV(Vec<Value>),
+    MapV(BTreeMap<String, Value>),
 }
 
 fn fmt_vec<T: fmt::Display>(
@@ -40,6 +42,36 @@ fn fmt_vec<T: fmt::Display>(
     Ok(())
 }
 
+fn fmt_map<T: fmt::Display>(
+    f: &mut fmt::Formatter,
+    map: &BTreeMap<String, T>,
+    prefix: &str,
+    suffix: &str,
+) -> fmt::Result {
+    match write!(f, "{}", prefix) {
+        Err(err) => return Err(err),
+        _ => (),
+    }
+    for (i, (k, v)) in map.iter().enumerate() {
+        if i > 0 {
+            match write!(f, ", {}:{}", k, v) {
+                Err(err) => return Err(err),
+                _ => (),
+            }
+        } else {
+            match write!(f, "{}:{}", k, v) {
+                Err(err) => return Err(err),
+                _ => (),
+            }
+        }
+    }
+    match write!(f, "{}", suffix) {
+        Err(err) => return Err(err),
+        _ => (),
+    }
+    Ok(())
+}
+
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -48,6 +80,7 @@ impl fmt::Display for Value {
             Value::NumberV(v) => write!(f, "{}", v.normalize()),
             Value::StrV(v) => write!(f, "\"{}\"", v),
             Value::ArrayV(arr) => fmt_vec(f, arr, "[", "]"),
+            Value::MapV(map) => fmt_map(f, map, "{", "}"),
         }
     }
 }
@@ -60,6 +93,7 @@ impl Value {
             Value::NumberV(_) => "number".to_owned(),
             Value::StrV(_) => "string".to_owned(),
             Value::ArrayV(_) => "array".to_owned(),
+            Value::MapV(_) => "map".to_owned(),
         }
     }
 }
