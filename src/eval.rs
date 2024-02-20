@@ -167,7 +167,8 @@ fn test_parse_and_eval() {
         ("2+ 4", "6"),
         ("2 -5", "-3"),
         ("8 - 2", "6"),
-        ("7 / 2", "3.50"),
+        ("7 / 2", "3.5"), // decimal display outputs normalized string
+        ("10 / 3", "3.3333333333333333333333333333"), // precision is up to 28
         ("4 * 9 + 1", "37"),
         (r#""abc" + "def""#, r#""abcdef""#),
         ("2 < 3 - 1", "false"),

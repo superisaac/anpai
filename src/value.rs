@@ -14,7 +14,7 @@ impl fmt::Display for Value {
         match self {
             Value::NullV => write!(f, "{}", "null"),
             Value::BoolV(v) => write!(f, "{}", v),
-            Value::NumberV(v) => write!(f, "{}", v),
+            Value::NumberV(v) => write!(f, "{}", v.normalize()),
             Value::StrV(v) => write!(f, "\"{}\"", v),
         }
     }
@@ -29,4 +29,13 @@ impl Value {
             Value::StrV(_) => "string".to_owned(),
         }
     }
+}
+
+#[test]
+fn test_decimal_trailing_zeros() {
+    let a = Decimal::from_str_exact("7").unwrap();
+    let b = Decimal::from_str_exact("2").unwrap();
+    let d = a / b;
+    assert_eq!(d.to_string(), "3.50");
+    assert_eq!(d.normalize().to_string(), "3.5");
 }
