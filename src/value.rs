@@ -1,4 +1,6 @@
 use rust_decimal::prelude::*;
+use std::cell::Ref;
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -8,13 +10,13 @@ pub enum Value {
     BoolV(bool),
     NumberV(Decimal),
     StrV(String),
-    ArrayV(Vec<Value>),
-    MapV(BTreeMap<String, Value>),
+    ArrayV(RefCell<Vec<Value>>),
+    MapV(RefCell<BTreeMap<String, Value>>),
 }
 
 fn fmt_vec<T: fmt::Display>(
     f: &mut fmt::Formatter,
-    vec: &Vec<T>,
+    vec: Ref<'_, Vec<T>>,
     prefix: &str,
     suffix: &str,
 ) -> fmt::Result {
@@ -44,7 +46,7 @@ fn fmt_vec<T: fmt::Display>(
 
 fn fmt_map<T: fmt::Display>(
     f: &mut fmt::Formatter,
-    map: &BTreeMap<String, T>,
+    map: Ref<'_, BTreeMap<String, T>>,
     prefix: &str,
     suffix: &str,
 ) -> fmt::Result {
@@ -79,8 +81,8 @@ impl fmt::Display for Value {
             Value::BoolV(v) => write!(f, "{}", v),
             Value::NumberV(v) => write!(f, "{}", v.normalize()),
             Value::StrV(v) => write!(f, "\"{}\"", v),
-            Value::ArrayV(arr) => fmt_vec(f, arr, "[", "]"),
-            Value::MapV(map) => fmt_map(f, map, "{", "}"),
+            Value::ArrayV(arr) => fmt_vec(f, arr.borrow(), "[", "]"),
+            Value::MapV(map) => fmt_map(f, map.borrow(), "{", "}"),
         }
     }
 }

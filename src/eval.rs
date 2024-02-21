@@ -1,4 +1,6 @@
-use std::collections::BTreeMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
+use std::hash::Hash;
 use std::ops::Neg;
 
 use crate::ast::{MapNodeItem, Node, Node::*};
@@ -8,8 +10,13 @@ use rust_decimal::prelude::*;
 
 pub type ValueResult = Result<Value, String>;
 
-#[derive(Clone)]
-pub struct Intepreter {}
+pub struct ScopeFrame {
+    vars: HashMap<String, Value>,
+}
+
+pub struct Intepreter {
+    scopes: Vec<RefCell<ScopeFrame>>,
+}
 
 macro_rules! ev_binop_add {
     ($self:ident, $op:expr, $left_value:expr, $right_value:expr) => {
@@ -92,7 +99,41 @@ macro_rules! ev_binop_comparation {
 
 impl Intepreter {
     pub fn new() -> Intepreter {
-        Intepreter {}
+        Intepreter { scopes: Vec::new() }
+    }
+
+    fn add_frame(&mut self) {
+        let frame = ScopeFrame {
+            vars: HashMap::new(),
+        };
+        self.scopes.push(RefCell::new(frame));
+    }
+
+    fn resolve(&self, name: String) -> Option<Value> {
+        for scope in self.scopes.iter().rev() {
+            if let Some(v) = scope.borrow().vars.get(&name) {
+                return Some(v.clone());
+            }
+        }
+        None
+    }
+
+    fn set_var(&mut self, name: String, value: Value) {
+        if self.scopes.len() == 0 {
+            self.add_frame();
+        }
+        self.scopes
+            .last()
+            .unwrap()
+            .borrow_mut()
+            .vars
+            .insert(name, value);
+    }
+
+    fn set_var_at(&mut self, name: String, value: Value, index: usize) {
+        if let Some(frame) = self.scopes.get_mut(index) {
+            frame.borrow_mut().vars.insert(name, value);
+        }
     }
 
     pub fn eval(&mut self, node: Box<Node>) -> ValueResult {
@@ -102,6 +143,7 @@ impl Intepreter {
             Number(value) => self.eval_number(value),
             Str(value) => self.eval_string(value),
             Ident(value) => Ok(StrV(value)),
+            Var(name) => self.eval_var(name),
             Neg(value) => self.eval_neg(value),
             Binop { op, left, right } => self.eval_binop(op, left, right),
             Array(elements) => self.eval_array(&elements),
@@ -123,6 +165,14 @@ impl Intepreter {
             Err(err) => return Err(err.to_string()),
         }
     }
+    #[inline(always)]
+    fn eval_var(&mut self, name: String) -> ValueResult {
+        if let Some(value) = self.resolve(name) {
+            Ok(value)
+        } else {
+            Err("var not found".to_owned())
+        }
+    }
 
     #[inline(always)]
     fn eval_array(&mut self, elements: &Vec<Box<Node>>) -> ValueResult {
@@ -134,7 +184,7 @@ impl Intepreter {
             };
             results.push(res);
         }
-        Ok(ArrayV(results))
+        Ok(ArrayV(RefCell::new(results)))
     }
 
     #[inline(always)]
@@ -151,7 +201,7 @@ impl Intepreter {
             };
             value_map.insert(key, val);
         }
-        Ok(MapV(value_map))
+        Ok(MapV(RefCell::new(value_map)))
     }
 
     #[inline(always)]
@@ -197,6 +247,8 @@ impl Intepreter {
 mod test {
     use crate::parse::parse;
     use core::assert_matches::assert_matches;
+    use rust_decimal_macros::dec;
+
     #[test]
     fn test_number_parse() {
         let a = "2342404820143892034890".parse::<i64>();
@@ -204,7 +256,7 @@ mod test {
     }
 
     #[test]
-    fn test_parse_and_eval() {
+    fn test_parse_stateless() {
         let testcases = [
             ("2+ 4", "6"),
             ("2 -5", "-3"),
@@ -225,5 +277,15 @@ mod test {
             let v = intp.eval(node).unwrap();
             assert_eq!(v.to_string(), output);
         }
+    }
+
+    #[test]
+    fn test_def_vars() {
+        let mut intp = super::Intepreter::new();
+        intp.set_var("v1".to_owned(), super::NumberV(dec!(2.3)));
+        let input = "v1 + 3";
+        let node = parse(input).unwrap();
+        let v = intp.eval(node).unwrap();
+        assert_eq!(v.to_string(), "5.3");
     }
 }
