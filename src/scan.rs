@@ -1,7 +1,31 @@
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::error::Error;
 use std::fmt;
 
+// Scan error
+#[derive(Debug)]
+pub struct ScanError {
+    pub message: String,
+}
+
+impl fmt::Display for ScanError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "ScanError: {}", self.message)
+    }
+}
+
+impl Error for ScanError {}
+
+impl ScanError {
+    pub fn from_str(message: &str) -> ScanError {
+        ScanError {
+            message: message.to_owned(),
+        }
+    }
+}
+
+// Token struct
 #[derive(Clone)]
 pub struct Token {
     pub kind: &'static str,
@@ -197,7 +221,7 @@ impl Scanner<'_> {
             .unwrap_or(false)
     }
 
-    pub fn next_token(&mut self) -> Result<(), String> {
+    pub fn next_token(&mut self) -> Result<(), ScanError> {
         match self.find_next_token() {
             Ok(token) => {
                 if token.kind == "comment_singleline"
@@ -213,7 +237,7 @@ impl Scanner<'_> {
         }
     }
 
-    fn find_next_token(&mut self) -> Result<Token, String> {
+    fn find_next_token(&mut self) -> Result<Token, ScanError> {
         if self.is_eof() {
             return Ok(Token {
                 kind: "eof",
@@ -244,10 +268,10 @@ impl Scanner<'_> {
                 return Ok(token);
             }
         }
-        Err("fail to find token".to_owned())
+        Err(ScanError::from_str("fail to find token"))
     }
 
-    pub fn find_tokens(&mut self) -> Result<Vec<Token>, String> {
+    pub fn find_tokens(&mut self) -> Result<Vec<Token>, ScanError> {
         let mut token_vecs: Vec<Token> = Vec::new();
         while !self.is_eof() {
             if let Err(err) = self.next_token() {

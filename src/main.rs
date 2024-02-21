@@ -3,7 +3,7 @@
 use crate::eval::Intepreter;
 
 mod ast;
-mod token;
+mod scan;
 
 mod parse;
 
@@ -12,7 +12,7 @@ mod value;
 mod eval;
 
 fn main() {
-    token::parse_token();
+    scan::parse_token();
     let n = ast::Node::Number("123".to_owned());
     println!("{}", n);
 

@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
-use std::hash::Hash;
 use std::ops::Neg;
 
 use crate::ast::{MapNodeItem, Node, Node::*};

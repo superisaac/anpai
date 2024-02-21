@@ -2,9 +2,48 @@ use crate::ast::{
     FuncCallArg, MapNodeItem,
     Node::{self, *},
 };
-use crate::token::Scanner;
+use crate::scan::{ScanError, Scanner};
+use std::error::Error;
+use std::fmt;
 
-type NodeResult = Result<Box<Node>, String>;
+// Parse error
+#[derive(Debug)]
+pub enum ParseError {
+    Parse(String),
+    Scan(ScanError),
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ParseError::Parse(message) => write!(f, "ParseError: {}", message),
+            ParseError::Scan(err) => write!(f, "{}", err),
+        }
+    }
+}
+
+impl Error for ParseError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            ParseError::Parse(_) => None,
+            ParseError::Scan(ref err) => Some(err),
+        }
+    }
+}
+
+impl From<ScanError> for ParseError {
+    fn from(err: ScanError) -> ParseError {
+        ParseError::Scan(err)
+    }
+}
+
+impl ParseError {
+    pub fn new(message: String) -> ParseError {
+        ParseError::Parse(message)
+    }
+}
+
+type NodeResult = Result<Box<Node>, ParseError>;
 
 pub struct Parser<'a> {
     scanner: Box<Scanner<'a>>,
@@ -13,9 +52,10 @@ pub struct Parser<'a> {
 // shortcuts to go ahead one token
 macro_rules! goahead {
     ($parser:ident) => {
-        if let Err(err) = $parser.scanner.next_token() {
-            return Err(err);
-        }
+        let _ = $parser.scanner.next_token()?;
+        // if let Err(err) = $parser.scanner.next_token() {
+        //     return Err(err);
+        // }
     };
 }
 
@@ -27,20 +67,20 @@ impl Parser<'_> {
         }
     }
 
-    fn unexpect(&self, expects: &str) -> String {
-        format!(
+    fn unexpect(&self, expects: &str) -> ParseError {
+        ParseError::new(format!(
             "unexpected token {}, expect {}",
             self.scanner.unwrap_current_token().kind,
             expects
-        )
+        ))
     }
 
-    fn unexpect_keyword(&self, expects: &str) -> String {
-        format!(
+    fn unexpect_keyword(&self, expects: &str) -> ParseError {
+        ParseError::new(format!(
             "unexpected keyword {}, expect {}",
             self.scanner.unwrap_current_token().value,
             expects
-        )
+        ))
     }
 
     pub fn parse(&mut self) -> NodeResult {
@@ -242,7 +282,7 @@ impl Parser<'_> {
         }))
     }
 
-    fn parse_funcall_arg(&mut self) -> Result<FuncCallArg, String> {
+    fn parse_funcall_arg(&mut self) -> Result<FuncCallArg, ParseError> {
         let arg = match self.parse_expression() {
             Ok(node) => node,
             Err(err) => return Err(err),
@@ -323,7 +363,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_name(&mut self, stop_keywords: Option<&[&str]>) -> Result<String, String> {
+    fn parse_name(&mut self, stop_keywords: Option<&[&str]>) -> Result<String, ParseError> {
         let mut names: Vec<String> = Vec::new();
 
         while self.scanner.expect_kinds(&["name", "keyword"]) {
