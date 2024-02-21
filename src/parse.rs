@@ -519,14 +519,15 @@ impl Parser<'_> {
 
     fn parse_array_given_first(&mut self, first_element: Box<Node>) -> NodeResult {
         let mut elements = Vec::new();
-        elements.push(*first_element);
+        elements.push(first_element);
+
         while self.scanner.expect(",") {
             goahead!(self); // skip ','
             let elem = match self.parse_expression() {
                 Ok(node) => node,
                 Err(err) => return Err(err),
             };
-            elements.push(*elem);
+            elements.push(elem);
         }
         if !self.scanner.expect("]") {
             return Err(self.unexpect("']'"));

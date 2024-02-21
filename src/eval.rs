@@ -125,10 +125,10 @@ impl Intepreter {
     }
 
     #[inline(always)]
-    fn eval_array(&mut self, elements: &Vec<Node>) -> ValueResult {
+    fn eval_array(&mut self, elements: &Vec<Box<Node>>) -> ValueResult {
         let mut results = Vec::new();
         for elem in elements.iter() {
-            let res = match self.eval(Box::new(elem.clone())) {
+            let res = match self.eval(elem.clone()) {
                 Ok(v) => v,
                 Err(err) => return Err(err),
             };
@@ -219,9 +219,9 @@ mod test {
             ("{a: 1, b: 2}", r#"{"a":1, "b":2}"#),
         ];
 
+        let mut intp = super::Intepreter::new();
         for (input, output) in testcases {
             let node = parse(input).unwrap();
-            let mut intp = super::Intepreter::new();
             let v = intp.eval(node).unwrap();
             assert_eq!(v.to_string(), output);
         }

@@ -102,7 +102,7 @@ pub enum Node {
 
     Neg(Box<Node>),
 
-    Array(Vec<Node>),
+    Array(Vec<Box<Node>>),
 
     Map(Vec<MapNodeItem>),
 
