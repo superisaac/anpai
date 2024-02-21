@@ -77,12 +77,12 @@ fn fmt_map<T: fmt::Display>(
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Value::NullV => write!(f, "{}", "null"),
-            Value::BoolV(v) => write!(f, "{}", v),
-            Value::NumberV(v) => write!(f, "{}", v.normalize()),
-            Value::StrV(v) => write!(f, "\"{}\"", v),
-            Value::ArrayV(arr) => fmt_vec(f, arr.borrow(), "[", "]"),
-            Value::MapV(map) => fmt_map(f, map.borrow(), "{", "}"),
+            Self::NullV => write!(f, "{}", "null"),
+            Self::BoolV(v) => write!(f, "{}", v),
+            Self::NumberV(v) => write!(f, "{}", v.normalize()),
+            Self::StrV(v) => write!(f, "\"{}\"", v),
+            Self::ArrayV(arr) => fmt_vec(f, arr.borrow(), "[", "]"),
+            Self::MapV(map) => fmt_map(f, map.borrow(), "{", "}"),
         }
     }
 }
@@ -90,12 +90,12 @@ impl fmt::Display for Value {
 impl Value {
     pub fn data_type(&self) -> String {
         match self {
-            Value::NullV => "null".to_owned(),
-            Value::BoolV(_) => "boolean".to_owned(),
-            Value::NumberV(_) => "number".to_owned(),
-            Value::StrV(_) => "string".to_owned(),
-            Value::ArrayV(_) => "array".to_owned(),
-            Value::MapV(_) => "map".to_owned(),
+            Self::NullV => "null".to_owned(),
+            Self::BoolV(_) => "boolean".to_owned(),
+            Self::NumberV(_) => "number".to_owned(),
+            Self::StrV(_) => "string".to_owned(),
+            Self::ArrayV(_) => "array".to_owned(),
+            Self::MapV(_) => "map".to_owned(),
         }
     }
 }

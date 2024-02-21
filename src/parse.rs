@@ -25,21 +25,21 @@ impl fmt::Display for ParseError {
 impl Error for ParseError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
-            ParseError::Parse(_) => None,
-            ParseError::Scan(ref err) => Some(err),
+            Self::Parse(_) => None,
+            Self::Scan(ref err) => Some(err),
         }
     }
 }
 
 impl From<ScanError> for ParseError {
     fn from(err: ScanError) -> ParseError {
-        ParseError::Scan(err)
+        Self::Scan(err)
     }
 }
 
 impl ParseError {
     pub fn new(message: String) -> ParseError {
-        ParseError::Parse(message)
+        Self::Parse(message)
     }
 }
 
@@ -91,10 +91,8 @@ impl Parser<'_> {
             if self.scanner.expect(";") {
                 goahead!(self);
             } else {
-                match self.parse_multi_tests() {
-                    Ok(node) => exprs.push(*node),
-                    Err(err) => return Err(err),
-                }
+                let node = self.parse_multi_tests()?;
+                exprs.push(*node);
             }
         }
         if exprs.len() == 1 {
@@ -112,10 +110,7 @@ impl Parser<'_> {
             // unary tests
             let op = self.scanner.unwrap_current_token().kind;
             goahead!(self); // skip op
-            let right = match self.parse_expression() {
-                Ok(node) => node,
-                Err(err) => return Err(err),
-            };
+            let right = self.parse_expression()?;
             let left = Box::new(Var("?".to_owned()));
             Ok(Box::new(Binop {
                 op: op.to_string(),
@@ -128,19 +123,13 @@ impl Parser<'_> {
     }
 
     fn parse_multi_tests(&mut self) -> NodeResult {
-        let elem = match self.parse_multi_tests_element() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
+        let elem = self.parse_multi_tests_element()?;
         if self.scanner.expect(",") {
             let mut elements = Vec::new();
             elements.push(*elem);
             while self.scanner.expect(",") {
                 goahead!(self); // skip ','
-                let elem1 = match self.parse_multi_tests_element() {
-                    Ok(node) => node,
-                    Err(err) => return Err(err),
-                };
+                let elem1 = self.parse_multi_tests_element()?;
                 elements.push(*elem1);
             }
             Ok(Box::new(MultiTests { elements }))
@@ -159,20 +148,11 @@ impl Parser<'_> {
         keywords: &[&str],
         sub_func: fn(&mut Self) -> NodeResult,
     ) -> NodeResult {
-        let mut left = match sub_func(self) {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
-
+        let mut left = sub_func(self)?;
         while self.scanner.expect_keywords(keywords) {
             let op = self.scanner.unwrap_current_token().value;
             goahead!(self);
-
-            let right = match sub_func(self) {
-                Ok(node) => node,
-                Err(err) => return Err(err),
-            };
-
+            let right = sub_func(self)?;
             left = Box::new(Binop { op, left, right });
         }
         Ok(left)
@@ -183,20 +163,11 @@ impl Parser<'_> {
         kinds: &[&str],
         sub_parse: fn(&mut Self) -> NodeResult,
     ) -> NodeResult {
-        let mut left = match sub_parse(self) {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
-
+        let mut left = sub_parse(self)?;
         while self.scanner.expect_kinds(kinds) {
             let op = self.scanner.unwrap_current_token().value;
             goahead!(self);
-
-            let right = match sub_parse(self) {
-                Ok(node) => node,
-                Err(err) => return Err(err),
-            };
-
+            let right = sub_parse(self)?;
             left = Box::new(Binop { op, left, right });
         }
         Ok(left)
@@ -227,29 +198,17 @@ impl Parser<'_> {
     }
 
     fn parse_funccall_or_index_or_dot(&mut self) -> NodeResult {
-        let mut node = match self.parse_single_element() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
+        let mut node = self.parse_single_element()?;
         loop {
             match self.scanner.unwrap_current_token().kind {
                 "(" => {
-                    node = match self.parse_funccall_rest(node) {
-                        Ok(node) => node,
-                        Err(err) => return Err(err),
-                    };
+                    node = self.parse_funccall_rest(node)?;
                 }
                 "[" => {
-                    node = match self.parse_index_rest(node) {
-                        Ok(node) => node,
-                        Err(err) => return Err(err),
-                    };
+                    node = self.parse_index_rest(node)?;
                 }
                 "." => {
-                    node = match self.parse_dot_rest(node) {
-                        Ok(node) => node,
-                        Err(err) => return Err(err),
-                    };
+                    node = self.parse_dot_rest(node)?;
                 }
                 _ => break,
             }
@@ -261,12 +220,8 @@ impl Parser<'_> {
         goahead!(self); // skip "("
         let mut args: Vec<FuncCallArg> = Vec::new();
         while !self.scanner.expect(")") {
-            match self.parse_funcall_arg() {
-                Ok(arg) => {
-                    args.push(arg);
-                }
-                Err(err) => return Err(err),
-            };
+            let arg = self.parse_funcall_arg()?;
+            args.push(arg);
             if self.scanner.expect(",") {
                 goahead!(self);
             } else if !self.scanner.expect(")") {
@@ -283,18 +238,12 @@ impl Parser<'_> {
     }
 
     fn parse_funcall_arg(&mut self) -> Result<FuncCallArg, ParseError> {
-        let arg = match self.parse_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
+        let arg = self.parse_expression()?;
         if self.scanner.expect(":") {
             goahead!(self);
             if let Var(name) = *arg {
                 goahead!(self); // skip ":"
-                let arg_value = match self.parse_expression() {
-                    Ok(node) => node,
-                    Err(err) => return Err(err),
-                };
+                let arg_value = self.parse_expression()?;
                 return Ok(FuncCallArg {
                     arg_name: name,
                     arg: arg_value,
@@ -313,10 +262,7 @@ impl Parser<'_> {
     fn parse_index_rest(&mut self, left: Box<Node>) -> NodeResult {
         goahead!(self); // skip "["
 
-        let at = match self.parse_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
+        let at = self.parse_expression()?;
         if !self.scanner.expect("]") {
             return Err(self.unexpect("]"));
         }
@@ -330,11 +276,7 @@ impl Parser<'_> {
 
     fn parse_dot_rest(&mut self, left: Box<Node>) -> NodeResult {
         goahead!(self); // skip "."
-
-        let attr = match self.parse_name(None) {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
+        let attr = self.parse_name(None)?;
         return Ok(Box::new(DotOp { left, attr }));
     }
 
@@ -405,10 +347,7 @@ impl Parser<'_> {
 
     fn parse_neg(&mut self) -> NodeResult {
         goahead!(self); // skip '-'
-        let value = match self.parse_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
+        let value = self.parse_expression()?;
         Ok(Box::new(Neg(value)))
     }
 
@@ -444,20 +383,14 @@ impl Parser<'_> {
         goahead!(self); // skip '{'
         let mut items = Vec::new();
         while !self.scanner.expect("}") {
-            let mapkey = match self.parse_map_key() {
-                Ok(key) => key,
-                Err(err) => return Err(err),
-            };
+            let mapkey = self.parse_map_key()?;
 
             if !self.scanner.expect(":") {
                 return Err(self.unexpect(":"));
             }
             goahead!(self); // skip ':'
 
-            let exp = match self.parse_expression() {
-                Ok(node) => node,
-                Err(err) => return Err(err),
-            };
+            let exp = self.parse_expression()?;
             items.push(MapNodeItem {
                 name: mapkey,
                 value: exp,
@@ -490,10 +423,7 @@ impl Parser<'_> {
     }
 
     fn parse_range_given_start(&mut self, start_open: bool, start_exp: Box<Node>) -> NodeResult {
-        let end_exp = match self.parse_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
+        let end_exp = self.parse_expression()?;
         if self.scanner.expect(")") {
             // open end range
             goahead!(self); //skip ')'
@@ -519,10 +449,7 @@ impl Parser<'_> {
 
     fn parse_bracket_or_range(&mut self) -> NodeResult {
         goahead!(self); // skip '('
-        let aexp = match self.parse_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
+        let aexp = self.parse_expression()?;
         if self.scanner.expect("..") {
             // is range
             goahead!(self); // skip '..'
@@ -541,10 +468,7 @@ impl Parser<'_> {
             goahead!(self); // skip ']'
             return Ok(Box::new(Array(Vec::new())));
         }
-        let aexp = match self.parse_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
+        let aexp = self.parse_expression()?;
         if self.scanner.expect_kinds(&[",", "]"]) {
             return self.parse_array_given_first(aexp);
         }
@@ -563,10 +487,7 @@ impl Parser<'_> {
 
         while self.scanner.expect(",") {
             goahead!(self); // skip ','
-            let elem = match self.parse_expression() {
-                Ok(node) => node,
-                Err(err) => return Err(err),
-            };
+            let elem = self.parse_expression()?;
             elements.push(elem);
         }
         if !self.scanner.expect("]") {
@@ -579,31 +500,19 @@ impl Parser<'_> {
     // if expression
     fn parse_if_expression(&mut self) -> NodeResult {
         goahead!(self); // skip 'if'
-        let cond = match self.parse_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
-
+        let cond = self.parse_expression()?;
         if !self.scanner.expect_keyword("then") {
             return Err(self.unexpect_keyword("then"));
         }
         goahead!(self); // skip 'then'
 
-        let then_branch = match self.parse_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
-
+        let then_branch = self.parse_expression()?;
         if !self.scanner.expect_keyword("else") {
             return Err(self.unexpect_keyword("else"));
         }
         goahead!(self); // skip 'else'
 
-        let else_branch = match self.parse_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
-
+        let else_branch = self.parse_expression()?;
         Ok(Box::new(IfExpr {
             condition: cond,
             then_branch,
@@ -613,27 +522,16 @@ impl Parser<'_> {
 
     fn parse_for_expression(&mut self) -> NodeResult {
         goahead!(self); // skip 'for'
-        let var_name = match self.parse_name(Some(&["in", "for"])) {
-            Ok(var_name) => var_name,
-            Err(err) => return Err(err),
-        };
-
+        let var_name = self.parse_name(Some(&["in", "for"]))?;
         if !self.scanner.expect_keyword("in") {
             return Err(self.unexpect_keyword("in"));
         }
         goahead!(self); // skip 'in'
 
-        let list_expr = match self.parse_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
-
+        let list_expr = self.parse_expression()?;
         if self.scanner.expect(",") {
             // recursively call for parser
-            let return_expr = match self.parse_for_expression() {
-                Ok(node) => node,
-                Err(err) => return Err(err),
-            };
+            let return_expr = self.parse_for_expression()?;
             return Ok(Box::new(ForExpr {
                 var_name,
                 list_expr,
@@ -646,10 +544,7 @@ impl Parser<'_> {
         }
         goahead!(self); // skip 'return'
 
-        let return_expr = match self.parse_for_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
+        let return_expr = self.parse_for_expression()?;
         Ok(Box::new(ForExpr {
             var_name,
             list_expr,
@@ -660,30 +555,20 @@ impl Parser<'_> {
     fn parse_some_or_every_expression(&mut self) -> NodeResult {
         let cmd = self.scanner.unwrap_current_token().value;
         goahead!(self); // skip 'for'
-        let var_name = match self.parse_name(Some(&["in"])) {
-            Ok(var_name) => var_name,
-            Err(err) => return Err(err),
-        };
+        let var_name = self.parse_name(Some(&["in"]))?;
 
         if !self.scanner.expect_keyword("in") {
             return Err(self.unexpect_keyword("in"));
         }
         goahead!(self); // skip 'in'
 
-        let list_expr = match self.parse_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
-
+        let list_expr = self.parse_expression()?;
         if !self.scanner.expect_keyword("satisfies") {
             return Err(self.unexpect_keyword("satisfies"));
         }
         goahead!(self); // skip 'satisfies'
 
-        let filter_expr = match self.parse_for_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
+        let filter_expr = self.parse_for_expression()?;
         if cmd == "some".to_owned() {
             Ok(Box::new(SomeExpr {
                 var_name,
@@ -708,10 +593,7 @@ impl Parser<'_> {
 
         let mut arg_names = Vec::new();
         while !self.scanner.expect(")") {
-            let arg_name = match self.parse_name(None) {
-                Ok(name) => name,
-                Err(err) => return Err(err),
-            };
+            let arg_name = self.parse_name(None)?;
             arg_names.push(arg_name);
             if self.scanner.expect(",") {
                 goahead!(self); // skip ','
@@ -725,10 +607,7 @@ impl Parser<'_> {
         }
         goahead!(self); // skip ')'
 
-        let exp = match self.parse_expression() {
-            Ok(node) => node,
-            Err(err) => return Err(err),
-        };
+        let exp = self.parse_expression()?;
         Ok(Box::new(FuncDef {
             args: arg_names,
             body: exp,

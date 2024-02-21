@@ -1,13 +1,49 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
+use std::error;
+use std::fmt;
 use std::ops::Neg;
 
 use crate::ast::{MapNodeItem, Node, Node::*};
 
 use crate::value::Value::{self, *};
-use rust_decimal::prelude::*;
+//use rust_decimal::prelude::*;
+use rust_decimal::{Decimal, Error as DecimalError};
 
-pub type ValueResult = Result<Value, String>;
+// EvalError
+#[derive(Debug)]
+pub enum EvalError {
+    VarNotFound,
+    Op(String),
+    Decimal(DecimalError),
+}
+
+impl fmt::Display for EvalError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::VarNotFound => write!(f, "{}", "VarNotFound"),
+            Self::Op(message) => write!(f, "OpError: {}", message),
+            Self::Decimal(err) => write!(f, "DecimalError: {}", err),
+        }
+    }
+}
+
+impl error::Error for EvalError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        match self {
+            Self::Decimal(err) => Some(err),
+            _ => None,
+        }
+    }
+}
+
+impl From<DecimalError> for EvalError {
+    fn from(err: DecimalError) -> EvalError {
+        Self::Decimal(err)
+    }
+}
+
+pub type ValueResult = Result<Value, EvalError>;
 
 pub struct ScopeFrame {
     vars: HashMap<String, Value>,
@@ -22,26 +58,26 @@ macro_rules! ev_binop_add {
         match $left_value {
             NumberV(a) => match $right_value {
                 NumberV(b) => Ok(NumberV(a + b)),
-                _ => Err(format!(
+                _ => Err(EvalError::Op(format!(
                     "canot {} number and {}",
                     $op,
                     $right_value.data_type()
-                )),
+                ))),
             },
             StrV(a) => match $right_value {
                 StrV(b) => Ok(StrV(a + &b)),
-                _ => Err(format!(
+                _ => Err(EvalError::Op(format!(
                     "canot {} string and {}",
                     $op,
                     $right_value.data_type()
-                )),
+                ))),
             },
-            _ => Err(format!(
+            _ => Err(EvalError::Op(format!(
                 "canot {} {} and {}",
                 $op,
                 $left_value.data_type(),
                 $right_value.data_type()
-            )),
+            ))),
         }
     };
 }
@@ -51,18 +87,18 @@ macro_rules! ev_binop_number {
         match $left_value {
             NumberV(numa) => match $right_value {
                 NumberV(numb) => Ok(NumberV(numa $numop numb)),
-                _ => Err(format!(
+                _ => Err(EvalError::Op(format!(
                     "canot {} number and {}",
                     $op,
                     $right_value.data_type()
-                )),
+                ))),
             },
-            _ => Err(format!(
+            _ => Err(EvalError::Op(format!(
                 "canot {} {} and {}",
                 $op,
                 $left_value.data_type(),
                 $right_value.data_type()
-            )),
+            ))),
         }
     };
 }
@@ -72,26 +108,26 @@ macro_rules! ev_binop_comparation {
         match $left_value {
             NumberV(a) => match $right_value {
                 NumberV(b) => Ok(BoolV(a $nativeop b)),
-                _ => Err(format!(
+                _ => Err(EvalError::Op(format!(
                     "canot {} number and {}",
                     $op,
                     $right_value.data_type()
-                )),
+                ))),
             },
             StrV(a) => match $right_value {
                 StrV(b) => Ok(BoolV(a $nativeop b)),
-                _ => Err(format!(
+                _ => Err(EvalError::Op(format!(
                     "canot {} string and {}",
                     $op,
                     $right_value.data_type()
-                )),
+                ))),
             },
-            _ => Err(format!(
+            _ => Err(EvalError::Op(format!(
                 "canot {} {} and {}",
                 $op,
                 $left_value.data_type(),
                 $right_value.data_type()
-            )),
+            ))),
         }
     };
 }
@@ -147,7 +183,7 @@ impl Intepreter {
             Binop { op, left, right } => self.eval_binop(op, left, right),
             Array(elements) => self.eval_array(&elements),
             Map(items) => self.eval_map(&items),
-            _ => Err(format!("eval not supported {}", *node)),
+            _ => Err(EvalError::Op(format!("eval not supported {}", *node))),
         }
     }
 
@@ -159,17 +195,16 @@ impl Intepreter {
 
     #[inline(always)]
     fn eval_number(&mut self, number_str: String) -> ValueResult {
-        match Decimal::from_str_exact(number_str.as_str()) {
-            Ok(d) => Ok(NumberV(d)),
-            Err(err) => return Err(err.to_string()),
-        }
+        let d = Decimal::from_str_exact(number_str.as_str())?;
+        Ok(NumberV(d))
     }
+
     #[inline(always)]
     fn eval_var(&mut self, name: String) -> ValueResult {
         if let Some(value) = self.resolve(name) {
             Ok(value)
         } else {
-            Err("var not found".to_owned())
+            Err(EvalError::VarNotFound)
         }
     }
 
@@ -177,10 +212,7 @@ impl Intepreter {
     fn eval_array(&mut self, elements: &Vec<Box<Node>>) -> ValueResult {
         let mut results = Vec::new();
         for elem in elements.iter() {
-            let res = match self.eval(elem.clone()) {
-                Ok(v) => v,
-                Err(err) => return Err(err),
-            };
+            let res = self.eval(elem.clone())?;
             results.push(res);
         }
         Ok(ArrayV(RefCell::new(results)))
@@ -190,14 +222,9 @@ impl Intepreter {
     fn eval_map(&mut self, items: &Vec<MapNodeItem>) -> ValueResult {
         let mut value_map: BTreeMap<String, Value> = BTreeMap::new();
         for item in items.iter() {
-            let key = match self.eval(item.name.clone()) {
-                Ok(k) => k.to_string(),
-                Err(err) => return Err(err),
-            };
-            let val = match self.eval(item.value.clone()) {
-                Ok(v) => v,
-                Err(err) => return Err(err),
-            };
+            let k = self.eval(item.name.clone())?;
+            let key = k.to_string();
+            let val = self.eval(item.value.clone())?;
             value_map.insert(key, val);
         }
         Ok(MapV(RefCell::new(value_map)))
@@ -205,27 +232,18 @@ impl Intepreter {
 
     #[inline(always)]
     fn eval_neg(&mut self, node: Box<Node>) -> ValueResult {
-        let pv = match self.eval(node) {
-            Ok(v) => v,
-            Err(err) => return Err(err),
-        };
+        let pv = self.eval(node)?;
         match pv {
             NumberV(v) => Ok(NumberV(v.neg())),
-            _ => return Err(format!("cannot neg {}", pv.data_type())),
+            _ => return Err(EvalError::Op(format!("cannot neg {}", pv.data_type()))),
         }
     }
 
     // binary ops
     #[inline(always)]
     fn eval_binop(&mut self, op: String, left: Box<Node>, right: Box<Node>) -> ValueResult {
-        let left_value = match self.eval(left) {
-            Ok(v) => v,
-            Err(err) => return Err(err),
-        };
-        let right_value = match self.eval(right) {
-            Ok(v) => v,
-            Err(err) => return Err(err),
-        };
+        let left_value = self.eval(left)?;
+        let right_value = self.eval(right)?;
         match op.as_str() {
             "+" => ev_binop_add!(self, op, left_value, right_value),
             "-" => ev_binop_number!(self, op, left_value, right_value, -),
@@ -237,7 +255,7 @@ impl Intepreter {
             "<=" => ev_binop_comparation!(self, op, left_value, right_value, <=),
             "!=" => ev_binop_comparation!(self, op, left_value, right_value, !=),
             "=" => ev_binop_comparation!(self, op, left_value, right_value, ==),
-            _ => return Err(format!("unknown op {}", op)),
+            _ => return Err(EvalError::Op(format!("unknown op {}", op))),
         }
     }
 }
