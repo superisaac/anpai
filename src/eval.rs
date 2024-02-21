@@ -4,8 +4,9 @@ use std::error;
 use std::fmt;
 use std::ops::Neg;
 
-use crate::ast::{MapNodeItem, Node, Node::*};
+use crate::ast::{FuncCallArg, MapNodeItem, Node, Node::*};
 
+use crate::value::NativeFunc;
 use crate::value::Value::{self, *};
 //use rust_decimal::prelude::*;
 use rust_decimal::{Decimal, Error as DecimalError};
@@ -14,7 +15,7 @@ use rust_decimal::{Decimal, Error as DecimalError};
 #[derive(Debug)]
 pub enum EvalError {
     VarNotFound,
-    Op(String),
+    Runtime(String),
     Decimal(DecimalError),
 }
 
@@ -22,7 +23,7 @@ impl fmt::Display for EvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::VarNotFound => write!(f, "{}", "VarNotFound"),
-            Self::Op(message) => write!(f, "OpError: {}", message),
+            Self::Runtime(message) => write!(f, "RuntimeError: {}", message),
             Self::Decimal(err) => write!(f, "DecimalError: {}", err),
         }
     }
@@ -58,7 +59,7 @@ macro_rules! ev_binop_add {
         match $left_value {
             NumberV(a) => match $right_value {
                 NumberV(b) => Ok(NumberV(a + b)),
-                _ => Err(EvalError::Op(format!(
+                _ => Err(EvalError::Runtime(format!(
                     "canot {} number and {}",
                     $op,
                     $right_value.data_type()
@@ -66,13 +67,13 @@ macro_rules! ev_binop_add {
             },
             StrV(a) => match $right_value {
                 StrV(b) => Ok(StrV(a + &b)),
-                _ => Err(EvalError::Op(format!(
+                _ => Err(EvalError::Runtime(format!(
                     "canot {} string and {}",
                     $op,
                     $right_value.data_type()
                 ))),
             },
-            _ => Err(EvalError::Op(format!(
+            _ => Err(EvalError::Runtime(format!(
                 "canot {} {} and {}",
                 $op,
                 $left_value.data_type(),
@@ -87,13 +88,13 @@ macro_rules! ev_binop_number {
         match $left_value {
             NumberV(numa) => match $right_value {
                 NumberV(numb) => Ok(NumberV(numa $numop numb)),
-                _ => Err(EvalError::Op(format!(
+                _ => Err(EvalError::Runtime(format!(
                     "canot {} number and {}",
                     $op,
                     $right_value.data_type()
                 ))),
             },
-            _ => Err(EvalError::Op(format!(
+            _ => Err(EvalError::Runtime(format!(
                 "canot {} {} and {}",
                 $op,
                 $left_value.data_type(),
@@ -108,7 +109,7 @@ macro_rules! ev_binop_comparation {
         match $left_value {
             NumberV(a) => match $right_value {
                 NumberV(b) => Ok(BoolV(a $nativeop b)),
-                _ => Err(EvalError::Op(format!(
+                _ => Err(EvalError::Runtime(format!(
                     "canot {} number and {}",
                     $op,
                     $right_value.data_type()
@@ -116,13 +117,13 @@ macro_rules! ev_binop_comparation {
             },
             StrV(a) => match $right_value {
                 StrV(b) => Ok(BoolV(a $nativeop b)),
-                _ => Err(EvalError::Op(format!(
+                _ => Err(EvalError::Runtime(format!(
                     "canot {} string and {}",
                     $op,
                     $right_value.data_type()
                 ))),
             },
-            _ => Err(EvalError::Op(format!(
+            _ => Err(EvalError::Runtime(format!(
                 "canot {} {} and {}",
                 $op,
                 $left_value.data_type(),
@@ -134,14 +135,21 @@ macro_rules! ev_binop_comparation {
 
 impl Intepreter {
     pub fn new() -> Intepreter {
-        Intepreter { scopes: Vec::new() }
+        let mut intp = Intepreter { scopes: Vec::new() };
+        intp.push_frame(); // prelude frame
+        intp.prelude();
+        intp
     }
 
-    fn add_frame(&mut self) {
+    fn push_frame(&mut self) {
         let frame = ScopeFrame {
             vars: HashMap::new(),
         };
         self.scopes.push(RefCell::new(frame));
+    }
+
+    fn pop_frame(&mut self) {
+        self.scopes.pop();
     }
 
     fn resolve(&self, name: String) -> Option<Value> {
@@ -155,7 +163,7 @@ impl Intepreter {
 
     fn set_var(&mut self, name: String, value: Value) {
         if self.scopes.len() == 0 {
-            self.add_frame();
+            self.push_frame();
         }
         self.scopes
             .last()
@@ -171,6 +179,32 @@ impl Intepreter {
         }
     }
 
+    fn add_prelude_func(&mut self, name: String, arg_names: &[&str], func: NativeFunc) {
+        let arg_names_vec = arg_names.into_iter().map(|s| String::from(*s)).collect();
+        let func_value = NativeFuncV {
+            func,
+            arg_names: arg_names_vec,
+        };
+        self.set_var_at(name, func_value, 0);
+    }
+
+    fn prelude(&mut self) {
+        self.add_prelude_func(
+            "set".to_owned(),
+            &["name", "value"],
+            |intp, args| -> Result<Value, String> {
+                let name_node = args.get(&"name".to_owned()).ok_or("no name")?;
+                let var_name = match name_node {
+                    StrV(value) => value.clone(),
+                    _ => return Err("argument name should be string".to_owned()),
+                };
+                let value = args.get(&"value".to_owned()).ok_or("no value")?;
+                intp.set_var(var_name, value.clone());
+                Ok(value.clone())
+            },
+        )
+    }
+
     pub fn eval(&mut self, node: Box<Node>) -> ValueResult {
         match *node {
             Null => Ok(NullV),
@@ -183,7 +217,11 @@ impl Intepreter {
             Binop { op, left, right } => self.eval_binop(op, left, right),
             Array(elements) => self.eval_array(&elements),
             Map(items) => self.eval_map(&items),
-            _ => Err(EvalError::Op(format!("eval not supported {}", *node))),
+            FuncDef { arg_names, body } => Ok(FuncV {
+                func_def: Box::new(FuncDef { arg_names, body }),
+            }),
+            FuncCall { func_ref, args } => self.eval_func_call(func_ref, args),
+            _ => Err(EvalError::Runtime(format!("eval not supported {}", *node))),
         }
     }
 
@@ -235,7 +273,74 @@ impl Intepreter {
         let pv = self.eval(node)?;
         match pv {
             NumberV(v) => Ok(NumberV(v.neg())),
-            _ => return Err(EvalError::Op(format!("cannot neg {}", pv.data_type()))),
+            _ => return Err(EvalError::Runtime(format!("cannot neg {}", pv.data_type()))),
+        }
+    }
+
+    #[inline(always)]
+    fn eval_func_call(&mut self, func_ref: Box<Node>, args: Vec<FuncCallArg>) -> ValueResult {
+        let fref = self.eval(func_ref)?;
+
+        let mut arg_values: Vec<Value> = Vec::new();
+        for a in args {
+            let v = self.eval(a.arg)?;
+            arg_values.push(v);
+        }
+
+        match fref {
+            NativeFuncV { func, arg_names } => self.call_native_func(func, arg_names, arg_values),
+            FuncV { func_def } => self.call_func(func_def, arg_values),
+            _ => {
+                return Err(EvalError::Runtime(format!(
+                    "cannot call non function {}",
+                    fref.data_type()
+                )))
+            }
+        }
+    }
+
+    fn call_native_func(
+        &mut self,
+        func: NativeFunc,
+        arg_names: Vec<String>,
+        arg_values: Vec<Value>,
+    ) -> ValueResult {
+        if arg_names.len() > arg_values.len() {
+            return Err(EvalError::Runtime(
+                "native func call with too few arguments".to_owned(),
+            ));
+        }
+        let mut args: HashMap<String, Value> = HashMap::new();
+        for (i, arg_name) in arg_names.iter().enumerate() {
+            let value = &arg_values[i];
+            args.insert(arg_name.clone(), value.clone());
+        }
+        match func(self, args) {
+            Ok(v) => Ok(v),
+            Err(err) => Err(EvalError::Runtime(err)),
+        }
+    }
+
+    fn call_func(&mut self, func_def: Box<Node>, arg_values: Vec<Value>) -> ValueResult {
+        if let FuncDef { arg_names, body } = *func_def {
+            if arg_names.len() > arg_values.len() {
+                return Err(EvalError::Runtime(
+                    "func call with too few arguments".to_owned(),
+                ));
+            }
+            self.push_frame();
+            for (i, arg_name) in arg_names.iter().enumerate() {
+                let value = &arg_values[i];
+                self.set_var(arg_name.clone(), value.clone());
+            }
+            let result = self.eval(body);
+            self.pop_frame();
+            result
+        } else {
+            Err(EvalError::Runtime(format!(
+                "cannot call non funct {}",
+                func_def
+            )))
         }
     }
 
@@ -255,7 +360,7 @@ impl Intepreter {
             "<=" => ev_binop_comparation!(self, op, left_value, right_value, <=),
             "!=" => ev_binop_comparation!(self, op, left_value, right_value, !=),
             "=" => ev_binop_comparation!(self, op, left_value, right_value, ==),
-            _ => return Err(EvalError::Op(format!("unknown op {}", op))),
+            _ => return Err(EvalError::Runtime(format!("unknown op {}", op))),
         }
     }
 }
@@ -304,5 +409,31 @@ mod test {
         let node = parse(input).unwrap();
         let v = intp.eval(node).unwrap();
         assert_eq!(v.to_string(), "5.3");
+    }
+
+    #[test]
+    fn test_native_func_set() {
+        let mut intp = super::Intepreter::new();
+        let input = r#"set("hi", 5)"#;
+        let node = parse(input).unwrap();
+        let _ = intp.eval(node).unwrap();
+
+        let input1 = r#"hi + 3"#;
+        let node1 = parse(input1).unwrap();
+        let v = intp.eval(node1).unwrap();
+        assert_eq!(v.to_string(), "8");
+    }
+
+    #[test]
+    fn test_func_call() {
+        let mut intp = super::Intepreter::new();
+        let input = r#"set("add2", function(a, b) a+b)"#;
+        let node = parse(input).unwrap();
+        let _ = intp.eval(node).unwrap();
+
+        let input1 = r#"add2(4.5, 9)"#;
+        let node1 = parse(input1).unwrap();
+        let v = intp.eval(node1).unwrap();
+        assert_eq!(v.to_string(), "13.5");
     }
 }

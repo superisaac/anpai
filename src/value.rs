@@ -1,8 +1,14 @@
+use crate::ast::Node;
+use crate::eval::Intepreter;
 use crate::helpers::{fmt_map, fmt_vec};
 use rust_decimal::prelude::*;
 use std::cell::RefCell;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
+
+// native func
+pub type NativeFunc =
+    fn(intp: &mut Intepreter, args: HashMap<String, Value>) -> Result<Value, String>;
 
 #[derive(Clone)]
 pub enum Value {
@@ -12,6 +18,13 @@ pub enum Value {
     StrV(String),
     ArrayV(RefCell<Vec<Value>>),
     MapV(RefCell<BTreeMap<String, Value>>),
+    NativeFuncV {
+        func: NativeFunc,
+        arg_names: Vec<String>,
+    },
+    FuncV {
+        func_def: Box<Node>,
+    },
 }
 
 impl fmt::Display for Value {
@@ -23,6 +36,11 @@ impl fmt::Display for Value {
             Self::StrV(v) => write!(f, "\"{}\"", v),
             Self::ArrayV(arr) => fmt_vec(f, arr.borrow().iter(), "[", "]"),
             Self::MapV(map) => fmt_map(f, map.borrow(), "{", "}"),
+            Self::NativeFuncV {
+                arg_names: _,
+                func: _,
+            } => write!(f, "{}", "function"),
+            Self::FuncV { func_def: _ } => write!(f, "{}", "function"),
         }
     }
 }
@@ -36,6 +54,11 @@ impl Value {
             Self::StrV(_) => "string".to_owned(),
             Self::ArrayV(_) => "array".to_owned(),
             Self::MapV(_) => "map".to_owned(),
+            Self::NativeFuncV {
+                arg_names: _,
+                func: _,
+            } => "nativefunc".to_owned(),
+            Self::FuncV { func_def: _ } => "function".to_owned(),
         }
     }
 }

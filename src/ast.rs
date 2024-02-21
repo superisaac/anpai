@@ -2,7 +2,7 @@ use crate::ast::Node::*;
 use crate::helpers::fmt_vec;
 use std::fmt;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct FuncCallArg {
     pub arg_name: String,
     pub arg: Box<Node>,
@@ -18,7 +18,7 @@ impl fmt::Display for FuncCallArg {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MapNodeItem {
     pub name: Box<Node>,
     pub value: Box<Node>,
@@ -30,7 +30,7 @@ impl fmt::Display for MapNodeItem {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Node {
     Binop {
         op: String,
@@ -51,7 +51,7 @@ pub enum Node {
 
     // function defination
     FuncDef {
-        args: Vec<String>,
+        arg_names: Vec<String>,
         body: Box<Node>,
     },
 
@@ -125,8 +125,8 @@ impl fmt::Display for Node {
             FuncCall { func_ref, args } => write!(f, "(call {} ", func_ref)
                 .and_then(|_| fmt_vec(f, args.iter(), "[", "]"))
                 .and_then(|_| write!(f, "{}", ")")),
-            FuncDef { args, body } => write!(f, "(function ")
-                .and_then(|_| fmt_vec(f, args.iter(), "[", "]"))
+            FuncDef { arg_names, body } => write!(f, "(function ")
+                .and_then(|_| fmt_vec(f, arg_names.iter(), "[", "]"))
                 .and_then(|_| write!(f, " {})", body)),
             Var(name) => write!(f, "{}", name),
             Ident(name) => write!(f, "{}", name),

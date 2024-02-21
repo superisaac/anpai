@@ -609,7 +609,7 @@ impl Parser<'_> {
 
         let exp = self.parse_expression()?;
         Ok(Box::new(FuncDef {
-            args: arg_names,
+            arg_names,
             body: exp,
         }))
     }
