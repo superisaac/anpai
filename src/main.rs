@@ -11,6 +11,8 @@ mod value;
 
 mod eval;
 
+mod helpers;
+
 fn main() {
     scan::parse_token();
     let n = ast::Node::Number("123".to_owned());

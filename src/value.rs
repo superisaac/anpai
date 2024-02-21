@@ -1,5 +1,5 @@
+use crate::helpers::{fmt_map, fmt_vec};
 use rust_decimal::prelude::*;
-use std::cell::Ref;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt;
@@ -14,66 +14,6 @@ pub enum Value {
     MapV(RefCell<BTreeMap<String, Value>>),
 }
 
-fn fmt_vec<T: fmt::Display>(
-    f: &mut fmt::Formatter,
-    vec: Ref<'_, Vec<T>>,
-    prefix: &str,
-    suffix: &str,
-) -> fmt::Result {
-    match write!(f, "{}", prefix) {
-        Err(err) => return Err(err),
-        _ => (),
-    }
-    for (i, v) in vec.iter().enumerate() {
-        if i > 0 {
-            match write!(f, ", {}", v) {
-                Err(err) => return Err(err),
-                _ => (),
-            }
-        } else {
-            match write!(f, "{}", v) {
-                Err(err) => return Err(err),
-                _ => (),
-            }
-        }
-    }
-    match write!(f, "{}", suffix) {
-        Err(err) => return Err(err),
-        _ => (),
-    }
-    Ok(())
-}
-
-fn fmt_map<T: fmt::Display>(
-    f: &mut fmt::Formatter,
-    map: Ref<'_, BTreeMap<String, T>>,
-    prefix: &str,
-    suffix: &str,
-) -> fmt::Result {
-    match write!(f, "{}", prefix) {
-        Err(err) => return Err(err),
-        _ => (),
-    }
-    for (i, (k, v)) in map.iter().enumerate() {
-        if i > 0 {
-            match write!(f, ", {}:{}", k, v) {
-                Err(err) => return Err(err),
-                _ => (),
-            }
-        } else {
-            match write!(f, "{}:{}", k, v) {
-                Err(err) => return Err(err),
-                _ => (),
-            }
-        }
-    }
-    match write!(f, "{}", suffix) {
-        Err(err) => return Err(err),
-        _ => (),
-    }
-    Ok(())
-}
-
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -81,7 +21,7 @@ impl fmt::Display for Value {
             Self::BoolV(v) => write!(f, "{}", v),
             Self::NumberV(v) => write!(f, "{}", v.normalize()),
             Self::StrV(v) => write!(f, "\"{}\"", v),
-            Self::ArrayV(arr) => fmt_vec(f, arr.borrow(), "[", "]"),
+            Self::ArrayV(arr) => fmt_vec(f, arr.borrow().iter(), "[", "]"),
             Self::MapV(map) => fmt_map(f, map.borrow(), "{", "}"),
         }
     }

@@ -1,4 +1,5 @@
 use crate::ast::Node::*;
+use crate::helpers::fmt_vec;
 use std::fmt;
 
 #[derive(Clone)]
@@ -15,36 +16,6 @@ impl fmt::Display for FuncCallArg {
             write!(f, "{}:{}", self.arg_name, self.arg)
         }
     }
-}
-
-fn fmt_vec<T: fmt::Display>(
-    f: &mut fmt::Formatter,
-    vec: &Vec<T>,
-    prefix: &str,
-    suffix: &str,
-) -> fmt::Result {
-    match write!(f, "{}", prefix) {
-        Err(err) => return Err(err),
-        _ => (),
-    }
-    for (i, arg) in vec.iter().enumerate() {
-        if i > 0 {
-            match write!(f, ", {}", arg) {
-                Err(err) => return Err(err),
-                _ => (),
-            }
-        } else {
-            match write!(f, "{}", arg) {
-                Err(err) => return Err(err),
-                _ => (),
-            }
-        }
-    }
-    match write!(f, "{}", suffix) {
-        Err(err) => return Err(err),
-        _ => (),
-    }
-    Ok(())
 }
 
 #[derive(Clone)]
@@ -152,10 +123,10 @@ impl fmt::Display for Node {
             Binop { op, left, right } => write!(f, "({} {} {})", op, left, right),
             DotOp { left, attr } => write!(f, "(. {} {})", left, attr),
             FuncCall { func_ref, args } => write!(f, "(call {} ", func_ref)
-                .and_then(|_| fmt_vec(f, args, "[", "]"))
+                .and_then(|_| fmt_vec(f, args.iter(), "[", "]"))
                 .and_then(|_| write!(f, "{}", ")")),
             FuncDef { args, body } => write!(f, "(function ")
-                .and_then(|_| fmt_vec(f, args, "[", "]"))
+                .and_then(|_| fmt_vec(f, args.iter(), "[", "]"))
                 .and_then(|_| write!(f, " {})", body)),
             Var(name) => write!(f, "{}", name),
             Ident(name) => write!(f, "{}", name),
@@ -175,8 +146,8 @@ impl fmt::Display for Node {
                 let end_bra = if *end_open { ")" } else { "]" };
                 write!(f, "{}{}..{}{}", start_bra, start, end, end_bra)
             }
-            Array(elements) => fmt_vec(f, elements, "[", "]"),
-            Map(items) => fmt_vec(f, items, "{", "}"),
+            Array(elements) => fmt_vec(f, elements.iter(), "[", "]"),
+            Map(items) => fmt_vec(f, items.iter(), "{", "}"),
             IfExpr {
                 condition,
                 then_branch,
@@ -205,8 +176,8 @@ impl fmt::Display for Node {
                 "(every {} in {} satisfies {})",
                 var_name, list_expr, filter_expr
             ),
-            ExprList { elements } => fmt_vec(f, elements, "", ""),
-            MultiTests { elements } => fmt_vec(f, elements, "", ""),
+            ExprList { elements } => fmt_vec(f, elements.iter(), "", ""),
+            MultiTests { elements } => fmt_vec(f, elements.iter(), "", ""),
         }
     }
 }
