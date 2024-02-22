@@ -85,20 +85,18 @@ impl Parser<'_> {
 
     pub fn parse(&mut self) -> NodeResult {
         let mut exprs: Vec<Node> = Vec::new();
-
         goahead!(self);
         while !self.scanner.expect("eof") {
             if self.scanner.expect(";") {
                 goahead!(self);
-            } else {
-                let node = self.parse_multi_tests()?;
-                exprs.push(*node);
             }
+            let node = self.parse_multi_tests()?;
+            exprs.push(*node);
         }
         if exprs.len() == 1 {
             return Ok(Box::new(exprs[0].clone()));
         } else {
-            return Ok(Box::new(ExprList { elements: exprs }));
+            return Ok(Box::new(ExprList(exprs)));
         }
     }
 
@@ -627,6 +625,7 @@ fn test_parse_results() {
         ("if a > 6 then true else false", "(if (> a 6) true false)"),
         ("{a: 1, \"bbb\": [2, 1]}", r#"{a: 1, "bbb": [2, 1]}"#),
         ("> 2, <= 1, a>8", "(> ? 2), (<= ? 1), (> a 8)"),
+        ("2>8; 9; true", "(exprlist (> 2 8), 9, true)"),
     ];
 
     for (input, output) in testcases {

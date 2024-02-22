@@ -251,6 +251,7 @@ impl Intepreter {
                 list_expr,
                 filter_expr,
             } => self.eval_every_expr(var_name, list_expr, filter_expr),
+            ExprList(exprs) => self.eval_expr_list(exprs),
             _ => Err(EvalError::Runtime(format!("eval not supported {}", *node))),
         }
     }
@@ -407,6 +408,20 @@ impl Intepreter {
         }
     }
 
+    fn eval_expr_list(&mut self, exprs: Vec<Node>) -> ValueResult {
+        let mut last_result: Option<Value> = None;
+        for expr in exprs.iter() {
+            println!("{}", expr);
+            let res = self.eval(Box::new(expr.clone()))?;
+            last_result = Some(res);
+        }
+        if let Some(v) = last_result {
+            Ok(v)
+        } else {
+            Ok(NullV)
+        }
+    }
+
     #[inline(always)]
     fn eval_func_call(&mut self, func_ref: Box<Node>, args: Vec<FuncCallArg>) -> ValueResult {
         let fref = self.eval(func_ref)?;
@@ -524,10 +539,12 @@ mod test {
             ),
             ("some a in [2, 8, 3, 6] satisfies a > 4", "8"),
             ("every a in [2, 8, 3, 6] satisfies a > 4", "[8, 6]"),
+            ("2 * 8; true; null; 9 / 3", "3"),
+            (r#"set("a", 5); a + 10.3"#, "15.3"),
         ];
 
-        let mut intp = super::Intepreter::new();
         for (input, output) in testcases {
+            let mut intp = super::Intepreter::new();
             let node = parse(input).unwrap();
             let v = intp.eval(node).unwrap();
             assert_eq!(v.to_string(), output);
