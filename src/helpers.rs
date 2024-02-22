@@ -1,5 +1,4 @@
 use core::slice::Iter;
-use std::cell::Ref;
 use std::collections::BTreeMap;
 use std::fmt;
 
@@ -22,7 +21,7 @@ pub fn fmt_vec<T: fmt::Display>(
 
 pub fn fmt_map<T: fmt::Display>(
     f: &mut fmt::Formatter,
-    map: Ref<'_, BTreeMap<String, T>>,
+    map: &BTreeMap<String, T>,
     prefix: &str,
     suffix: &str,
 ) -> fmt::Result {

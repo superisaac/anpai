@@ -231,6 +231,11 @@ impl Intepreter {
                 func_def: Box::new(FuncDef { arg_names, body }),
             }),
             FuncCall { func_ref, args } => self.eval_func_call(func_ref, args),
+            IfExpr {
+                condition,
+                then_branch,
+                else_branch,
+            } => self.eval_if_expr(condition, then_branch, else_branch),
             _ => Err(EvalError::Runtime(format!("eval not supported {}", *node))),
         }
     }
@@ -284,6 +289,21 @@ impl Intepreter {
         match pv {
             NumberV(v) => Ok(NumberV(v.neg())),
             _ => return Err(EvalError::Runtime(format!("cannot neg {}", pv.data_type()))),
+        }
+    }
+
+    #[inline(always)]
+    fn eval_if_expr(
+        &mut self,
+        condition: Box<Node>,
+        then_branch: Box<Node>,
+        else_branch: Box<Node>,
+    ) -> ValueResult {
+        let cond_value = self.eval(condition)?;
+        if cond_value.bool_value() {
+            self.eval(then_branch)
+        } else {
+            self.eval(else_branch)
         }
     }
 
@@ -396,6 +416,7 @@ mod test {
             (r#""abc" <= "abd""#, "true"),
             ("[2, 8,false,true]", "[2, 8, false, true]"),
             ("{a: 1, b: 2}", r#"{"a":1, "b":2}"#),
+            ("if 2 > 3 then 6 else 8", "8"),
         ];
 
         let mut intp = super::Intepreter::new();

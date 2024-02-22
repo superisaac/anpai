@@ -2,6 +2,7 @@ use crate::ast::Node;
 use crate::eval::{EvalError, Intepreter};
 use crate::helpers::{fmt_map, fmt_vec};
 use rust_decimal::prelude::*;
+use rust_decimal_macros::dec;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
@@ -35,7 +36,7 @@ impl fmt::Display for Value {
             Self::NumberV(v) => write!(f, "{}", v.normalize()),
             Self::StrV(v) => write!(f, "\"{}\"", v),
             Self::ArrayV(arr) => fmt_vec(f, arr.borrow().iter(), "[", "]"),
-            Self::MapV(map) => fmt_map(f, map.borrow(), "{", "}"),
+            Self::MapV(map) => fmt_map(f, &map.borrow(), "{", "}"),
             Self::NativeFuncV {
                 arg_names: _,
                 func: _,
@@ -59,6 +60,18 @@ impl Value {
                 func: _,
             } => "nativefunc".to_owned(),
             Self::FuncV { func_def: _ } => "function".to_owned(),
+        }
+    }
+
+    pub fn bool_value(&self) -> bool {
+        match self {
+            Self::NullV => false,
+            Self::BoolV(v) => *v,
+            Self::NumberV(v) => *v != dec!(0),
+            Self::StrV(v) => v.len() > 0,
+            Self::ArrayV(v) => v.borrow().len() > 0,
+            Self::MapV(v) => v.borrow().len() > 0,
+            _ => true,
         }
     }
 }
