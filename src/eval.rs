@@ -236,6 +236,11 @@ impl Intepreter {
                 then_branch,
                 else_branch,
             } => self.eval_if_expr(condition, then_branch, else_branch),
+            ForExpr {
+                var_name,
+                list_expr,
+                return_expr,
+            } => self.eval_for_expr(var_name, list_expr, return_expr),
             _ => Err(EvalError::Runtime(format!("eval not supported {}", *node))),
         }
     }
@@ -304,6 +309,32 @@ impl Intepreter {
             self.eval(then_branch)
         } else {
             self.eval(else_branch)
+        }
+    }
+
+    fn eval_for_expr(
+        &mut self,
+        var_name: String,
+        list_expr: Box<Node>,
+        return_expr: Box<Node>,
+    ) -> ValueResult {
+        let list_value = self.eval(list_expr)?;
+        match list_value {
+            ArrayV(items) => {
+                let mut results: Vec<Value> = vec![];
+                for item in items.borrow().iter() {
+                    self.push_frame();
+                    self.set_var(var_name.clone(), item.clone());
+                    let result = self.eval(return_expr.clone());
+                    self.pop_frame();
+                    match result {
+                        Ok(v) => results.push(v),
+                        Err(err) => return Err(err),
+                    }
+                }
+                Ok(ArrayV(RefCell::new(results)))
+            }
+            _ => Err(EvalError::runtime("for loop require a list")),
         }
     }
 
@@ -417,6 +448,11 @@ mod test {
             ("[2, 8,false,true]", "[2, 8, false, true]"),
             ("{a: 1, b: 2}", r#"{"a":1, "b":2}"#),
             ("if 2 > 3 then 6 else 8", "8"),
+            ("for a in [2, 3, 4] return a * 2", "[4, 6, 8]"), // simple for loop
+            (
+                "for a in [2, 3, 4], b in [8, 1, 2] return a + b",
+                "[[10, 3, 4], [11, 4, 5], [12, 5, 6]]",
+            ),
         ];
 
         let mut intp = super::Intepreter::new();

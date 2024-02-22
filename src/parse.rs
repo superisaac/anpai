@@ -544,7 +544,7 @@ impl Parser<'_> {
         }
         goahead!(self); // skip 'return'
 
-        let return_expr = self.parse_for_expression()?;
+        let return_expr = self.parse_expression()?;
         Ok(Box::new(ForExpr {
             var_name,
             list_expr,
