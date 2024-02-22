@@ -44,6 +44,12 @@ impl From<DecimalError> for EvalError {
     }
 }
 
+impl EvalError {
+    pub fn runtime(message: &str) -> EvalError {
+        Self::Runtime(String::from(message))
+    }
+}
+
 pub type ValueResult = Result<Value, EvalError>;
 
 pub struct ScopeFrame {
@@ -179,26 +185,30 @@ impl Intepreter {
         }
     }
 
-    fn add_prelude_func(&mut self, name: String, arg_names: &[&str], func: NativeFunc) {
+    fn add_prelude_func(&mut self, name: &str, arg_names: &[&str], func: NativeFunc) {
         let arg_names_vec = arg_names.into_iter().map(|s| String::from(*s)).collect();
         let func_value = NativeFuncV {
             func,
             arg_names: arg_names_vec,
         };
-        self.set_var_at(name, func_value, 0);
+        self.set_var_at(name.to_owned(), func_value, 0);
     }
 
     fn prelude(&mut self) {
         self.add_prelude_func(
-            "set".to_owned(),
+            "set",
             &["name", "value"],
-            |intp, args| -> Result<Value, String> {
-                let name_node = args.get(&"name".to_owned()).ok_or("no name")?;
+            |intp, args| -> Result<Value, EvalError> {
+                let name_node = args
+                    .get(&"name".to_owned())
+                    .ok_or(EvalError::runtime("no name"))?;
                 let var_name = match name_node {
                     StrV(value) => value.clone(),
-                    _ => return Err("argument name should be string".to_owned()),
+                    _ => return Err(EvalError::runtime("argument name should be string")),
                 };
-                let value = args.get(&"value".to_owned()).ok_or("no value")?;
+                let value = args
+                    .get(&"value".to_owned())
+                    .ok_or(EvalError::runtime("no value"))?;
                 intp.set_var(var_name, value.clone());
                 Ok(value.clone())
             },
@@ -306,8 +316,8 @@ impl Intepreter {
         arg_values: Vec<Value>,
     ) -> ValueResult {
         if arg_names.len() > arg_values.len() {
-            return Err(EvalError::Runtime(
-                "native func call with too few arguments".to_owned(),
+            return Err(EvalError::runtime(
+                "native func call with too few arguments",
             ));
         }
         let mut args: HashMap<String, Value> = HashMap::new();
@@ -315,18 +325,13 @@ impl Intepreter {
             let value = &arg_values[i];
             args.insert(arg_name.clone(), value.clone());
         }
-        match func(self, args) {
-            Ok(v) => Ok(v),
-            Err(err) => Err(EvalError::Runtime(err)),
-        }
+        func(self, args)
     }
 
     fn call_func(&mut self, func_def: Box<Node>, arg_values: Vec<Value>) -> ValueResult {
         if let FuncDef { arg_names, body } = *func_def {
             if arg_names.len() > arg_values.len() {
-                return Err(EvalError::Runtime(
-                    "func call with too few arguments".to_owned(),
-                ));
+                return Err(EvalError::runtime("func call with too few arguments"));
             }
             self.push_frame();
             for (i, arg_name) in arg_names.iter().enumerate() {

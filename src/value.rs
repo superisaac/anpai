@@ -1,5 +1,5 @@
 use crate::ast::Node;
-use crate::eval::Intepreter;
+use crate::eval::{EvalError, Intepreter};
 use crate::helpers::{fmt_map, fmt_vec};
 use rust_decimal::prelude::*;
 use std::cell::RefCell;
@@ -8,7 +8,7 @@ use std::fmt;
 
 // native func
 pub type NativeFunc =
-    fn(intp: &mut Intepreter, args: HashMap<String, Value>) -> Result<Value, String>;
+    fn(intp: &mut Intepreter, args: HashMap<String, Value>) -> Result<Value, EvalError>;
 
 #[derive(Clone)]
 pub enum Value {
