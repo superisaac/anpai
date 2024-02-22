@@ -252,6 +252,7 @@ impl Intepreter {
                 filter_expr,
             } => self.eval_every_expr(var_name, list_expr, filter_expr),
             ExprList(exprs) => self.eval_expr_list(exprs),
+            MultiTests(exprs) => self.eval_multi_tests(exprs),
             _ => Err(EvalError::Runtime(format!("eval not supported {}", *node))),
         }
     }
@@ -408,10 +409,10 @@ impl Intepreter {
         }
     }
 
+    #[inline(always)]
     fn eval_expr_list(&mut self, exprs: Vec<Node>) -> ValueResult {
         let mut last_result: Option<Value> = None;
         for expr in exprs.iter() {
-            println!("{}", expr);
             let res = self.eval(Box::new(expr.clone()))?;
             last_result = Some(res);
         }
@@ -420,6 +421,18 @@ impl Intepreter {
         } else {
             Ok(NullV)
         }
+    }
+
+    #[inline(always)]
+    fn eval_multi_tests(&mut self, exprs: Vec<Node>) -> ValueResult {
+        //let input_value = self.resolve("?".to_owned()).ok_or(EvalError::VarNotFound)?;
+        for expr in exprs.iter() {
+            let res = self.eval(Box::new(expr.clone()))?;
+            if res.bool_value() {
+                return Ok(BoolV(true));
+            }
+        }
+        Ok(BoolV(false))
     }
 
     #[inline(always)]
@@ -540,7 +553,9 @@ mod test {
             ("some a in [2, 8, 3, 6] satisfies a > 4", "8"),
             ("every a in [2, 8, 3, 6] satisfies a > 4", "[8, 6]"),
             ("2 * 8; true; null; 9 / 3", "3"),
-            (r#"set("a", 5); a + 10.3"#, "15.3"),
+            (r#"set("a", 5); a + 10.3"#, "15.3"), // expression list
+            (r#"set("?", 5); >6, =8, < 3"#, "false"), // multi tests
+            (r#"set("?", 5); >6, <8, < 3"#, "true"),
         ];
 
         for (input, output) in testcases {

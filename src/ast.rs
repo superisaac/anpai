@@ -110,9 +110,7 @@ pub enum Node {
 
     ExprList(Vec<Node>),
 
-    MultiTests {
-        elements: Vec<Node>,
-    },
+    MultiTests(Vec<Node>),
 }
 
 impl fmt::Display for Node {
@@ -174,8 +172,8 @@ impl fmt::Display for Node {
                 "(every {} in {} satisfies {})",
                 var_name, list_expr, filter_expr
             ),
-            ExprList(elements) => fmt_vec(f, elements.iter(), "(exprlist ", ")"),
-            MultiTests { elements } => fmt_vec(f, elements.iter(), "", ""),
+            ExprList(elements) => fmt_vec(f, elements.iter(), "(expr-list ", ")"),
+            MultiTests(elements) => fmt_vec(f, elements.iter(), "(multi-tests ", ")"),
         }
     }
 }

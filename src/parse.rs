@@ -130,7 +130,7 @@ impl Parser<'_> {
                 let elem1 = self.parse_multi_tests_element()?;
                 elements.push(*elem1);
             }
-            Ok(Box::new(MultiTests { elements }))
+            Ok(Box::new(MultiTests(elements)))
         } else {
             Ok(elem)
         }
@@ -624,8 +624,8 @@ fn test_parse_results() {
         ("a + b(4, 9)", "(+ a (call b [4, 9]))"),
         ("if a > 6 then true else false", "(if (> a 6) true false)"),
         ("{a: 1, \"bbb\": [2, 1]}", r#"{a: 1, "bbb": [2, 1]}"#),
-        ("> 2, <= 1, a>8", "(> ? 2), (<= ? 1), (> a 8)"),
-        ("2>8; 9; true", "(exprlist (> 2 8), 9, true)"),
+        ("> 2, <= 1, a>8", "(multi-tests (> ? 2), (<= ? 1), (> a 8))"),
+        ("2>8; 9; true", "(expr-list (> 2 8), 9, true)"),
     ];
 
     for (input, output) in testcases {
