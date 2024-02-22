@@ -568,7 +568,7 @@ impl Parser<'_> {
         }
         goahead!(self); // skip 'satisfies'
 
-        let filter_expr = self.parse_for_expression()?;
+        let filter_expr = self.parse_expression()?;
         if cmd == "some".to_owned() {
             Ok(Box::new(SomeExpr {
                 var_name,

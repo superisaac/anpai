@@ -241,6 +241,16 @@ impl Intepreter {
                 list_expr,
                 return_expr,
             } => self.eval_for_expr(var_name, list_expr, return_expr),
+            SomeExpr {
+                var_name,
+                list_expr,
+                filter_expr,
+            } => self.eval_some_expr(var_name, list_expr, filter_expr),
+            EveryExpr {
+                var_name,
+                list_expr,
+                filter_expr,
+            } => self.eval_every_expr(var_name, list_expr, filter_expr),
             _ => Err(EvalError::Runtime(format!("eval not supported {}", *node))),
         }
     }
@@ -329,6 +339,65 @@ impl Intepreter {
                     self.pop_frame();
                     match result {
                         Ok(v) => results.push(v),
+                        Err(err) => return Err(err),
+                    }
+                }
+                Ok(ArrayV(RefCell::new(results)))
+            }
+            _ => Err(EvalError::runtime("for loop require a list")),
+        }
+    }
+
+    fn eval_some_expr(
+        &mut self,
+        var_name: String,
+        list_expr: Box<Node>,
+        filter_expr: Box<Node>,
+    ) -> ValueResult {
+        let list_value = self.eval(list_expr)?;
+        match list_value {
+            ArrayV(items) => {
+                for item in items.borrow().iter() {
+                    self.push_frame();
+                    self.set_var(var_name.clone(), item.clone());
+                    let result = self.eval(filter_expr.clone());
+                    self.pop_frame();
+                    match result {
+                        Ok(v) => {
+                            if v.bool_value() {
+                                return Ok(item.clone());
+                            }
+                        }
+                        Err(err) => return Err(err),
+                    }
+                }
+                Ok(NullV)
+            }
+            _ => Err(EvalError::runtime("for loop require a list")),
+        }
+    }
+
+    fn eval_every_expr(
+        &mut self,
+        var_name: String,
+        list_expr: Box<Node>,
+        filter_expr: Box<Node>,
+    ) -> ValueResult {
+        let list_value = self.eval(list_expr)?;
+        match list_value {
+            ArrayV(items) => {
+                let mut results: Vec<Value> = vec![];
+                for item in items.borrow().iter() {
+                    self.push_frame();
+                    self.set_var(var_name.clone(), item.clone());
+                    let result = self.eval(filter_expr.clone());
+                    self.pop_frame();
+                    match result {
+                        Ok(v) => {
+                            if v.bool_value() {
+                                results.push(item.clone());
+                            }
+                        }
                         Err(err) => return Err(err),
                     }
                 }
@@ -453,6 +522,8 @@ mod test {
                 "for a in [2, 3, 4], b in [8, 1, 2] return a + b",
                 "[[10, 3, 4], [11, 4, 5], [12, 5, 6]]",
             ),
+            ("some a in [2, 8, 3, 6] satisfies a > 4", "8"),
+            ("every a in [2, 8, 3, 6] satisfies a > 4", "[8, 6]"),
         ];
 
         let mut intp = super::Intepreter::new();
