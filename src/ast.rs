@@ -1,5 +1,5 @@
 use crate::ast::Node::*;
-use crate::helpers::fmt_vec;
+use crate::helpers::{fmt_iter, fmt_vec};
 use std::fmt;
 
 #[derive(Clone, Debug)]
@@ -172,8 +172,8 @@ impl fmt::Display for Node {
                 "(every {} in {} satisfies {})",
                 var_name, list_expr, filter_expr
             ),
-            ExprList(elements) => fmt_vec(f, elements.iter(), "(expr-list ", ")"),
-            MultiTests(elements) => fmt_vec(f, elements.iter(), "(multi-tests ", ")"),
+            ExprList(elements) => fmt_iter(f, elements.iter(), " ", "(expr-list ", ")"),
+            MultiTests(elements) => fmt_iter(f, elements.iter(), " ", "(multi-tests ", ")"),
         }
     }
 }

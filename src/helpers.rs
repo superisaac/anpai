@@ -8,10 +8,20 @@ pub fn fmt_vec<T: fmt::Display>(
     prefix: &str,
     suffix: &str,
 ) -> fmt::Result {
+    fmt_iter(f, vec_iter, ", ", prefix, suffix)
+}
+
+pub fn fmt_iter<T: fmt::Display>(
+    f: &mut fmt::Formatter,
+    vec_iter: Iter<T>,
+    delim: &str,
+    prefix: &str,
+    suffix: &str,
+) -> fmt::Result {
     write!(f, "{}", prefix)?;
     for (i, v) in vec_iter.enumerate() {
         if i > 0 {
-            write!(f, ", {}", v)?;
+            write!(f, "{}{}", delim, v)?;
         } else {
             write!(f, "{}", v)?;
         }
