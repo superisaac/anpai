@@ -1,6 +1,6 @@
 #![feature(assert_matches)]
 
-use crate::eval::Intepreter;
+use clap::Parser;
 
 mod ast;
 mod scan;
@@ -13,20 +13,12 @@ mod eval;
 
 mod helpers;
 
+mod commands;
+
 fn main() {
-    scan::parse_token();
-    let n = ast::Node::Number("123".to_owned());
-    println!("{}", n);
-
-    let mut p = parse::Parser::new("a(5,9)");
-    match p.parse() {
-        Ok(node) => println!("P: {}", node),
+    let cmd = commands::FEELCommands::parse();
+    match cmd.execute() {
         Err(err) => panic!("{}", err),
-    }
-
-    let mut intp = Intepreter::new();
-    if let Ok(n) = parse::parse("5 + 8") {
-        let r = intp.eval(n).unwrap();
-        println!("{}", r);
+        _ => (),
     }
 }

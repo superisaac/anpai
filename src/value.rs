@@ -2,7 +2,7 @@ use crate::ast::Node;
 use crate::eval::{EvalError, Intepreter};
 use crate::helpers::{fmt_map, fmt_vec};
 use rust_decimal::prelude::*;
-use rust_decimal_macros::dec;
+use rust_decimal_macros::*;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;

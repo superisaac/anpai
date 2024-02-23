@@ -5,10 +5,9 @@ use std::fmt;
 use std::ops::Neg;
 
 use crate::ast::{FuncCallArg, MapNodeItem, Node, Node::*};
-
+use crate::parse::ParseError;
 use crate::value::NativeFunc;
 use crate::value::Value::{self, *};
-//use rust_decimal::prelude::*;
 use rust_decimal::{Decimal, Error as DecimalError};
 
 // EvalError
@@ -17,6 +16,7 @@ pub enum EvalError {
     VarNotFound,
     Runtime(String),
     Decimal(DecimalError),
+    Parse(ParseError),
 }
 
 impl fmt::Display for EvalError {
@@ -25,6 +25,7 @@ impl fmt::Display for EvalError {
             Self::VarNotFound => write!(f, "{}", "VarNotFound"),
             Self::Runtime(message) => write!(f, "RuntimeError: {}", message),
             Self::Decimal(err) => write!(f, "DecimalError: {}", err),
+            Self::Parse(err) => write!(f, "{}", err),
         }
     }
 }
@@ -41,6 +42,12 @@ impl error::Error for EvalError {
 impl From<DecimalError> for EvalError {
     fn from(err: DecimalError) -> EvalError {
         Self::Decimal(err)
+    }
+}
+
+impl From<ParseError> for EvalError {
+    fn from(err: ParseError) -> EvalError {
+        Self::Parse(err)
     }
 }
 
