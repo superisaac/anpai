@@ -215,12 +215,19 @@ name = "feel"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "fileinput",
  "iso8601",
  "lazy_static",
  "regex",
  "rust_decimal",
  "rust_decimal_macros",
 ]
+
+[[package]]
+name = "fileinput"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53a330402b8f3d1b473ce5999ac0e5061ed45fbb19876173cd9c923602ac7a1b"
 
 [[package]]
 name = "funty"

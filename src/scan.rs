@@ -172,7 +172,7 @@ impl Scanner<'_> {
         Scanner {
             cursor: 0,
             current: None,
-            input: input.clone(),
+            input: input,
         }
     }
 
@@ -271,24 +271,14 @@ impl Scanner<'_> {
         Err(ScanError::from_str("fail to find token"))
     }
 
-    pub fn find_tokens(&mut self) -> Result<Vec<Token>, ScanError> {
-        let mut token_vecs: Vec<Token> = Vec::new();
-        while !self.is_eof() {
-            if let Err(err) = self.next_token() {
-                return Err(err);
-            }
-            token_vecs.push(self.unwrap_current_token());
-        }
-        Ok(token_vecs)
-    }
-}
-
-pub fn parse_token() {
-    let input = "1 world我 but(a+b) true";
-    let mut scanner = Scanner::new(input);
-    if let Ok(tokens) = scanner.find_tokens() {
-        for token in tokens {
-            println!("{}", token);
-        }
-    }
+    // pub fn find_tokens(&mut self) -> Result<Vec<Token>, ScanError> {
+    //     let mut token_vecs: Vec<Token> = Vec::new();
+    //     while !self.is_eof() {
+    //         if let Err(err) = self.next_token() {
+    //             return Err(err);
+    //         }
+    //         token_vecs.push(self.unwrap_current_token());
+    //     }
+    //     Ok(token_vecs)
+    // }
 }
