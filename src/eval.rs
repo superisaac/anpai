@@ -4,7 +4,7 @@ use std::error;
 use std::fmt;
 use std::ops::Neg;
 
-use crate::ast::{FuncCallArg, MapNodeItem, Node, Node::*};
+use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use crate::parse::ParseError;
 use crate::value::NativeFunc;
 use crate::value::Value::{self, *};
@@ -223,7 +223,7 @@ impl Intepreter {
     }
 
     pub fn eval(&mut self, node: Box<Node>) -> ValueResult {
-        match *node {
+        match *node.syntax {
             Null => Ok(NullV),
             Bool(value) => Ok(BoolV(value)),
             Number(value) => self.eval_number(value),
@@ -235,7 +235,7 @@ impl Intepreter {
             Array(elements) => self.eval_array(&elements),
             Map(items) => self.eval_map(&items),
             FuncDef { arg_names, body } => Ok(FuncV {
-                func_def: Box::new(FuncDef { arg_names, body }),
+                func_def: Node::new(FuncDef { arg_names, body }),
             }),
             FuncCall { func_ref, args } => self.eval_func_call(func_ref, args),
             IfExpr {
@@ -484,7 +484,7 @@ impl Intepreter {
     }
 
     fn call_func(&mut self, func_def: Box<Node>, arg_values: Vec<Value>) -> ValueResult {
-        if let FuncDef { arg_names, body } = *func_def {
+        if let FuncDef { arg_names, body } = *func_def.syntax {
             if arg_names.len() > arg_values.len() {
                 return Err(EvalError::runtime("func call with too few arguments"));
             }

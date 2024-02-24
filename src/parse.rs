@@ -1,7 +1,4 @@
-use crate::ast::{
-    FuncCallArg, MapNodeItem,
-    Node::{self, *},
-};
+use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use crate::scan::{ScanError, Scanner};
 use std::error::Error;
 use std::fmt;
@@ -96,7 +93,7 @@ impl Parser<'_> {
         if exprs.len() == 1 {
             return Ok(Box::new(exprs[0].clone()));
         } else {
-            return Ok(Box::new(ExprList(exprs)));
+            return Ok(Node::new(ExprList(exprs)));
         }
     }
 
@@ -109,8 +106,8 @@ impl Parser<'_> {
             let op = self.scanner.unwrap_current_token().kind;
             goahead!(self); // skip op
             let right = self.parse_expression()?;
-            let left = Box::new(Var("?".to_owned()));
-            Ok(Box::new(Binop {
+            let left = Node::new(Var("?".to_owned()));
+            Ok(Node::new(Binop {
                 op: op.to_string(),
                 left,
                 right,
@@ -130,7 +127,7 @@ impl Parser<'_> {
                 let elem1 = self.parse_multi_tests_element()?;
                 elements.push(*elem1);
             }
-            Ok(Box::new(MultiTests(elements)))
+            Ok(Node::new(MultiTests(elements)))
         } else {
             Ok(elem)
         }
@@ -151,7 +148,7 @@ impl Parser<'_> {
             let op = self.scanner.unwrap_current_token().value;
             goahead!(self);
             let right = sub_func(self)?;
-            left = Box::new(Binop { op, left, right });
+            left = Node::new(Binop { op, left, right });
         }
         Ok(left)
     }
@@ -166,7 +163,7 @@ impl Parser<'_> {
             let op = self.scanner.unwrap_current_token().value;
             goahead!(self);
             let right = sub_parse(self)?;
-            left = Box::new(Binop { op, left, right });
+            left = Node::new(Binop { op, left, right });
         }
         Ok(left)
     }
@@ -229,7 +226,7 @@ impl Parser<'_> {
         if self.scanner.expect(")") {
             goahead!(self);
         }
-        Ok(Box::new(FuncCall {
+        Ok(Node::new(FuncCall {
             func_ref: func_node,
             args,
         }))
@@ -239,7 +236,7 @@ impl Parser<'_> {
         let arg = self.parse_expression()?;
         if self.scanner.expect(":") {
             goahead!(self);
-            if let Var(name) = *arg {
+            if let Var(name) = *arg.syntax {
                 goahead!(self); // skip ":"
                 let arg_value = self.parse_expression()?;
                 return Ok(FuncCallArg {
@@ -265,7 +262,7 @@ impl Parser<'_> {
             return Err(self.unexpect("]"));
         }
         goahead!(self);
-        return Ok(Box::new(Binop {
+        return Ok(Node::new(Binop {
             op: "[]".to_owned(),
             left,
             right: at,
@@ -275,7 +272,7 @@ impl Parser<'_> {
     fn parse_dot_rest(&mut self, left: Box<Node>) -> NodeResult {
         goahead!(self); // skip "."
         let attr = self.parse_name(None)?;
-        return Ok(Box::new(DotOp { left, attr }));
+        return Ok(Node::new(DotOp { left, attr }));
     }
 
     // single element
@@ -289,7 +286,7 @@ impl Parser<'_> {
             "{" => self.parse_map(),
             "(" => self.parse_bracket_or_range(),
             "[" => self.parse_range_or_array(),
-            "?" => Ok(Box::new(Var("?".to_owned()))),
+            "?" => Ok(Node::new(Var("?".to_owned()))),
             "keyword" => match self.scanner.unwrap_current_token().value.as_str() {
                 "true" | "false" => self.parse_bool(),
                 "null" => self.parse_null(),
@@ -334,31 +331,31 @@ impl Parser<'_> {
     fn parse_var(&mut self) -> NodeResult {
         let token = self.scanner.unwrap_current_token();
         goahead!(self);
-        Ok(Box::new(Var(token.value)))
+        Ok(Node::new(Var(token.value)))
     }
 
     fn parse_number(&mut self) -> NodeResult {
         let token = self.scanner.unwrap_current_token();
         goahead!(self);
-        Ok(Box::new(Number(token.value)))
+        Ok(Node::new(Number(token.value)))
     }
 
     fn parse_neg(&mut self) -> NodeResult {
         goahead!(self); // skip '-'
         let value = self.parse_expression()?;
-        Ok(Box::new(Neg(value)))
+        Ok(Node::new(Neg(value)))
     }
 
     fn parse_string(&mut self) -> NodeResult {
         let token = self.scanner.unwrap_current_token();
         goahead!(self);
-        Ok(Box::new(Str(token.value)))
+        Ok(Node::new(Str(token.value)))
     }
 
     fn parse_temporal(&mut self) -> NodeResult {
         let token = self.scanner.unwrap_current_token();
         goahead!(self);
-        Ok(Box::new(Temporal(token.value)))
+        Ok(Node::new(Temporal(token.value)))
     }
 
     fn parse_bool(&mut self) -> NodeResult {
@@ -368,12 +365,12 @@ impl Parser<'_> {
             _ => return Err(self.unexpect_keyword("true, false")),
         };
         goahead!(self);
-        Ok(Box::new(Bool(bool_value)))
+        Ok(Node::new(Bool(bool_value)))
     }
 
     fn parse_null(&mut self) -> NodeResult {
         goahead!(self); // skip 'null'
-        Ok(Box::new(Null))
+        Ok(Node::new(Null))
     }
 
     // parse map/context defination
@@ -404,13 +401,13 @@ impl Parser<'_> {
         if self.scanner.expect("}") {
             goahead!(self); // skip '}'
         }
-        Ok(Box::new(Map(items)))
+        Ok(Node::new(Map(items)))
     }
 
     fn parse_map_key(&mut self) -> NodeResult {
         if self.scanner.expect("name") {
             match self.parse_name(None) {
-                Ok(name) => Ok(Box::new(Ident(name))),
+                Ok(name) => Ok(Node::new(Ident(name))),
                 Err(err) => Err(err),
             }
         } else if self.scanner.expect("string") {
@@ -425,7 +422,7 @@ impl Parser<'_> {
         if self.scanner.expect(")") {
             // open end range
             goahead!(self); //skip ')'
-            return Ok(Box::new(Range {
+            return Ok(Node::new(Range {
                 start_open,
                 start: start_exp,
                 end_open: true,
@@ -434,7 +431,7 @@ impl Parser<'_> {
         } else if self.scanner.expect("]") {
             // close end range
             goahead!(self); //skip ')'
-            return Ok(Box::new(Range {
+            return Ok(Node::new(Range {
                 start_open,
                 start: start_exp,
                 end_open: false,
@@ -464,7 +461,7 @@ impl Parser<'_> {
         goahead!(self); // skip '['
         if self.scanner.expect("]") {
             goahead!(self); // skip ']'
-            return Ok(Box::new(Array(Vec::new())));
+            return Ok(Node::new(Array(Vec::new())));
         }
         let aexp = self.parse_expression()?;
         if self.scanner.expect_kinds(&[",", "]"]) {
@@ -492,7 +489,7 @@ impl Parser<'_> {
             return Err(self.unexpect("']'"));
         }
         goahead!(self); // skip ']'
-        Ok(Box::new(Array(elements)))
+        Ok(Node::new(Array(elements)))
     }
 
     // if expression
@@ -511,7 +508,7 @@ impl Parser<'_> {
         goahead!(self); // skip 'else'
 
         let else_branch = self.parse_expression()?;
-        Ok(Box::new(IfExpr {
+        Ok(Node::new(IfExpr {
             condition: cond,
             then_branch,
             else_branch,
@@ -530,7 +527,7 @@ impl Parser<'_> {
         if self.scanner.expect(",") {
             // recursively call for parser
             let return_expr = self.parse_for_expression()?;
-            return Ok(Box::new(ForExpr {
+            return Ok(Node::new(ForExpr {
                 var_name,
                 list_expr,
                 return_expr,
@@ -543,7 +540,7 @@ impl Parser<'_> {
         goahead!(self); // skip 'return'
 
         let return_expr = self.parse_expression()?;
-        Ok(Box::new(ForExpr {
+        Ok(Node::new(ForExpr {
             var_name,
             list_expr,
             return_expr,
@@ -568,13 +565,13 @@ impl Parser<'_> {
 
         let filter_expr = self.parse_expression()?;
         if cmd == "some".to_owned() {
-            Ok(Box::new(SomeExpr {
+            Ok(Node::new(SomeExpr {
                 var_name,
                 list_expr,
                 filter_expr,
             }))
         } else {
-            Ok(Box::new(EveryExpr {
+            Ok(Node::new(EveryExpr {
                 var_name,
                 list_expr,
                 filter_expr,
@@ -606,7 +603,7 @@ impl Parser<'_> {
         goahead!(self); // skip ')'
 
         let exp = self.parse_expression()?;
-        Ok(Box::new(FuncDef {
+        Ok(Node::new(FuncDef {
             arg_names,
             body: exp,
         }))

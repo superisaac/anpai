@@ -1,4 +1,3 @@
-use crate::ast::Node::*;
 use crate::helpers::{fmt_iter, fmt_vec};
 use std::fmt;
 
@@ -31,7 +30,7 @@ impl fmt::Display for MapNodeItem {
 }
 
 #[derive(Clone, Debug)]
-pub enum Node {
+pub enum NodeSyntax {
     Binop {
         op: String,
         left: Box<Node>,
@@ -113,26 +112,26 @@ pub enum Node {
     MultiTests(Vec<Node>),
 }
 
-impl fmt::Display for Node {
+impl fmt::Display for NodeSyntax {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Binop { op, left, right } => write!(f, "({} {} {})", op, left, right),
-            DotOp { left, attr } => write!(f, "(. {} {})", left, attr),
-            FuncCall { func_ref, args } => write!(f, "(call {} ", func_ref)
+            Self::Binop { op, left, right } => write!(f, "({} {} {})", op, left, right),
+            Self::DotOp { left, attr } => write!(f, "(. {} {})", left, attr),
+            Self::FuncCall { func_ref, args } => write!(f, "(call {} ", func_ref)
                 .and_then(|_| fmt_vec(f, args.iter(), "[", "]"))
                 .and_then(|_| write!(f, "{}", ")")),
-            FuncDef { arg_names, body } => write!(f, "(function ")
+            Self::FuncDef { arg_names, body } => write!(f, "(function ")
                 .and_then(|_| fmt_vec(f, arg_names.iter(), "[", "]"))
                 .and_then(|_| write!(f, " {})", body)),
-            Var(name) => write!(f, "{}", name),
-            Ident(name) => write!(f, "{}", name),
-            Number(value) => write!(f, "{}", value),
-            Bool(value) => write!(f, "{}", value),
-            Null => write!(f, "null"),
-            Str(value) => write!(f, "{}", value),
-            Temporal(value) => write!(f, "{}", value),
-            Neg(value) => write!(f, "(- {})", value),
-            Range {
+            Self::Var(name) => write!(f, "{}", name),
+            Self::Ident(name) => write!(f, "{}", name),
+            Self::Number(value) => write!(f, "{}", value),
+            Self::Bool(value) => write!(f, "{}", value),
+            Self::Null => write!(f, "null"),
+            Self::Str(value) => write!(f, "{}", value),
+            Self::Temporal(value) => write!(f, "{}", value),
+            Self::Neg(value) => write!(f, "(- {})", value),
+            Self::Range {
                 start_open,
                 start,
                 end_open,
@@ -142,19 +141,19 @@ impl fmt::Display for Node {
                 let end_bra = if *end_open { ")" } else { "]" };
                 write!(f, "{}{}..{}{}", start_bra, start, end, end_bra)
             }
-            Array(elements) => fmt_vec(f, elements.iter(), "[", "]"),
-            Map(items) => fmt_vec(f, items.iter(), "{", "}"),
-            IfExpr {
+            Self::Array(elements) => fmt_vec(f, elements.iter(), "[", "]"),
+            Self::Map(items) => fmt_vec(f, items.iter(), "{", "}"),
+            Self::IfExpr {
                 condition,
                 then_branch,
                 else_branch,
             } => write!(f, "(if {} {} {})", condition, then_branch, else_branch),
-            ForExpr {
+            Self::ForExpr {
                 var_name,
                 list_expr,
                 return_expr,
             } => write!(f, "(for {} in {} {})", var_name, list_expr, return_expr),
-            SomeExpr {
+            Self::SomeExpr {
                 var_name,
                 list_expr,
                 filter_expr,
@@ -163,7 +162,7 @@ impl fmt::Display for Node {
                 "(some {} in {} satisfies {})",
                 var_name, list_expr, filter_expr
             ),
-            EveryExpr {
+            Self::EveryExpr {
                 var_name,
                 list_expr,
                 filter_expr,
@@ -172,8 +171,27 @@ impl fmt::Display for Node {
                 "(every {} in {} satisfies {})",
                 var_name, list_expr, filter_expr
             ),
-            ExprList(elements) => fmt_iter(f, elements.iter(), " ", "(expr-list ", ")"),
-            MultiTests(elements) => fmt_iter(f, elements.iter(), " ", "(multi-tests ", ")"),
+            Self::ExprList(elements) => fmt_iter(f, elements.iter(), " ", "(expr-list ", ")"),
+            Self::MultiTests(elements) => fmt_iter(f, elements.iter(), " ", "(multi-tests ", ")"),
         }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Node {
+    pub syntax: Box<NodeSyntax>,
+}
+
+impl fmt::Display for Node {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.syntax)
+    }
+}
+
+impl Node {
+    pub fn new(syntax: NodeSyntax) -> Box<Node> {
+        Box::new(Node {
+            syntax: Box::new(syntax),
+        })
     }
 }
