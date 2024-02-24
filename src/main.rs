@@ -2,7 +2,7 @@
 
 use clap::Parser;
 use fileinput::FileInput;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader};
 
 mod ast;
 mod scan;

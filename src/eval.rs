@@ -6,7 +6,7 @@ use std::ops::Neg;
 
 use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use crate::parse::ParseError;
-use crate::value::NativeFunc;
+use crate::value::{NativeFunc, NativeFuncT};
 use crate::value::Value::{self, *};
 use rust_decimal::{Decimal, Error as DecimalError};
 
@@ -194,8 +194,9 @@ impl Intepreter {
 
     fn add_prelude_func(&mut self, name: &str, arg_names: &[&str], func: NativeFunc) {
         let arg_names_vec = arg_names.into_iter().map(|s| String::from(*s)).collect();
+        let func_t = NativeFuncT(func);
         let func_value = NativeFuncV {
-            func,
+            func: func_t,
             arg_names: arg_names_vec,
         };
         self.set_var_at(name.to_owned(), func_value, 0);
@@ -453,7 +454,7 @@ impl Intepreter {
         }
 
         match fref {
-            NativeFuncV { func, arg_names } => self.call_native_func(func, arg_names, arg_values),
+            NativeFuncV { func, arg_names } => self.call_native_func(func.0, arg_names, arg_values),
             FuncV { func_def } => self.call_func(func_def, arg_values),
             _ => {
                 return Err(EvalError::Runtime(format!(

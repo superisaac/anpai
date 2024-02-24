@@ -12,6 +12,14 @@ pub type NativeFunc =
     fn(intp: &mut Intepreter, args: HashMap<String, Value>) -> Result<Value, EvalError>;
 
 #[derive(Clone)]
+pub struct NativeFuncT(pub NativeFunc);
+impl fmt::Debug for NativeFuncT {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", "native func")
+    }
+}
+
+#[derive(Clone, Debug)]
 pub enum Value {
     NullV,
     BoolV(bool),
@@ -20,7 +28,7 @@ pub enum Value {
     ArrayV(RefCell<Vec<Value>>),
     MapV(RefCell<BTreeMap<String, Value>>),
     NativeFuncV {
-        func: NativeFunc,
+        func: NativeFuncT,
         arg_names: Vec<String>,
     },
     FuncV {
