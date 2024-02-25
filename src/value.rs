@@ -1,6 +1,7 @@
 use crate::ast::Node;
 use crate::eval::{EvalError, Intepreter};
 use crate::helpers::{fmt_map, fmt_vec};
+use iso8601::{Date, DateTime, Duration, Time};
 use rust_decimal::prelude::*;
 use rust_decimal_macros::*;
 use std::cell::RefCell;
@@ -25,6 +26,10 @@ pub enum Value {
     BoolV(bool),
     NumberV(Decimal),
     StrV(String),
+    DateTimeV(DateTime),
+    DateV(Date),
+    TimeV(Time),
+    DurationV(Duration),
     ArrayV(RefCell<Vec<Value>>),
     MapV(RefCell<BTreeMap<String, Value>>),
     NativeFuncV {
@@ -43,6 +48,10 @@ impl fmt::Display for Value {
             Self::BoolV(v) => write!(f, "{}", v),
             Self::NumberV(v) => write!(f, "{}", v.normalize()),
             Self::StrV(v) => write!(f, "\"{}\"", v),
+            Self::DateTimeV(v) => write!(f, "{}", v),
+            Self::DateV(v) => write!(f, "{}", v),
+            Self::TimeV(v) => write!(f, "{}", v),
+            Self::DurationV(v) => write!(f, "{}", v),
             Self::ArrayV(arr) => fmt_vec(f, arr.borrow().iter(), "[", "]"),
             Self::MapV(map) => fmt_map(f, &map.borrow(), "{", "}"),
             Self::NativeFuncV {
@@ -61,6 +70,10 @@ impl Value {
             Self::BoolV(_) => "boolean".to_owned(),
             Self::NumberV(_) => "number".to_owned(),
             Self::StrV(_) => "string".to_owned(),
+            Self::DateTimeV(_) => "date time".to_owned(),
+            Self::DateV(_) => "date".to_owned(),
+            Self::TimeV(_) => "time".to_owned(),
+            Self::DurationV(_) => "duration".to_owned(),
             Self::ArrayV(_) => "array".to_owned(),
             Self::MapV(_) => "map".to_owned(),
             Self::NativeFuncV {

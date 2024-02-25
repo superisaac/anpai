@@ -11,6 +11,8 @@ mod parse;
 
 mod value;
 
+mod temporal;
+
 mod eval;
 
 mod helpers;
@@ -22,7 +24,7 @@ struct FEELArgs {
     ast: bool,
 
     #[arg(short, long)]
-    script: Option<String>,
+    code: Option<String>,
 
     files: Vec<String>,
 }
@@ -30,8 +32,8 @@ struct FEELArgs {
 impl FEELArgs {
     fn execute(&self) -> Result<(), eval::EvalError> {
         let mut intp = eval::Intepreter::new();
-        if let Some(script) = self.script.clone() {
-            let n = parse::parse(script.as_str())?;
+        if let Some(code) = self.code.clone() {
+            let n = parse::parse(code.as_str())?;
             if self.ast {
                 println!("{}", n);
             } else {

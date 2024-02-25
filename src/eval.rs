@@ -6,8 +6,8 @@ use std::ops::Neg;
 
 use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use crate::parse::ParseError;
-use crate::value::{NativeFunc, NativeFuncT};
 use crate::value::Value::{self, *};
+use crate::value::{NativeFunc, NativeFuncT};
 use rust_decimal::{Decimal, Error as DecimalError};
 
 // EvalError
