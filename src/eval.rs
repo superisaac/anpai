@@ -6,6 +6,7 @@ use std::ops::Neg;
 
 use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use crate::parse::ParseError;
+use crate::temporal::{datetime_add, parse_temporal};
 use crate::value::Value::{self, *};
 use crate::value::{NativeFunc, NativeFuncT};
 use rust_decimal::{Decimal, Error as DecimalError};
@@ -45,6 +46,12 @@ impl From<DecimalError> for EvalError {
     }
 }
 
+impl From<String> for EvalError {
+    fn from(err: String) -> EvalError {
+        Self::Runtime(err)
+    }
+}
+
 impl From<ParseError> for EvalError {
     fn from(err: ParseError) -> EvalError {
         Self::Parse(err)
@@ -65,35 +72,6 @@ pub struct ScopeFrame {
 
 pub struct Intepreter {
     scopes: Vec<RefCell<ScopeFrame>>,
-}
-
-macro_rules! ev_binop_add {
-    ($self:ident, $op:expr, $left_value:expr, $right_value:expr) => {
-        match $left_value {
-            NumberV(a) => match $right_value {
-                NumberV(b) => Ok(NumberV(a + b)),
-                _ => Err(EvalError::Runtime(format!(
-                    "canot {} number and {}",
-                    $op,
-                    $right_value.data_type()
-                ))),
-            },
-            StrV(a) => match $right_value {
-                StrV(b) => Ok(StrV(a + &b)),
-                _ => Err(EvalError::Runtime(format!(
-                    "canot {} string and {}",
-                    $op,
-                    $right_value.data_type()
-                ))),
-            },
-            _ => Err(EvalError::Runtime(format!(
-                "canot {} {} and {}",
-                $op,
-                $left_value.data_type(),
-                $right_value.data_type()
-            ))),
-        }
-    };
 }
 
 macro_rules! ev_binop_number {
@@ -229,6 +207,10 @@ impl Intepreter {
             Bool(value) => Ok(BoolV(value)),
             Number(value) => self.eval_number(value),
             Str(value) => self.eval_string(value),
+            Temporal(value) => match parse_temporal(value.as_str()) {
+                Ok(v) => Ok(v),
+                Err(err) => Err(EvalError::Runtime(err)),
+            },
             Ident(value) => Ok(StrV(value)),
             Var(name) => self.eval_var(name),
             Neg(value) => self.eval_neg(value),
@@ -511,7 +493,7 @@ impl Intepreter {
         let left_value = self.eval(left)?;
         let right_value = self.eval(right)?;
         match op.as_str() {
-            "+" => ev_binop_add!(self, op, left_value, right_value),
+            "+" => self.eval_binop_add(left_value, right_value),
             "-" => ev_binop_number!(self, op, left_value, right_value, -),
             "*" => ev_binop_number!(self, op, left_value, right_value, *),
             "/" => ev_binop_number!(self,op, left_value, right_value, /),
@@ -522,6 +504,41 @@ impl Intepreter {
             "!=" => ev_binop_comparation!(self, op, left_value, right_value, !=),
             "=" => ev_binop_comparation!(self, op, left_value, right_value, ==),
             _ => return Err(EvalError::Runtime(format!("unknown op {}", op))),
+        }
+    }
+
+    #[inline(always)]
+    fn eval_binop_add(&mut self, left_value: Value, right_value: Value) -> ValueResult {
+        match left_value {
+            NumberV(a) => match right_value {
+                NumberV(b) => Ok(NumberV(a + b)),
+                _ => Err(EvalError::Runtime(format!(
+                    "canot + number and {}",
+                    right_value.data_type()
+                ))),
+            },
+            StrV(a) => match right_value {
+                StrV(b) => Ok(StrV(a + &b)),
+                _ => Err(EvalError::Runtime(format!(
+                    "canot + string and {}",
+                    right_value.data_type()
+                ))),
+            },
+            DateTimeV(dt) => match right_value {
+                DurationV(dur) => match datetime_add(dt, dur) {
+                    Ok(new_dt) => Ok(DateTimeV(new_dt)),
+                    Err(err) => Err(EvalError::Runtime(err)),
+                },
+                _ => Err(EvalError::Runtime(format!(
+                    "canot + datetime and {}",
+                    right_value.data_type()
+                ))),
+            },
+            _ => Err(EvalError::Runtime(format!(
+                "canot + {} and {}",
+                left_value.data_type(),
+                right_value.data_type()
+            ))),
         }
     }
 }
@@ -547,6 +564,10 @@ mod test {
             ("7 / 2", "3.5"), // decimal display outputs normalized string
             ("10 / 3", "3.3333333333333333333333333333"), // precision is up to 28
             ("4 * 9 + 1", "37"),
+            (
+                r#"@"2023-06-01T10:33:20+01:00" + @"P3Y11M""#,
+                "2027-05-01T10:33:20.0+01:00",
+            ),
             (r#""abc" + "def""#, r#""abcdef""#),
             ("2 < 3 - 1", "false"),
             (r#""abc" <= "abd""#, "true"),
