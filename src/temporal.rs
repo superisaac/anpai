@@ -1,4 +1,5 @@
 use crate::value::Value;
+
 extern crate iso8601;
 
 pub fn parse_temporal(temp_str: &str) -> Result<Value, String> {
@@ -8,7 +9,11 @@ pub fn parse_temporal(temp_str: &str) -> Result<Value, String> {
     }
 
     if let Ok(dt) = iso8601::datetime(temp_str) {
-        Ok(Value::DateTimeV(dt))
+        let cdt = match chrono::DateTime::try_from(dt) {
+            Ok(v) => v,
+            Err(err) => return Err(format!("{:?}", err)),
+        };
+        Ok(Value::DateTimeV(cdt))
     } else if let Ok(date) = iso8601::date(temp_str) {
         Ok(Value::DateV(date))
     } else if let Ok(time) = iso8601::time(temp_str) {
@@ -20,55 +25,60 @@ pub fn parse_temporal(temp_str: &str) -> Result<Value, String> {
     }
 }
 
-fn mod_div(v: u32, max_value: u32) -> (u32, u32) {
-    (v % max_value, v / max_value)
+pub fn datetime_add(
+    cdt: chrono::DateTime<chrono::FixedOffset>,
+    dur: iso8601::Duration,
+) -> Result<chrono::DateTime<chrono::FixedOffset>, String> {
+    //let cdt = chrono::DateTime::try_from(dt).unwrap();
+    if let iso8601::Duration::YMDHMS {
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second,
+        millisecond,
+    } = dur
+    {
+        let secs = second + 60 * minute + 3600 * hour + 86400 * day;
+        let cdur = chrono::TimeDelta::new(secs as i64, millisecond * 1000_000).unwrap();
+        let mut d0 = cdt
+            .checked_add_months(chrono::Months::new(month + year * 12))
+            .unwrap();
+        d0 = d0.checked_add_days(chrono::Days::new(day as u64)).unwrap();
+        d0 = d0.checked_add_signed(cdur).unwrap();
+        Ok(d0)
+    } else {
+        Err("fail to add datetime and duration".to_owned())
+    }
 }
 
-pub fn datetime_add(
-    dt: iso8601::DateTime,
+pub fn datetime_sub(
+    cdt: chrono::DateTime<chrono::FixedOffset>,
     dur: iso8601::Duration,
-) -> Result<iso8601::DateTime, String> {
-    if let iso8601::Date::YMD {
-        year: dt_year,
-        month: dt_month,
-        day: dt_day,
-    } = dt.date
+) -> Result<chrono::DateTime<chrono::FixedOffset>, String> {
+    //let cdt = chrono::DateTime::try_from(dt).unwrap();
+    if let iso8601::Duration::YMDHMS {
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second,
+        millisecond,
+    } = dur
     {
-        if let iso8601::Duration::YMDHMS {
-            year,
-            month,
-            day,
-            hour,
-            minute,
-            second,
-            millisecond,
-        } = dur
-        {
-            let (r_millisecond, rem) = mod_div(dt.time.millisecond + millisecond, 1000);
-            let (r_second, rem) = mod_div(dt.time.second + second + rem, 60);
-            let (r_minute, rem) = mod_div(dt.time.minute + minute + rem, 60);
-            let (r_hour, rem) = mod_div(dt.time.hour + hour + rem, 24);
-            let (r_day, rem) = mod_div(dt_day + day + rem, 30);
-            let (r_month, rem) = mod_div(dt_month + month + rem, 12);
-            let r_year = (dt_year as u32) + year + rem;
-            return Ok(iso8601::DateTime {
-                time: iso8601::Time {
-                    millisecond: r_millisecond,
-                    second: r_second,
-                    minute: r_minute,
-                    hour: r_hour,
-                    tz_offset_hours: dt.time.tz_offset_hours,
-                    tz_offset_minutes: dt.time.tz_offset_minutes,
-                },
-                date: iso8601::Date::YMD {
-                    year: r_year as i32,
-                    month: r_month,
-                    day: r_day,
-                },
-            });
-        }
+        let secs = second + 60 * minute + 3600 * hour + 86400 * day;
+        let cdur = chrono::TimeDelta::new(secs as i64, millisecond * 1000_000).unwrap();
+        let mut d0 = cdt
+            .checked_sub_months(chrono::Months::new(month + year * 12))
+            .unwrap();
+        d0 = d0.checked_sub_days(chrono::Days::new(day as u64)).unwrap();
+        d0 = d0.checked_sub_signed(cdur).unwrap();
+        Ok(d0)
+    } else {
+        Err("fail to add datetime and duration".to_owned())
     }
-    Err("fail to add temporal value".to_owned())
 }
 
 #[cfg(test)]
@@ -76,6 +86,9 @@ mod test {
     use super::parse_temporal;
     use crate::value::Value;
     use core::assert_matches::assert_matches;
+    extern crate chrono;
+    extern crate iso8601;
+    use chrono::Datelike;
 
     #[test]
     fn test_parse_temp_value() {
@@ -88,5 +101,31 @@ mod test {
             Ok(Value::DateTimeV(_))
         );
         assert_matches!(parse_temporal("PT2H3M"), Ok(Value::DurationV(_)));
+    }
+
+    #[test]
+    fn test_chrono_functions() {
+        let dt = iso8601::datetime("2021-02-27T08:00:00+08:00").unwrap();
+        //let dur = iso8601::duration("PT2H3M").unwrap();
+        //assert_eq!(dt.date.year, 2020);
+        let cdt = chrono::DateTime::try_from(dt).unwrap();
+        //let cdur = chrono::Duration::try_from(dur);
+        assert_eq!(cdt.month(), 2);
+        assert_eq!(cdt.day(), 27);
+
+        let r0 = cdt.checked_add_months(chrono::Months::new(8)).unwrap();
+        assert_eq!(
+            format!("{}", r0.format("%Y-%m-%dT%H:%M:%S%:z")),
+            "2021-10-27T08:00:00+08:00".to_owned()
+        );
+
+        let r1 = cdt.checked_add_days(chrono::Days::new(2)).unwrap();
+        assert_eq!(
+            format!("{}", r1.format("%Y-%m-%dT%H:%M:%S%:z")),
+            "2021-03-01T08:00:00+08:00".to_owned()
+        );
+
+        let r2 = r0 - r1;
+        assert_eq!(r2.to_string(), "PT20736000S");
     }
 }

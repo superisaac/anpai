@@ -6,7 +6,7 @@ use std::ops::Neg;
 
 use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use crate::parse::ParseError;
-use crate::temporal::{datetime_add, parse_temporal};
+use crate::temporal::{datetime_add, datetime_sub, parse_temporal};
 use crate::value::Value::{self, *};
 use crate::value::{NativeFunc, NativeFuncT};
 use rust_decimal::{Decimal, Error as DecimalError};
@@ -494,7 +494,7 @@ impl Intepreter {
         let right_value = self.eval(right)?;
         match op.as_str() {
             "+" => self.eval_binop_add(left_value, right_value),
-            "-" => ev_binop_number!(self, op, left_value, right_value, -),
+            "-" => self.eval_binop_sub(left_value, right_value),
             "*" => ev_binop_number!(self, op, left_value, right_value, *),
             "/" => ev_binop_number!(self,op, left_value, right_value, /),
             ">" => ev_binop_comparation!(self, op, left_value, right_value, >),
@@ -541,6 +541,34 @@ impl Intepreter {
             ))),
         }
     }
+
+    #[inline(always)]
+    fn eval_binop_sub(&mut self, left_value: Value, right_value: Value) -> ValueResult {
+        match left_value {
+            NumberV(a) => match right_value {
+                NumberV(b) => Ok(NumberV(a - b)),
+                _ => Err(EvalError::Runtime(format!(
+                    "canot - number and {}",
+                    right_value.data_type()
+                ))),
+            },
+            DateTimeV(dt) => match right_value {
+                DurationV(dur) => match datetime_sub(dt, dur) {
+                    Ok(new_dt) => Ok(DateTimeV(new_dt)),
+                    Err(err) => Err(EvalError::Runtime(err)),
+                },
+                _ => Err(EvalError::Runtime(format!(
+                    "canot - datetime and {}",
+                    right_value.data_type()
+                ))),
+            },
+            _ => Err(EvalError::Runtime(format!(
+                "canot - {} and {}",
+                left_value.data_type(),
+                right_value.data_type()
+            ))),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -566,8 +594,16 @@ mod test {
             ("4 * 9 + 1", "37"),
             (
                 r#"@"2023-06-01T10:33:20+01:00" + @"P3Y11M""#,
-                "2027-05-01T10:33:20.0+01:00",
+                "2027-05-01T10:33:20+01:00",
             ),
+            (
+                r#"@"2023-06-01T10:33:20+01:00" - @"P1Y2M""#,
+                "2022-04-01T10:33:20+01:00",
+            ),
+            // (
+            //     r#" @"2023-06-01T10:33:20+01:00" - @"2022-04-01T10:33:20+01:00" "#,
+            //     "P1Y2M",
+            // ),
             (r#""abc" + "def""#, r#""abcdef""#),
             ("2 < 3 - 1", "false"),
             (r#""abc" <= "abd""#, "true"),

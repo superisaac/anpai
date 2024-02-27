@@ -1,7 +1,9 @@
 use crate::ast::Node;
 use crate::eval::{EvalError, Intepreter};
 use crate::helpers::{fmt_map, fmt_vec};
-use iso8601::{Date, DateTime, Duration, Time};
+extern crate chrono;
+extern crate iso8601;
+
 use rust_decimal::prelude::*;
 use rust_decimal_macros::*;
 use std::cell::RefCell;
@@ -26,10 +28,10 @@ pub enum Value {
     BoolV(bool),
     NumberV(Decimal),
     StrV(String),
-    DateTimeV(DateTime),
-    DateV(Date),
-    TimeV(Time),
-    DurationV(Duration),
+    DateTimeV(chrono::DateTime<chrono::FixedOffset>),
+    DateV(iso8601::Date),
+    TimeV(iso8601::Time),
+    DurationV(iso8601::Duration),
     ArrayV(RefCell<Vec<Value>>),
     MapV(RefCell<BTreeMap<String, Value>>),
     NativeFuncV {
@@ -48,7 +50,7 @@ impl fmt::Display for Value {
             Self::BoolV(v) => write!(f, "{}", v),
             Self::NumberV(v) => write!(f, "{}", v.normalize()),
             Self::StrV(v) => write!(f, "\"{}\"", v),
-            Self::DateTimeV(v) => write!(f, "{}", v),
+            Self::DateTimeV(v) => write!(f, "{}", v.format("%Y-%m-%dT%H:%M:%S%:z")),
             Self::DateV(v) => write!(f, "{}", v),
             Self::TimeV(v) => write!(f, "{}", v),
             Self::DurationV(v) => write!(f, "{}", v),
