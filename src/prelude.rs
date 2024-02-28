@@ -39,7 +39,7 @@ impl Prelude {
     }
 
     pub fn add_native_func(&mut self, name: &str, arg_names: &[&str], func: NativeFunc) {
-        let arg_names_vec = arg_names.into_iter().map(|s| String::from(*s)).collect();
+        let arg_names_vec = arg_names.into_iter().map(|&s| String::from(s)).collect();
         let func_t = NativeFuncT(func);
         let func_value = NativeFuncV {
             func: func_t,

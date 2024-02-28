@@ -703,13 +703,14 @@ mod test {
             (r#"set("?", 5); >6, <8, < 3"#, "true"),
             (r#"is defined(a)"#, "false"),
             (r#"is defined([1, 2][0])"#, "true"),
+            (r#"is defined([1, 2][6])"#, "false"),
         ];
 
         for (input, output) in testcases {
             let mut intp = super::Intepreter::new();
             let node = parse(input).unwrap();
             let v = intp.eval(node).unwrap();
-            assert_eq!(v.to_string(), output, "output mismatch input {}", input);
+            assert_eq!(v.to_string(), output, "output mismatch input: '{}'", input);
         }
     }
 
