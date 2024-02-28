@@ -46,6 +46,10 @@ pub enum Value {
     },
 }
 
+// FIXME: using more decent way to handle sync
+unsafe impl Send for Value {}
+unsafe impl Sync for Value {}
+
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

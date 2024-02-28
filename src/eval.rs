@@ -6,9 +6,10 @@ use std::ops::Neg;
 
 use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use crate::parse::ParseError;
+use crate::prelude::PRELUDE;
 use crate::temporal::{datetime_op, parse_temporal, timedelta_to_duration};
+use crate::value::NativeFunc;
 use crate::value::Value::{self, *};
-use crate::value::{NativeFunc, NativeFuncT};
 use rust_decimal::{Decimal, Error as DecimalError};
 
 // EvalError
@@ -128,7 +129,6 @@ impl Intepreter {
     pub fn new() -> Intepreter {
         let mut intp = Intepreter { scopes: Vec::new() };
         intp.push_frame(); // prelude frame
-        intp.prelude();
         intp
     }
 
@@ -149,10 +149,10 @@ impl Intepreter {
                 return Some(v.clone());
             }
         }
-        None
+        PRELUDE.resolve(name)
     }
 
-    fn set_var(&mut self, name: String, value: Value) {
+    pub fn set_var(&mut self, name: String, value: Value) {
         if self.scopes.len() == 0 {
             self.push_frame();
         }
@@ -164,42 +164,11 @@ impl Intepreter {
             .insert(name, value);
     }
 
-    fn set_var_at(&mut self, name: String, value: Value, index: usize) {
-        if let Some(frame) = self.scopes.get_mut(index) {
-            frame.borrow_mut().vars.insert(name, value);
-        }
-    }
-
-    fn add_prelude_func(&mut self, name: &str, arg_names: &[&str], func: NativeFunc) {
-        let arg_names_vec = arg_names.into_iter().map(|s| String::from(*s)).collect();
-        let func_t = NativeFuncT(func);
-        let func_value = NativeFuncV {
-            func: func_t,
-            arg_names: arg_names_vec,
-        };
-        self.set_var_at(name.to_owned(), func_value, 0);
-    }
-
-    fn prelude(&mut self) {
-        self.add_prelude_func(
-            "set",
-            &["name", "value"],
-            |intp, args| -> Result<Value, EvalError> {
-                let name_node = args
-                    .get(&"name".to_owned())
-                    .ok_or(EvalError::runtime("no name"))?;
-                let var_name = match name_node {
-                    StrV(value) => value.clone(),
-                    _ => return Err(EvalError::runtime("argument name should be string")),
-                };
-                let value = args
-                    .get(&"value".to_owned())
-                    .ok_or(EvalError::runtime("no value"))?;
-                intp.set_var(var_name, value.clone());
-                Ok(value.clone())
-            },
-        )
-    }
+    // pub fn set_var_at(&mut self, name: String, value: Value, index: usize) {
+    //     if let Some(frame) = self.scopes.get_mut(index) {
+    //         frame.borrow_mut().vars.insert(name, value);
+    //     }
+    // }
 
     pub fn eval(&mut self, node: Box<Node>) -> ValueResult {
         match *node.syntax {

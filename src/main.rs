@@ -17,6 +17,8 @@ mod eval;
 
 mod helpers;
 
+mod prelude;
+
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct FEELArgs {
