@@ -9,6 +9,7 @@ use rust_decimal_macros::*;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
+use std::rc::Rc;
 
 // native func
 pub type NativeFunc =
@@ -48,8 +49,8 @@ pub enum Value {
         duration: iso8601::Duration,
         negative: bool,
     },
-    ArrayV(RefCell<Vec<Value>>),
-    MapV(RefCell<BTreeMap<String, Value>>),
+    ArrayV(RefCell<Rc<Vec<Value>>>),
+    MapV(RefCell<Rc<BTreeMap<String, Value>>>),
     NativeFuncV {
         func: NativeFuncT,
         arg_names: Vec<String>,

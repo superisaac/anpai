@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::error;
 use std::fmt;
 use std::ops::Neg;
+use std::rc::Rc;
 
 use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use crate::parse::ParseError;
@@ -268,7 +269,7 @@ impl Intepreter {
             let res = self.eval(elem.clone())?;
             results.push(res);
         }
-        Ok(ArrayV(RefCell::new(results)))
+        Ok(ArrayV(RefCell::new(Rc::new(results))))
     }
 
     #[inline(always)]
@@ -280,7 +281,7 @@ impl Intepreter {
             let val = self.eval(item.value.clone())?;
             value_map.insert(key, val);
         }
-        Ok(MapV(RefCell::new(value_map)))
+        Ok(MapV(RefCell::new(Rc::new(value_map))))
     }
 
     #[inline(always)]
@@ -327,7 +328,7 @@ impl Intepreter {
                         Err(err) => return Err(err),
                     }
                 }
-                Ok(ArrayV(RefCell::new(results)))
+                Ok(ArrayV(RefCell::new(Rc::new(results))))
             }
             _ => Err(EvalError::runtime("for loop require a list")),
         }
@@ -386,7 +387,7 @@ impl Intepreter {
                         Err(err) => return Err(err),
                     }
                 }
-                Ok(ArrayV(RefCell::new(results)))
+                Ok(ArrayV(RefCell::new(Rc::new(results))))
             }
             _ => Err(EvalError::runtime("for loop require a list")),
         }
