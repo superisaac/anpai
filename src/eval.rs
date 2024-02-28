@@ -9,13 +9,18 @@ use crate::parse::ParseError;
 use crate::prelude::PRELUDE;
 use crate::temporal::{datetime_op, parse_temporal, timedelta_to_duration};
 use crate::value::NativeFunc;
+
+use crate::value::MacroCbT;
 use crate::value::Value::{self, *};
+use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::{Decimal, Error as DecimalError};
 
 // EvalError
 #[derive(Debug)]
 pub enum EvalError {
     VarNotFound,
+    KeyError,
+    IndexError,
     Runtime(String),
     Decimal(DecimalError),
     Parse(ParseError),
@@ -25,6 +30,8 @@ impl fmt::Display for EvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::VarNotFound => write!(f, "{}", "VarNotFound"),
+            Self::KeyError => write!(f, "{}", "KeyError"),
+            Self::IndexError => write!(f, "{}", "IndexError"),
             Self::Runtime(message) => write!(f, "RuntimeError: {}", message),
             Self::Decimal(err) => write!(f, "DecimalError: {}", err),
             Self::Parse(err) => write!(f, "{}", err),
@@ -143,7 +150,7 @@ impl Intepreter {
         self.scopes.pop();
     }
 
-    fn resolve(&self, name: String) -> Option<Value> {
+    pub fn resolve(&self, name: String) -> Option<Value> {
         for scope in self.scopes.iter().rev() {
             if let Some(v) = scope.borrow().vars.get(&name) {
                 return Some(v.clone());
@@ -183,7 +190,8 @@ impl Intepreter {
             Ident(value) => Ok(StrV(value)),
             Var(name) => self.eval_var(name),
             Neg(value) => self.eval_neg(value),
-            Binop { op, left, right } => self.eval_binop(op, left, right),
+            BinOp { op, left, right } => self.eval_binop(op, left, right),
+            DotOp { left, attr } => self.eval_dotop(left, attr),
             Array(elements) => self.eval_array(&elements),
             Map(items) => self.eval_map(&items),
             FuncDef { arg_names, body } => Ok(FuncV {
@@ -220,6 +228,22 @@ impl Intepreter {
     fn eval_string(&mut self, value: String) -> ValueResult {
         let content = String::from(&value[1..(value.len() - 1)]);
         Ok(StrV(content))
+    }
+
+    pub fn is_defined(&mut self, value_node: Box<Node>) -> ValueResult {
+        if let Var(v) = *value_node.syntax.clone() {
+            return match self.resolve(v) {
+                Some(_) => Ok(BoolV(true)),
+                None => Ok(BoolV(false)),
+            };
+        }
+        match self.eval(value_node.clone()) {
+            Ok(_) => Ok(BoolV(true)),
+            Err(EvalError::IndexError) | Err(EvalError::KeyError) | Err(EvalError::VarNotFound) => {
+                Ok(BoolV(false))
+            }
+            Err(err) => Err(err),
+        }
     }
 
     #[inline(always)]
@@ -395,18 +419,15 @@ impl Intepreter {
     }
 
     #[inline(always)]
-    fn eval_func_call(&mut self, func_ref: Box<Node>, args: Vec<FuncCallArg>) -> ValueResult {
+    fn eval_func_call(&mut self, func_ref: Box<Node>, call_args: Vec<FuncCallArg>) -> ValueResult {
         let fref = self.eval(func_ref)?;
-
-        let mut arg_values: Vec<Value> = Vec::new();
-        for a in args {
-            let v = self.eval(a.arg)?;
-            arg_values.push(v);
-        }
-
         match fref {
-            NativeFuncV { func, arg_names } => self.call_native_func(func.0, arg_names, arg_values),
-            FuncV { func_def } => self.call_func(func_def, arg_values),
+            NativeFuncV { func, arg_names } => self.call_native_func(func.0, arg_names, call_args),
+            FuncV { func_def } => self.call_func(func_def, call_args),
+            MacroV {
+                callback,
+                arg_names,
+            } => self.call_macro(callback, arg_names, call_args),
             _ => {
                 return Err(EvalError::Runtime(format!(
                     "cannot call non function {}",
@@ -420,8 +441,14 @@ impl Intepreter {
         &mut self,
         func: NativeFunc,
         arg_names: Vec<String>,
-        arg_values: Vec<Value>,
+        call_args: Vec<FuncCallArg>,
     ) -> ValueResult {
+        let mut arg_values: Vec<Value> = Vec::new();
+        for a in call_args {
+            let v = self.eval(a.arg)?;
+            arg_values.push(v);
+        }
+
         if arg_names.len() > arg_values.len() {
             return Err(EvalError::runtime(
                 "native func call with too few arguments",
@@ -435,7 +462,30 @@ impl Intepreter {
         func(self, args)
     }
 
-    fn call_func(&mut self, func_def: Box<Node>, arg_values: Vec<Value>) -> ValueResult {
+    fn call_macro(
+        &mut self,
+        callback: MacroCbT,
+        arg_names: Vec<String>,
+        call_args: Vec<FuncCallArg>,
+    ) -> ValueResult {
+        if arg_names.len() > call_args.len() {
+            return Err(EvalError::runtime("call macro with too few arguments"));
+        }
+
+        let mut args: HashMap<String, Box<Node>> = HashMap::new();
+        for (i, arg_name) in arg_names.iter().enumerate() {
+            args.insert(arg_name.clone(), call_args[i].arg.clone());
+        }
+        callback.0(self, args)
+    }
+
+    fn call_func(&mut self, func_def: Box<Node>, call_args: Vec<FuncCallArg>) -> ValueResult {
+        let mut arg_values: Vec<Value> = Vec::new();
+        for a in call_args {
+            let v = self.eval(a.arg)?;
+            arg_values.push(v);
+        }
+
         if let FuncDef { arg_names, body } = *func_def.syntax {
             if arg_names.len() > arg_values.len() {
                 return Err(EvalError::runtime("func call with too few arguments"));
@@ -472,6 +522,7 @@ impl Intepreter {
             "<=" => ev_binop_comparation!(self, op, left_value, right_value, <=),
             "!=" => ev_binop_comparation!(self, op, left_value, right_value, !=),
             "=" => ev_binop_comparation!(self, op, left_value, right_value, ==),
+            "[]" => self.eval_binop_index(left_value, right_value),
             _ => return Err(EvalError::Runtime(format!("unknown op {}", op))),
         }
     }
@@ -557,6 +608,46 @@ impl Intepreter {
             ))),
         }
     }
+
+    #[inline(always)]
+    fn eval_binop_index(&mut self, left_value: Value, right_value: Value) -> ValueResult {
+        match left_value {
+            MapV(a) => match right_value {
+                StrV(k) => {
+                    let m = a.borrow();
+                    let v = m.get(&k).ok_or(EvalError::KeyError)?;
+                    Ok(v.clone())
+                }
+                _ => Err(EvalError::runtime("map key not string")),
+            },
+            ArrayV(a) => match right_value {
+                NumberV(idx) => {
+                    let idx0 = idx.to_usize().unwrap();
+                    let arr = a.borrow();
+                    let v = arr.get(idx0).ok_or(EvalError::IndexError)?;
+                    Ok(v.clone())
+                }
+                _ => Err(EvalError::runtime("array index not string")),
+            },
+            _ => Err(EvalError::Runtime(format!(
+                "value {} is not indexable",
+                left_value.data_type()
+            ))),
+        }
+    }
+
+    #[inline(always)]
+    fn eval_dotop(&mut self, left: Box<Node>, attr: String) -> ValueResult {
+        let left_value = self.eval(left)?;
+        match left_value {
+            MapV(a) => {
+                let m = a.borrow();
+                let v = m.get(&attr).ok_or(EvalError::KeyError)?;
+                Ok(v.clone())
+            }
+            _ => Err(EvalError::runtime("map is not indexable")),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -595,6 +686,7 @@ mod test {
             (r#""abc" + "def""#, r#""abcdef""#),
             ("2 < 3 - 1", "false"),
             (r#""abc" <= "abd""#, "true"),
+            ("[6, 1, 2, -3][3]", "-3"),
             ("[2, 8,false,true]", "[2, 8, false, true]"),
             ("{a: 1, b: 2}", r#"{"a":1, "b":2}"#),
             ("if 2 > 3 then 6 else 8", "8"),
@@ -609,13 +701,15 @@ mod test {
             (r#"set("a", 5); a + 10.3"#, "15.3"), // expression list
             (r#"set("?", 5); >6, =8, < 3"#, "false"), // multi tests
             (r#"set("?", 5); >6, <8, < 3"#, "true"),
+            (r#"is defined(a)"#, "false"),
+            (r#"is defined([1, 2][0])"#, "true"),
         ];
 
         for (input, output) in testcases {
             let mut intp = super::Intepreter::new();
             let node = parse(input).unwrap();
             let v = intp.eval(node).unwrap();
-            assert_eq!(v.to_string(), output);
+            assert_eq!(v.to_string(), output, "output mismatch input {}", input);
         }
     }
 

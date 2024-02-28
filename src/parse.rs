@@ -107,7 +107,7 @@ impl Parser<'_> {
             goahead!(self); // skip op
             let right = self.parse_expression()?;
             let left = Node::new(Var("?".to_owned()));
-            Ok(Node::new(Binop {
+            Ok(Node::new(BinOp {
                 op: op.to_string(),
                 left,
                 right,
@@ -148,7 +148,7 @@ impl Parser<'_> {
             let op = self.scanner.unwrap_current_token().value;
             goahead!(self);
             let right = sub_func(self)?;
-            left = Node::new(Binop { op, left, right });
+            left = Node::new(BinOp { op, left, right });
         }
         Ok(left)
     }
@@ -163,7 +163,7 @@ impl Parser<'_> {
             let op = self.scanner.unwrap_current_token().value;
             goahead!(self);
             let right = sub_parse(self)?;
-            left = Node::new(Binop { op, left, right });
+            left = Node::new(BinOp { op, left, right });
         }
         Ok(left)
     }
@@ -197,7 +197,7 @@ impl Parser<'_> {
         loop {
             match self.scanner.unwrap_current_token().kind {
                 "(" => {
-                    node = self.parse_funccall_rest(node)?;
+                    node = self.parse_func_call_rest(node)?;
                 }
                 "[" => {
                     node = self.parse_index_rest(node)?;
@@ -211,7 +211,7 @@ impl Parser<'_> {
         Ok(node)
     }
 
-    fn parse_funccall_rest(&mut self, func_node: Box<Node>) -> NodeResult {
+    fn parse_func_call_rest(&mut self, func_node: Box<Node>) -> NodeResult {
         goahead!(self); // skip "("
         let mut args: Vec<FuncCallArg> = Vec::new();
         while !self.scanner.expect(")") {
@@ -262,7 +262,7 @@ impl Parser<'_> {
             return Err(self.unexpect("]"));
         }
         goahead!(self);
-        return Ok(Node::new(Binop {
+        return Ok(Node::new(BinOp {
             op: "[]".to_owned(),
             left,
             right: at,
@@ -329,9 +329,10 @@ impl Parser<'_> {
     }
 
     fn parse_var(&mut self) -> NodeResult {
-        let token = self.scanner.unwrap_current_token();
-        goahead!(self);
-        Ok(Node::new(Var(token.value)))
+        let var_name = self.parse_name(None)?;
+        // let token = self.scanner.unwrap_current_token();
+        // goahead!(self);
+        Ok(Node::new(Var(var_name)))
     }
 
     fn parse_number(&mut self) -> NodeResult {

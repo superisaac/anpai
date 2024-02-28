@@ -22,6 +22,19 @@ impl fmt::Debug for NativeFuncT {
     }
 }
 
+// macro
+pub type MacroCb =
+    fn(intp: &mut Intepreter, nodes: HashMap<String, Box<Node>>) -> Result<Value, EvalError>;
+
+#[derive(Clone)]
+pub struct MacroCbT(pub MacroCb);
+
+impl fmt::Debug for MacroCbT {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", "macro")
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Value {
     NullV,
@@ -39,6 +52,10 @@ pub enum Value {
     MapV(RefCell<BTreeMap<String, Value>>),
     NativeFuncV {
         func: NativeFuncT,
+        arg_names: Vec<String>,
+    },
+    MacroV {
+        callback: MacroCbT,
         arg_names: Vec<String>,
     },
     FuncV {
@@ -70,6 +87,10 @@ impl fmt::Display for Value {
                 arg_names: _,
                 func: _,
             } => write!(f, "{}", "function"),
+            Self::MacroV {
+                arg_names: _,
+                callback: _,
+            } => write!(f, "{}", "macro"),
             Self::FuncV { func_def: _ } => write!(f, "{}", "function"),
         }
     }
@@ -95,6 +116,10 @@ impl Value {
                 arg_names: _,
                 func: _,
             } => "nativefunc".to_owned(),
+            Self::MacroV {
+                arg_names: _,
+                callback: _,
+            } => "macro".to_owned(),
             Self::FuncV { func_def: _ } => "function".to_owned(),
         }
     }

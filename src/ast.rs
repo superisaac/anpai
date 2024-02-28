@@ -31,7 +31,7 @@ impl fmt::Display for MapNodeItem {
 
 #[derive(Clone, Debug)]
 pub enum NodeSyntax {
-    Binop {
+    BinOp {
         op: String,
         left: Box<Node>,
         right: Box<Node>,
@@ -115,7 +115,7 @@ pub enum NodeSyntax {
 impl fmt::Display for NodeSyntax {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Binop { op, left, right } => write!(f, "({} {} {})", op, left, right),
+            Self::BinOp { op, left, right } => write!(f, "({} {} {})", op, left, right),
             Self::DotOp { left, attr } => write!(f, "(. {} {})", left, attr),
             Self::FuncCall { func_ref, args } => write!(f, "(call {} ", func_ref)
                 .and_then(|_| fmt_vec(f, args.iter(), "[", "]"))
