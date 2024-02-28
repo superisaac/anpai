@@ -31,7 +31,10 @@ pub enum Value {
     DateTimeV(chrono::DateTime<chrono::FixedOffset>),
     DateV(iso8601::Date),
     TimeV(iso8601::Time),
-    DurationV(iso8601::Duration),
+    DurationV {
+        duration: iso8601::Duration,
+        negative: bool,
+    },
     ArrayV(RefCell<Vec<Value>>),
     MapV(RefCell<BTreeMap<String, Value>>),
     NativeFuncV {
@@ -53,7 +56,10 @@ impl fmt::Display for Value {
             Self::DateTimeV(v) => write!(f, "{}", v.format("%Y-%m-%dT%H:%M:%S%:z")),
             Self::DateV(v) => write!(f, "{}", v),
             Self::TimeV(v) => write!(f, "{}", v),
-            Self::DurationV(v) => write!(f, "{}", v),
+            Self::DurationV { duration, negative } => {
+                let sign = if *negative { "-" } else { "" };
+                write!(f, "{}{}", sign, duration)
+            }
             Self::ArrayV(arr) => fmt_vec(f, arr.borrow().iter(), "[", "]"),
             Self::MapV(map) => fmt_map(f, &map.borrow(), "{", "}"),
             Self::NativeFuncV {
@@ -75,7 +81,10 @@ impl Value {
             Self::DateTimeV(_) => "date time".to_owned(),
             Self::DateV(_) => "date".to_owned(),
             Self::TimeV(_) => "time".to_owned(),
-            Self::DurationV(_) => "duration".to_owned(),
+            Self::DurationV {
+                duration: _,
+                negative: _,
+            } => "duration".to_owned(),
             Self::ArrayV(_) => "array".to_owned(),
             Self::MapV(_) => "map".to_owned(),
             Self::NativeFuncV {

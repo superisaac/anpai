@@ -6,7 +6,7 @@ use std::ops::Neg;
 
 use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use crate::parse::ParseError;
-use crate::temporal::{datetime_add, datetime_sub, parse_temporal};
+use crate::temporal::{datetime_op, parse_temporal, timedelta_to_duration};
 use crate::value::Value::{self, *};
 use crate::value::{NativeFunc, NativeFuncT};
 use rust_decimal::{Decimal, Error as DecimalError};
@@ -525,12 +525,24 @@ impl Intepreter {
                 ))),
             },
             DateTimeV(dt) => match right_value {
-                DurationV(dur) => match datetime_add(dt, dur) {
-                    Ok(new_dt) => Ok(DateTimeV(new_dt)),
+                DurationV { duration, negative } => {
+                    match datetime_op(true, dt, duration, negative) {
+                        Ok(v) => Ok(DateTimeV(v)),
+                        Err(err) => Err(EvalError::Runtime(err)),
+                    }
+                }
+                _ => Err(EvalError::Runtime(format!(
+                    "canot + datetime and {}",
+                    right_value.data_type()
+                ))),
+            },
+            DurationV { duration, negative } => match right_value {
+                DateTimeV(b) => match datetime_op(true, b, duration, negative) {
+                    Ok(v) => Ok(DateTimeV(v)),
                     Err(err) => Err(EvalError::Runtime(err)),
                 },
                 _ => Err(EvalError::Runtime(format!(
-                    "canot + datetime and {}",
+                    "canot + duration and {}",
                     right_value.data_type()
                 ))),
             },
@@ -552,11 +564,18 @@ impl Intepreter {
                     right_value.data_type()
                 ))),
             },
-            DateTimeV(dt) => match right_value {
-                DurationV(dur) => match datetime_sub(dt, dur) {
-                    Ok(new_dt) => Ok(DateTimeV(new_dt)),
-                    Err(err) => Err(EvalError::Runtime(err)),
-                },
+            DateTimeV(a) => match right_value {
+                DurationV { duration, negative } => {
+                    match datetime_op(false, a, duration, negative) {
+                        Ok(v) => Ok(DateTimeV(v)),
+                        Err(err) => Err(EvalError::Runtime(err)),
+                    }
+                }
+                DateTimeV(b) => {
+                    let delta = a - b;
+                    let (duration, negative) = timedelta_to_duration(delta);
+                    Ok(DurationV { duration, negative })
+                }
                 _ => Err(EvalError::Runtime(format!(
                     "canot - datetime and {}",
                     right_value.data_type()
@@ -600,10 +619,10 @@ mod test {
                 r#"@"2023-06-01T10:33:20+01:00" - @"P1Y2M""#,
                 "2022-04-01T10:33:20+01:00",
             ),
-            // (
-            //     r#" @"2023-06-01T10:33:20+01:00" - @"2022-04-01T10:33:20+01:00" "#,
-            //     "P1Y2M",
-            // ),
+            (
+                r#" @"2023-06-01T10:33:20+01:00" - @"2022-04-01T10:33:20+01:00" "#,
+                "P426DT0.2446661632S",
+            ),
             (r#""abc" + "def""#, r#""abcdef""#),
             ("2 < 3 - 1", "false"),
             (r#""abc" <= "abd""#, "true"),

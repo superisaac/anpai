@@ -8,7 +8,16 @@ pub fn parse_temporal(temp_str: &str) -> Result<Value, String> {
         return parse_temporal(striped);
     }
 
-    if let Ok(dt) = iso8601::datetime(temp_str) {
+    if temp_str.starts_with("-") {
+        if let Ok(dur) = iso8601::duration(&temp_str[1..]) {
+            Ok(Value::DurationV {
+                duration: dur,
+                negative: true,
+            })
+        } else {
+            Err("fail to parse negative temporal value".to_owned())
+        }
+    } else if let Ok(dt) = iso8601::datetime(temp_str) {
         let cdt = match chrono::DateTime::try_from(dt) {
             Ok(v) => v,
             Err(err) => return Err(format!("{:?}", err)),
@@ -19,9 +28,26 @@ pub fn parse_temporal(temp_str: &str) -> Result<Value, String> {
     } else if let Ok(time) = iso8601::time(temp_str) {
         Ok(Value::TimeV(time))
     } else if let Ok(dur) = iso8601::duration(temp_str) {
-        Ok(Value::DurationV(dur))
+        Ok(Value::DurationV {
+            duration: dur,
+            negative: false,
+        })
     } else {
         Err("fail to parse temporal value".to_owned())
+    }
+}
+
+pub fn datetime_op(
+    op_is_add: bool,
+    cdt: chrono::DateTime<chrono::FixedOffset>,
+    dur: iso8601::Duration,
+    duration_negative: bool,
+) -> Result<chrono::DateTime<chrono::FixedOffset>, String> {
+    //if (op_is_add && !duration_negative) || (!op_is_add && duration_negative) {
+    if op_is_add ^ duration_negative {
+        datetime_add(cdt, dur)
+    } else {
+        datetime_sub(cdt, dur)
     }
 }
 
@@ -81,6 +107,32 @@ pub fn datetime_sub(
     }
 }
 
+pub fn timedelta_to_duration(delta: chrono::TimeDelta) -> (iso8601::Duration, bool) {
+    let mut nsecs = delta.num_seconds();
+    let negative = nsecs < 0;
+    if negative {
+        nsecs = -nsecs;
+    }
+    let nano = delta.num_nanoseconds().unwrap_or_default().abs();
+
+    let day = nsecs / 86400;
+    let hour = (nsecs - day * 86400) / 3600;
+    let min = (nsecs - day * 86400 - hour * 3600) / 60;
+    let sec = nsecs - day * 86400 - hour * 3600 - 60 * min;
+    (
+        iso8601::Duration::YMDHMS {
+            year: 0,
+            month: 0,
+            day: day as u32,
+            hour: hour as u32,
+            minute: min as u32,
+            second: sec as u32,
+            millisecond: (nano / 1000_000) as u32,
+        },
+        negative,
+    )
+}
+
 #[cfg(test)]
 mod test {
     use super::parse_temporal;
@@ -100,7 +152,13 @@ mod test {
             parse_temporal("2020-04-06T08:00:00@Europe/Berlin"),
             Ok(Value::DateTimeV(_))
         );
-        assert_matches!(parse_temporal("PT2H3M"), Ok(Value::DurationV(_)));
+        assert_matches!(
+            parse_temporal("PT2H3M"),
+            Ok(Value::DurationV {
+                duration: _,
+                negative: false
+            })
+        );
     }
 
     #[test]
