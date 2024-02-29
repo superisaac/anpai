@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::error;
-
 use std::fmt;
+
 use std::ops::Neg;
 use std::rc::Rc;
 
@@ -115,35 +115,6 @@ macro_rules! ev_binop_number {
     };
 }
 
-macro_rules! ev_binop_comparation {
-    ($self:ident, $op:expr, $left_value:expr, $right_value:expr, $nativeop:tt) => {
-        match $left_value {
-            NumberV(a) => match $right_value {
-                NumberV(b) => Ok(BoolV(a $nativeop b)),
-                _ => Err(EvalError::Runtime(format!(
-                    "canot {} number and {}",
-                    $op,
-                    $right_value.data_type()
-                ))),
-            },
-            StrV(a) => match $right_value {
-                StrV(b) => Ok(BoolV(a $nativeop b)),
-                _ => Err(EvalError::Runtime(format!(
-                    "canot {} string and {}",
-                    $op,
-                    $right_value.data_type()
-                ))),
-            },
-            _ => Err(EvalError::Runtime(format!(
-                "canot {} {} and {}",
-                $op,
-                $left_value.data_type(),
-                $right_value.data_type()
-            ))),
-        }
-    };
-}
-
 impl Intepreter {
     pub fn new() -> Intepreter {
         let mut intp = Intepreter { scopes: Vec::new() };
@@ -182,12 +153,6 @@ impl Intepreter {
             .vars
             .insert(name, value);
     }
-
-    // pub fn set_var_at(&mut self, name: String, value: Value, index: usize) {
-    //     if let Some(frame) = self.scopes.get_mut(index) {
-    //         frame.borrow_mut().vars.insert(name, value);
-    //     }
-    // }
 
     pub fn eval(&mut self, node: Box<Node>) -> EvalResult {
         match *node.syntax {
@@ -555,12 +520,12 @@ impl Intepreter {
             "-" => Ok((left_value - right_value)?),
             "*" => ev_binop_number!(self, op, left_value, right_value, *),
             "/" => ev_binop_number!(self,op, left_value, right_value, /),
-            ">" => ev_binop_comparation!(self, op, left_value, right_value, >),
-            ">=" => ev_binop_comparation!(self, op, left_value, right_value, >=),
-            "<" => ev_binop_comparation!(self, op, left_value, right_value, <),
-            "<=" => ev_binop_comparation!(self, op, left_value, right_value, <=),
-            "!=" => ev_binop_comparation!(self, op, left_value, right_value, !=),
-            "=" => ev_binop_comparation!(self, op, left_value, right_value, ==),
+            ">" => Ok(BoolV(left_value > right_value)),
+            ">=" => Ok(BoolV(left_value >= right_value)),
+            "<" => Ok(BoolV(left_value < right_value)),
+            "<=" => Ok(BoolV(left_value <= right_value)),
+            "!=" => Ok(BoolV(left_value != right_value)),
+            "=" => Ok(BoolV(left_value == right_value)),
             "[]" => self.eval_binop_index(left_value, right_value),
             "in" => self.eval_binop_in(left_value, right_value),
             _ => return Err(EvalError::Runtime(format!("unknown op {}", op))),

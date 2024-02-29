@@ -1,7 +1,7 @@
 use crate::helpers::{fmt_iter, fmt_vec};
 use std::fmt;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FuncCallArg {
     pub arg_name: String,
     pub arg: Box<Node>,
@@ -17,7 +17,7 @@ impl fmt::Display for FuncCallArg {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct MapNodeItem {
     pub name: Box<Node>,
     pub value: Box<Node>,
@@ -29,7 +29,7 @@ impl fmt::Display for MapNodeItem {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum NodeSyntax {
     BinOp {
         op: String,
@@ -177,7 +177,7 @@ impl fmt::Display for NodeSyntax {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Node {
     pub syntax: Box<NodeSyntax>,
 }

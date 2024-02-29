@@ -8,6 +8,7 @@ use crate::temporal::{datetime_op, timedelta_to_duration};
 use rust_decimal::prelude::*;
 use rust_decimal_macros::*;
 use std::cell::RefCell;
+use std::cmp;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::ops;
@@ -39,7 +40,13 @@ pub type NativeFunc =
 pub struct NativeFuncT(pub NativeFunc);
 impl fmt::Debug for NativeFuncT {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", "native func")
+        write!(f, "native func: {}", self.0 as usize)
+    }
+}
+
+impl cmp::PartialEq for NativeFuncT {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 as usize == other.0 as usize
     }
 }
 
@@ -52,12 +59,18 @@ pub struct MacroCbT(pub MacroCb);
 
 impl fmt::Debug for MacroCbT {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", "macro")
+        write!(f, "macro {}", self.0 as usize)
+    }
+}
+
+impl cmp::PartialEq for MacroCbT {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 as usize == other.0 as usize
     }
 }
 
 // range
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct RangeT {
     pub start_open: bool,
     pub start: Decimal,
@@ -132,7 +145,7 @@ impl RangeT {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     NullV,
     BoolV(bool),
@@ -322,6 +335,41 @@ impl ops::Sub for Value {
                 self.data_type(),
                 other.data_type()
             ))),
+        }
+    }
+}
+
+#[inline(always)]
+fn compare_value<T>(a: T, b: T) -> cmp::Ordering
+where
+    T: cmp::PartialOrd,
+{
+    if a < b {
+        cmp::Ordering::Less
+    } else if a == b {
+        cmp::Ordering::Equal
+    } else {
+        cmp::Ordering::Greater
+    }
+}
+
+impl cmp::PartialOrd for Value {
+    #[inline(always)]
+    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
+        match self {
+            Self::NumberV(a) => match other {
+                Self::NumberV(b) => Some(compare_value(a, b)),
+                _ => None,
+            },
+            Self::StrV(a) => match other {
+                Self::StrV(b) => Some(compare_value(a, b)),
+                _ => None,
+            },
+            Self::DateTimeV(a) => match other {
+                Self::DateTimeV(b) => Some(compare_value(a, b)),
+                _ => None,
+            },
+            _ => None,
         }
     }
 }
