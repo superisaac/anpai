@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, HashMap};
 use std::error;
 use std::fmt;
 
-use std::ops::Neg;
 use std::rc::Rc;
 
 use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
@@ -92,27 +91,6 @@ pub struct ScopeFrame {
 
 pub struct Intepreter {
     scopes: Vec<RefCell<ScopeFrame>>,
-}
-
-macro_rules! ev_binop_number {
-    ($self:ident, $op:expr, $left_value:expr, $right_value:expr, $numop:tt) => {
-        match $left_value {
-            NumberV(numa) => match $right_value {
-                NumberV(numb) => Ok(NumberV(numa $numop numb)),
-                _ => Err(EvalError::Runtime(format!(
-                    "canot {} number and {}",
-                    $op,
-                    $right_value.data_type()
-                ))),
-            },
-            _ => Err(EvalError::Runtime(format!(
-                "canot {} {} and {}",
-                $op,
-                $left_value.data_type(),
-                $right_value.data_type()
-            ))),
-        }
-    };
 }
 
 impl Intepreter {
@@ -265,10 +243,7 @@ impl Intepreter {
     #[inline(always)]
     fn eval_neg(&mut self, node: Box<Node>) -> EvalResult {
         let pv = self.eval(node)?;
-        match pv {
-            NumberV(v) => Ok(NumberV(v.neg())),
-            _ => return Err(EvalError::Runtime(format!("cannot neg {}", pv.data_type()))),
-        }
+        Ok((-pv)?)
     }
 
     #[inline(always)]
@@ -518,8 +493,9 @@ impl Intepreter {
         match op.as_str() {
             "+" => Ok((left_value + right_value)?),
             "-" => Ok((left_value - right_value)?),
-            "*" => ev_binop_number!(self, op, left_value, right_value, *),
-            "/" => ev_binop_number!(self,op, left_value, right_value, /),
+            "*" => Ok((left_value * right_value)?),
+            "/" => Ok((left_value / right_value)?),
+            "%" => Ok((left_value % right_value)?),
             ">" => Ok(BoolV(left_value > right_value)),
             ">=" => Ok(BoolV(left_value >= right_value)),
             "<" => Ok(BoolV(left_value < right_value)),
@@ -612,6 +588,8 @@ mod test {
             ("7 / 2", "3.5"), // decimal display outputs normalized string
             ("10 / 3", "3.3333333333333333333333333333"), // precision is up to 28
             ("4 * 9 + 1", "37"),
+            ("8 % 5", "3"),
+            ("8 / 5", "1.6"),
             (
                 r#"@"2023-06-01T10:33:20+01:00" + @"P3Y11M""#,
                 "2027-05-01T10:33:20+01:00",

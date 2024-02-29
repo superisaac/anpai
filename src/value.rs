@@ -339,6 +339,93 @@ impl ops::Sub for Value {
     }
 }
 
+impl ops::Mul for Value {
+    type Output = ValueResult;
+
+    #[inline(always)]
+    fn mul(self, other: Self) -> Self::Output {
+        match self {
+            Self::NumberV(a) => match other {
+                Self::NumberV(b) => Ok(Self::NumberV(a * b)),
+                _ => Err(ValueError(format!(
+                    "canot * number and {}",
+                    other.data_type()
+                ))),
+            },
+            _ => Err(ValueError(format!(
+                "canot * {} and {}",
+                self.data_type(),
+                other.data_type()
+            ))),
+        }
+    }
+}
+
+impl ops::Div for Value {
+    type Output = ValueResult;
+
+    #[inline(always)]
+    fn div(self, other: Self) -> Self::Output {
+        match self {
+            Self::NumberV(a) => match other {
+                Self::NumberV(b) => Ok(Self::NumberV(a / b)),
+                _ => Err(ValueError(format!(
+                    "canot / number and {}",
+                    other.data_type()
+                ))),
+            },
+            _ => Err(ValueError(format!(
+                "canot / {} and {}",
+                self.data_type(),
+                other.data_type()
+            ))),
+        }
+    }
+}
+
+impl ops::Rem for Value {
+    type Output = ValueResult;
+
+    #[inline(always)]
+    fn rem(self, other: Self) -> Self::Output {
+        match self {
+            Self::NumberV(a) => match other {
+                Self::NumberV(b) => Ok(Self::NumberV(a % b)),
+                _ => Err(ValueError(format!(
+                    "canot % number and {}",
+                    other.data_type()
+                ))),
+            },
+            _ => Err(ValueError(format!(
+                "canot % {} and {}",
+                self.data_type(),
+                other.data_type()
+            ))),
+        }
+    }
+}
+
+impl ops::Neg for Value {
+    type Output = ValueResult;
+
+    #[inline(always)]
+    fn neg(self) -> Self::Output {
+        match self {
+            Self::NumberV(a) => Ok(Self::NumberV(a.neg())),
+            _ => Err(ValueError(format!("canot neg {}", self.data_type()))),
+        }
+    }
+}
+
+impl ops::Not for Value {
+    type Output = Value;
+
+    #[inline(always)]
+    fn not(self) -> Self::Output {
+        Self::BoolV(!self.bool_value())
+    }
+}
+
 impl cmp::PartialOrd for Value {
     #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
