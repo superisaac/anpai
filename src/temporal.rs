@@ -1,7 +1,9 @@
 use crate::value::Value;
 use crate::value::ValueError;
 
+use std::cmp;
 extern crate iso8601;
+use crate::helpers::compare_value;
 
 pub fn parse_temporal(temp_str: &str) -> Result<Value, ValueError> {
     if temp_str.starts_with("@") {
@@ -37,6 +39,34 @@ pub fn parse_temporal(temp_str: &str) -> Result<Value, ValueError> {
         })
     } else {
         Err(ValueError("fail to parse temporal value".to_owned()))
+    }
+}
+
+pub fn compare_date(a: &iso8601::Date, b: &iso8601::Date) -> Option<cmp::Ordering> {
+    match *a {
+        iso8601::Date::YMD { year, month, day } => match *b {
+            iso8601::Date::YMD {
+                year: b_year,
+                month: b_month,
+                day: b_day,
+            } => Some(compare_value((year, month, day), (b_year, b_month, b_day))),
+            _ => None,
+        },
+        iso8601::Date::Week { year, ww, d } => match *b {
+            iso8601::Date::Week {
+                year: b_year,
+                ww: b_ww,
+                d: b_d,
+            } => Some(compare_value((year, ww, d), (b_year, b_ww, b_d))),
+            _ => None,
+        },
+        iso8601::Date::Ordinal { year, ddd } => match *b {
+            iso8601::Date::Ordinal {
+                year: b_year,
+                ddd: b_ddd,
+            } => Some(compare_value((year, ddd), (b_year, b_ddd))),
+            _ => None,
+        },
     }
 }
 

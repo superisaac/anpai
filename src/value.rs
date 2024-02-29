@@ -1,10 +1,10 @@
 use crate::ast::Node;
 use crate::eval::{EvalError, Intepreter};
-use crate::helpers::{fmt_map, fmt_vec};
+use crate::helpers::{compare_value, fmt_map, fmt_vec};
 extern crate chrono;
 extern crate iso8601;
 
-use crate::temporal::{datetime_op, timedelta_to_duration};
+use crate::temporal::{compare_date, datetime_op, timedelta_to_duration};
 use rust_decimal::prelude::*;
 use rust_decimal_macros::*;
 use std::cell::RefCell;
@@ -339,20 +339,6 @@ impl ops::Sub for Value {
     }
 }
 
-#[inline(always)]
-fn compare_value<T>(a: T, b: T) -> cmp::Ordering
-where
-    T: cmp::PartialOrd,
-{
-    if a < b {
-        cmp::Ordering::Less
-    } else if a == b {
-        cmp::Ordering::Equal
-    } else {
-        cmp::Ordering::Greater
-    }
-}
-
 impl cmp::PartialOrd for Value {
     #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
@@ -367,6 +353,10 @@ impl cmp::PartialOrd for Value {
             },
             Self::DateTimeV(a) => match other {
                 Self::DateTimeV(b) => Some(compare_value(a, b)),
+                _ => None,
+            },
+            Self::DateV(a) => match other {
+                Self::DateV(b) => compare_date(a, b),
                 _ => None,
             },
             _ => None,

@@ -1,6 +1,21 @@
 use core::slice::Iter;
+use std::cmp;
 use std::collections::BTreeMap;
 use std::fmt;
+
+#[inline(always)]
+pub fn compare_value<T>(a: T, b: T) -> cmp::Ordering
+where
+    T: cmp::PartialOrd,
+{
+    if a < b {
+        cmp::Ordering::Less
+    } else if a == b {
+        cmp::Ordering::Equal
+    } else {
+        cmp::Ordering::Greater
+    }
+}
 
 pub fn fmt_vec<T: fmt::Display>(
     f: &mut fmt::Formatter,
