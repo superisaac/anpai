@@ -4,12 +4,32 @@ use crate::helpers::{fmt_map, fmt_vec};
 extern crate chrono;
 extern crate iso8601;
 
+use crate::temporal::{datetime_op, timedelta_to_duration};
 use rust_decimal::prelude::*;
 use rust_decimal_macros::*;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
+use std::ops;
 use std::rc::Rc;
+
+// value error
+#[derive(Clone, Debug)]
+pub struct ValueError(pub String);
+
+impl From<String> for ValueError {
+    fn from(err: String) -> Self {
+        Self(err)
+    }
+}
+
+impl From<&str> for ValueError {
+    fn from(err: &str) -> Self {
+        Self(err.to_owned())
+    }
+}
+
+type ValueResult = Result<Value, ValueError>;
 
 // native func
 pub type NativeFunc =
@@ -72,6 +92,43 @@ impl fmt::Display for RangeT {
             self.end.normalize(),
             end_sym
         )
+    }
+}
+
+impl RangeT {
+    fn compare(a: Decimal, b: Decimal) -> i32 {
+        if a < b {
+            -1
+        } else if a == b {
+            0
+        } else {
+            1
+        }
+    }
+
+    pub fn position(&self, p: Decimal) -> i32 {
+        let cmp_start = Self::compare(p, self.start);
+        if self.start_open {
+            if cmp_start <= 0 {
+                return -1;
+            }
+        } else {
+            if cmp_start <= 0 {
+                return cmp_start;
+            }
+        }
+
+        let cmp_end = Self::compare(p, self.end);
+        if self.end_open && cmp_end >= 0 {
+            1
+        } else if !self.end_open && cmp_end > 0 {
+            1
+        } else {
+            0
+        }
+    }
+    pub fn contains(&self, n: Decimal) -> bool {
+        self.position(n) == 0
     }
 }
 
@@ -176,6 +233,95 @@ impl Value {
             Self::ArrayV(v) => v.borrow().len() > 0,
             Self::MapV(v) => v.borrow().len() > 0,
             _ => true,
+        }
+    }
+}
+
+// ops traits
+impl ops::Add for Value {
+    type Output = ValueResult;
+
+    #[inline(always)]
+    fn add(self, other: Self) -> Self::Output {
+        match self {
+            Self::NumberV(a) => match other {
+                Self::NumberV(b) => Ok(Self::NumberV(a + b)),
+                _ => Err(ValueError(format!(
+                    "canot + number and {}",
+                    other.data_type()
+                ))),
+            },
+            Self::StrV(a) => match other {
+                Self::StrV(b) => Ok(Self::StrV(a + &b)),
+                _ => Err(ValueError(format!(
+                    "canot + string and {}",
+                    other.data_type()
+                ))),
+            },
+            Self::DateTimeV(dt) => match other {
+                Self::DurationV { duration, negative } => {
+                    let v = datetime_op(true, dt, duration, negative)?;
+                    Ok(Self::DateTimeV(v))
+                }
+                _ => Err(ValueError(format!(
+                    "canot + datetime and {}",
+                    other.data_type()
+                ))),
+            },
+            Self::DurationV { duration, negative } => match other {
+                Self::DateTimeV(b) => {
+                    let v = datetime_op(true, b, duration, negative)?;
+                    Ok(Self::DateTimeV(v))
+                }
+                _ => Err(ValueError(format!(
+                    "canot + duration and {}",
+                    other.data_type()
+                ))),
+            },
+            _ => Err(ValueError(format!(
+                "canot + {} and {}",
+                self.data_type(),
+                other.data_type()
+            ))),
+        }
+    }
+}
+
+impl ops::Sub for Value {
+    type Output = ValueResult;
+
+    #[inline(always)]
+    fn sub(self, other: Self) -> Self::Output {
+        match self {
+            Self::NumberV(a) => match other {
+                Self::NumberV(b) => Ok(Self::NumberV(a - b)),
+                _ => Err(ValueError(format!(
+                    "canot - number and {}",
+                    other.data_type()
+                ))),
+            },
+            Self::DateTimeV(a) => match other {
+                Self::DurationV { duration, negative } => {
+                    match datetime_op(false, a, duration, negative) {
+                        Ok(v) => Ok(Self::DateTimeV(v)),
+                        Err(err) => Err(ValueError(err)),
+                    }
+                }
+                Self::DateTimeV(b) => {
+                    let delta = a - b;
+                    let (duration, negative) = timedelta_to_duration(delta);
+                    Ok(Self::DurationV { duration, negative })
+                }
+                _ => Err(ValueError(format!(
+                    "canot - datetime and {}",
+                    other.data_type()
+                ))),
+            },
+            _ => Err(ValueError(format!(
+                "canot - {} and {}",
+                self.data_type(),
+                other.data_type()
+            ))),
         }
     }
 }

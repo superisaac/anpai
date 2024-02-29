@@ -1,8 +1,9 @@
 use crate::value::Value;
+use crate::value::ValueError;
 
 extern crate iso8601;
 
-pub fn parse_temporal(temp_str: &str) -> Result<Value, String> {
+pub fn parse_temporal(temp_str: &str) -> Result<Value, ValueError> {
     if temp_str.starts_with("@") {
         let striped = &temp_str[2..temp_str.len() - 1];
         return parse_temporal(striped);
@@ -15,12 +16,14 @@ pub fn parse_temporal(temp_str: &str) -> Result<Value, String> {
                 negative: true,
             })
         } else {
-            Err("fail to parse negative temporal value".to_owned())
+            Err(ValueError(
+                "fail to parse negative temporal value".to_owned(),
+            ))
         }
     } else if let Ok(dt) = iso8601::datetime(temp_str) {
         let cdt = match chrono::DateTime::try_from(dt) {
             Ok(v) => v,
-            Err(err) => return Err(format!("{:?}", err)),
+            Err(err) => return Err(ValueError(format!("{:?}", err))),
         };
         Ok(Value::DateTimeV(cdt))
     } else if let Ok(date) = iso8601::date(temp_str) {
@@ -33,7 +36,7 @@ pub fn parse_temporal(temp_str: &str) -> Result<Value, String> {
             negative: false,
         })
     } else {
-        Err("fail to parse temporal value".to_owned())
+        Err(ValueError("fail to parse temporal value".to_owned()))
     }
 }
 

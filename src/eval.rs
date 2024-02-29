@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::error;
+
 use std::fmt;
 use std::ops::Neg;
 use std::rc::Rc;
@@ -8,8 +9,8 @@ use std::rc::Rc;
 use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use crate::parse::ParseError;
 use crate::prelude::PRELUDE;
-use crate::temporal::{datetime_op, parse_temporal, timedelta_to_duration};
-use crate::value::NativeFunc;
+use crate::temporal::parse_temporal;
+use crate::value::{NativeFunc, ValueError};
 
 use crate::value::MacroCbT;
 use crate::value::RangeT;
@@ -27,6 +28,7 @@ pub enum EvalError {
     Runtime(String),
     Decimal(DecimalError),
     Parse(ParseError),
+    Value(String),
 }
 
 impl fmt::Display for EvalError {
@@ -36,6 +38,7 @@ impl fmt::Display for EvalError {
             Self::KeyError => write!(f, "{}", "KeyError"),
             Self::IndexError => write!(f, "{}", "IndexError"),
             Self::Runtime(message) => write!(f, "RuntimeError: {}", message),
+            Self::Value(message) => write!(f, "ValueError: {}", message),
             Self::Decimal(err) => write!(f, "DecimalError: {}", err),
             Self::Parse(err) => write!(f, "{}", err),
         }
@@ -69,13 +72,19 @@ impl From<ParseError> for EvalError {
     }
 }
 
+impl From<ValueError> for EvalError {
+    fn from(err: ValueError) -> EvalError {
+        Self::Value(err.0)
+    }
+}
+
 impl EvalError {
     pub fn runtime(message: &str) -> EvalError {
         Self::Runtime(String::from(message))
     }
 }
 
-pub type ValueResult = Result<Value, EvalError>;
+pub type EvalResult = Result<Value, EvalError>;
 
 pub struct ScopeFrame {
     vars: HashMap<String, Value>,
@@ -180,16 +189,13 @@ impl Intepreter {
     //     }
     // }
 
-    pub fn eval(&mut self, node: Box<Node>) -> ValueResult {
+    pub fn eval(&mut self, node: Box<Node>) -> EvalResult {
         match *node.syntax {
             Null => Ok(NullV),
             Bool(value) => Ok(BoolV(value)),
             Number(value) => self.eval_number(value),
             Str(value) => self.eval_string(value),
-            Temporal(value) => match parse_temporal(value.as_str()) {
-                Ok(v) => Ok(v),
-                Err(err) => Err(EvalError::Runtime(err)),
-            },
+            Temporal(value) => Ok(parse_temporal(value.as_str())?),
             Ident(value) => Ok(StrV(value)),
             Var(name) => self.eval_var(name),
             Neg(value) => self.eval_neg(value),
@@ -229,17 +235,16 @@ impl Intepreter {
             } => self.eval_every_expr(var_name, list_expr, filter_expr),
             ExprList(exprs) => self.eval_expr_list(exprs),
             MultiTests(exprs) => self.eval_multi_tests(exprs),
-            //_ => Err(EvalError::Runtime(format!("eval not supported {}", *node))),
         }
     }
 
     #[inline(always)]
-    fn eval_string(&mut self, value: String) -> ValueResult {
+    fn eval_string(&mut self, value: String) -> EvalResult {
         let content = String::from(&value[1..(value.len() - 1)]);
         Ok(StrV(content))
     }
 
-    pub fn is_defined(&mut self, value_node: Box<Node>) -> ValueResult {
+    pub fn is_defined(&mut self, value_node: Box<Node>) -> EvalResult {
         if let Var(v) = *value_node.syntax.clone() {
             return match self.resolve(v) {
                 Some(_) => Ok(BoolV(true)),
@@ -256,13 +261,13 @@ impl Intepreter {
     }
 
     #[inline(always)]
-    fn eval_number(&mut self, number_str: String) -> ValueResult {
+    fn eval_number(&mut self, number_str: String) -> EvalResult {
         let d = Decimal::from_str_exact(number_str.as_str())?;
         Ok(NumberV(d))
     }
 
     #[inline(always)]
-    fn eval_var(&mut self, name: String) -> ValueResult {
+    fn eval_var(&mut self, name: String) -> EvalResult {
         if let Some(value) = self.resolve(name) {
             Ok(value)
         } else {
@@ -271,7 +276,7 @@ impl Intepreter {
     }
 
     #[inline(always)]
-    fn eval_array(&mut self, elements: &Vec<Box<Node>>) -> ValueResult {
+    fn eval_array(&mut self, elements: &Vec<Box<Node>>) -> EvalResult {
         let mut results = Vec::new();
         for elem in elements.iter() {
             let res = self.eval(elem.clone())?;
@@ -281,7 +286,7 @@ impl Intepreter {
     }
 
     #[inline(always)]
-    fn eval_map(&mut self, items: &Vec<MapNodeItem>) -> ValueResult {
+    fn eval_map(&mut self, items: &Vec<MapNodeItem>) -> EvalResult {
         let mut value_map: BTreeMap<String, Value> = BTreeMap::new();
         for item in items.iter() {
             let k = self.eval(item.name.clone())?;
@@ -293,7 +298,7 @@ impl Intepreter {
     }
 
     #[inline(always)]
-    fn eval_neg(&mut self, node: Box<Node>) -> ValueResult {
+    fn eval_neg(&mut self, node: Box<Node>) -> EvalResult {
         let pv = self.eval(node)?;
         match pv {
             NumberV(v) => Ok(NumberV(v.neg())),
@@ -307,7 +312,7 @@ impl Intepreter {
         condition: Box<Node>,
         then_branch: Box<Node>,
         else_branch: Box<Node>,
-    ) -> ValueResult {
+    ) -> EvalResult {
         let cond_value = self.eval(condition)?;
         if cond_value.bool_value() {
             self.eval(then_branch)
@@ -322,7 +327,7 @@ impl Intepreter {
         start_node: Box<Node>,
         end_node: Box<Node>,
         end_open: bool,
-    ) -> ValueResult {
+    ) -> EvalResult {
         let start_value = self.eval(start_node)?;
         let start = match start_value {
             NumberV(v) => v,
@@ -346,7 +351,7 @@ impl Intepreter {
         var_name: String,
         list_expr: Box<Node>,
         return_expr: Box<Node>,
-    ) -> ValueResult {
+    ) -> EvalResult {
         let list_value = self.eval(list_expr)?;
         match list_value {
             ArrayV(items) => {
@@ -372,7 +377,7 @@ impl Intepreter {
         var_name: String,
         list_expr: Box<Node>,
         filter_expr: Box<Node>,
-    ) -> ValueResult {
+    ) -> EvalResult {
         let list_value = self.eval(list_expr)?;
         match list_value {
             ArrayV(items) => {
@@ -401,7 +406,7 @@ impl Intepreter {
         var_name: String,
         list_expr: Box<Node>,
         filter_expr: Box<Node>,
-    ) -> ValueResult {
+    ) -> EvalResult {
         let list_value = self.eval(list_expr)?;
         match list_value {
             ArrayV(items) => {
@@ -427,7 +432,7 @@ impl Intepreter {
     }
 
     #[inline(always)]
-    fn eval_expr_list(&mut self, exprs: Vec<Node>) -> ValueResult {
+    fn eval_expr_list(&mut self, exprs: Vec<Node>) -> EvalResult {
         let mut last_result: Option<Value> = None;
         for expr in exprs.iter() {
             let res = self.eval(Box::new(expr.clone()))?;
@@ -441,7 +446,7 @@ impl Intepreter {
     }
 
     #[inline(always)]
-    fn eval_multi_tests(&mut self, exprs: Vec<Node>) -> ValueResult {
+    fn eval_multi_tests(&mut self, exprs: Vec<Node>) -> EvalResult {
         //let input_value = self.resolve("?".to_owned()).ok_or(EvalError::VarNotFound)?;
         for expr in exprs.iter() {
             let res = self.eval(Box::new(expr.clone()))?;
@@ -453,7 +458,7 @@ impl Intepreter {
     }
 
     #[inline(always)]
-    fn eval_func_call(&mut self, func_ref: Box<Node>, call_args: Vec<FuncCallArg>) -> ValueResult {
+    fn eval_func_call(&mut self, func_ref: Box<Node>, call_args: Vec<FuncCallArg>) -> EvalResult {
         let fref = self.eval(func_ref)?;
         match fref {
             NativeFuncV { func, arg_names } => self.call_native_func(func.0, arg_names, call_args),
@@ -476,7 +481,7 @@ impl Intepreter {
         func: NativeFunc,
         arg_names: Vec<String>,
         call_args: Vec<FuncCallArg>,
-    ) -> ValueResult {
+    ) -> EvalResult {
         let mut arg_values: Vec<Value> = Vec::new();
         for a in call_args {
             let v = self.eval(a.arg)?;
@@ -501,7 +506,7 @@ impl Intepreter {
         callback: MacroCbT,
         arg_names: Vec<String>,
         call_args: Vec<FuncCallArg>,
-    ) -> ValueResult {
+    ) -> EvalResult {
         if arg_names.len() > call_args.len() {
             return Err(EvalError::runtime("call macro with too few arguments"));
         }
@@ -513,7 +518,7 @@ impl Intepreter {
         callback.0(self, args)
     }
 
-    fn call_func(&mut self, func_def: Box<Node>, call_args: Vec<FuncCallArg>) -> ValueResult {
+    fn call_func(&mut self, func_def: Box<Node>, call_args: Vec<FuncCallArg>) -> EvalResult {
         let mut arg_values: Vec<Value> = Vec::new();
         for a in call_args {
             let v = self.eval(a.arg)?;
@@ -542,12 +547,12 @@ impl Intepreter {
 
     // binary ops
     #[inline(always)]
-    fn eval_binop(&mut self, op: String, left: Box<Node>, right: Box<Node>) -> ValueResult {
+    fn eval_binop(&mut self, op: String, left: Box<Node>, right: Box<Node>) -> EvalResult {
         let left_value = self.eval(left)?;
         let right_value = self.eval(right)?;
         match op.as_str() {
-            "+" => self.eval_binop_add(left_value, right_value),
-            "-" => self.eval_binop_sub(left_value, right_value),
+            "+" => Ok((left_value + right_value)?),
+            "-" => Ok((left_value - right_value)?),
             "*" => ev_binop_number!(self, op, left_value, right_value, *),
             "/" => ev_binop_number!(self,op, left_value, right_value, /),
             ">" => ev_binop_comparation!(self, op, left_value, right_value, >),
@@ -557,94 +562,13 @@ impl Intepreter {
             "!=" => ev_binop_comparation!(self, op, left_value, right_value, !=),
             "=" => ev_binop_comparation!(self, op, left_value, right_value, ==),
             "[]" => self.eval_binop_index(left_value, right_value),
+            "in" => self.eval_binop_in(left_value, right_value),
             _ => return Err(EvalError::Runtime(format!("unknown op {}", op))),
         }
     }
 
     #[inline(always)]
-    fn eval_binop_add(&mut self, left_value: Value, right_value: Value) -> ValueResult {
-        match left_value {
-            NumberV(a) => match right_value {
-                NumberV(b) => Ok(NumberV(a + b)),
-                _ => Err(EvalError::Runtime(format!(
-                    "canot + number and {}",
-                    right_value.data_type()
-                ))),
-            },
-            StrV(a) => match right_value {
-                StrV(b) => Ok(StrV(a + &b)),
-                _ => Err(EvalError::Runtime(format!(
-                    "canot + string and {}",
-                    right_value.data_type()
-                ))),
-            },
-            DateTimeV(dt) => match right_value {
-                DurationV { duration, negative } => {
-                    match datetime_op(true, dt, duration, negative) {
-                        Ok(v) => Ok(DateTimeV(v)),
-                        Err(err) => Err(EvalError::Runtime(err)),
-                    }
-                }
-                _ => Err(EvalError::Runtime(format!(
-                    "canot + datetime and {}",
-                    right_value.data_type()
-                ))),
-            },
-            DurationV { duration, negative } => match right_value {
-                DateTimeV(b) => match datetime_op(true, b, duration, negative) {
-                    Ok(v) => Ok(DateTimeV(v)),
-                    Err(err) => Err(EvalError::Runtime(err)),
-                },
-                _ => Err(EvalError::Runtime(format!(
-                    "canot + duration and {}",
-                    right_value.data_type()
-                ))),
-            },
-            _ => Err(EvalError::Runtime(format!(
-                "canot + {} and {}",
-                left_value.data_type(),
-                right_value.data_type()
-            ))),
-        }
-    }
-
-    #[inline(always)]
-    fn eval_binop_sub(&mut self, left_value: Value, right_value: Value) -> ValueResult {
-        match left_value {
-            NumberV(a) => match right_value {
-                NumberV(b) => Ok(NumberV(a - b)),
-                _ => Err(EvalError::Runtime(format!(
-                    "canot - number and {}",
-                    right_value.data_type()
-                ))),
-            },
-            DateTimeV(a) => match right_value {
-                DurationV { duration, negative } => {
-                    match datetime_op(false, a, duration, negative) {
-                        Ok(v) => Ok(DateTimeV(v)),
-                        Err(err) => Err(EvalError::Runtime(err)),
-                    }
-                }
-                DateTimeV(b) => {
-                    let delta = a - b;
-                    let (duration, negative) = timedelta_to_duration(delta);
-                    Ok(DurationV { duration, negative })
-                }
-                _ => Err(EvalError::Runtime(format!(
-                    "canot - datetime and {}",
-                    right_value.data_type()
-                ))),
-            },
-            _ => Err(EvalError::Runtime(format!(
-                "canot - {} and {}",
-                left_value.data_type(),
-                right_value.data_type()
-            ))),
-        }
-    }
-
-    #[inline(always)]
-    fn eval_binop_index(&mut self, left_value: Value, right_value: Value) -> ValueResult {
+    fn eval_binop_index(&mut self, left_value: Value, right_value: Value) -> EvalResult {
         match left_value {
             MapV(a) => match right_value {
                 StrV(k) => {
@@ -671,7 +595,25 @@ impl Intepreter {
     }
 
     #[inline(always)]
-    fn eval_dotop(&mut self, left: Box<Node>, attr: String) -> ValueResult {
+    fn eval_binop_in(&mut self, left_value: Value, right_value: Value) -> EvalResult {
+        match right_value {
+            RangeV(rng) => {
+                if let NumberV(n) = left_value {
+                    let contains = rng.contains(n);
+                    Ok(BoolV(contains))
+                } else {
+                    Err(EvalError::runtime("cannot check in for non number"))
+                }
+            }
+            _ => Err(EvalError::Runtime(format!(
+                "cannot perform in op on {}",
+                right_value.data_type(),
+            ))),
+        }
+    }
+
+    #[inline(always)]
+    fn eval_dotop(&mut self, left: Box<Node>, attr: String) -> EvalResult {
         let left_value = self.eval(left)?;
         match left_value {
             MapV(a) => {
