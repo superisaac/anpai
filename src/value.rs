@@ -36,6 +36,45 @@ impl fmt::Debug for MacroCbT {
     }
 }
 
+// range
+#[derive(Clone)]
+pub struct RangeT {
+    pub start_open: bool,
+    pub start: Decimal,
+    pub end_open: bool,
+    pub end: Decimal,
+}
+
+impl fmt::Debug for RangeT {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let start_sym = if self.start_open { "(" } else { "[" };
+        let end_sym = if self.end_open { ")" } else { "]" };
+        write!(
+            f,
+            "{}{}..{}{}",
+            start_sym,
+            self.start.normalize(),
+            self.end.normalize(),
+            end_sym
+        )
+    }
+}
+
+impl fmt::Display for RangeT {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let start_sym = if self.start_open { "(" } else { "[" };
+        let end_sym = if self.end_open { ")" } else { "]" };
+        write!(
+            f,
+            "{}{}..{}{}",
+            start_sym,
+            self.start.normalize(),
+            self.end.normalize(),
+            end_sym
+        )
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Value {
     NullV,
@@ -49,6 +88,7 @@ pub enum Value {
         duration: iso8601::Duration,
         negative: bool,
     },
+    RangeV(RangeT),
     ArrayV(RefCell<Rc<Vec<Value>>>),
     MapV(RefCell<Rc<BTreeMap<String, Value>>>),
     NativeFuncV {
@@ -82,6 +122,7 @@ impl fmt::Display for Value {
                 let sign = if *negative { "-" } else { "" };
                 write!(f, "{}{}", sign, duration)
             }
+            Self::RangeV(v) => write!(f, "{}", v),
             Self::ArrayV(arr) => fmt_vec(f, arr.borrow().iter(), "[", "]"),
             Self::MapV(map) => fmt_map(f, &map.borrow(), "{", "}"),
             Self::NativeFuncV {
@@ -111,6 +152,7 @@ impl Value {
                 duration: _,
                 negative: _,
             } => "duration".to_owned(),
+            Self::RangeV(_) => "range".to_owned(),
             Self::ArrayV(_) => "array".to_owned(),
             Self::MapV(_) => "map".to_owned(),
             Self::NativeFuncV {

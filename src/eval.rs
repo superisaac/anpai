@@ -12,7 +12,9 @@ use crate::temporal::{datetime_op, parse_temporal, timedelta_to_duration};
 use crate::value::NativeFunc;
 
 use crate::value::MacroCbT;
+use crate::value::RangeT;
 use crate::value::Value::{self, *};
+
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::{Decimal, Error as DecimalError};
 
@@ -193,6 +195,12 @@ impl Intepreter {
             Neg(value) => self.eval_neg(value),
             BinOp { op, left, right } => self.eval_binop(op, left, right),
             DotOp { left, attr } => self.eval_dotop(left, attr),
+            Range {
+                start_open,
+                start,
+                end_open,
+                end,
+            } => self.eval_range(start_open, start, end, end_open),
             Array(elements) => self.eval_array(&elements),
             Map(items) => self.eval_map(&items),
             FuncDef { arg_names, body } => Ok(FuncV {
@@ -221,7 +229,7 @@ impl Intepreter {
             } => self.eval_every_expr(var_name, list_expr, filter_expr),
             ExprList(exprs) => self.eval_expr_list(exprs),
             MultiTests(exprs) => self.eval_multi_tests(exprs),
-            _ => Err(EvalError::Runtime(format!("eval not supported {}", *node))),
+            //_ => Err(EvalError::Runtime(format!("eval not supported {}", *node))),
         }
     }
 
@@ -306,6 +314,31 @@ impl Intepreter {
         } else {
             self.eval(else_branch)
         }
+    }
+
+    fn eval_range(
+        &mut self,
+        start_open: bool,
+        start_node: Box<Node>,
+        end_node: Box<Node>,
+        end_open: bool,
+    ) -> ValueResult {
+        let start_value = self.eval(start_node)?;
+        let start = match start_value {
+            NumberV(v) => v,
+            _ => return Err(EvalError::runtime("start is not number")),
+        };
+        let end_value = self.eval(end_node)?;
+        let end = match end_value {
+            NumberV(v) => v,
+            _ => return Err(EvalError::runtime("end is not number")),
+        };
+        Ok(RangeV(RangeT {
+            start_open,
+            start,
+            end,
+            end_open,
+        }))
     }
 
     fn eval_for_expr(
