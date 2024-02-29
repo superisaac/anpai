@@ -489,8 +489,7 @@ impl Intepreter {
     // logic ops
     #[inline(always)]
     fn eval_logicop(&mut self, op: String, left: Box<Node>, right: Box<Node>) -> EvalResult {
-        let left_value = self.eval(left)?;
-        let left_bool_value = left_value.bool_value();
+        let left_bool_value = self.eval(left)?.bool_value();
         match op.as_str() {
             "and" => {
                 let right_value = self.eval(right)?;
@@ -556,7 +555,7 @@ impl Intepreter {
                     let v = arr.get(idx0 - 1).ok_or(EvalError::IndexError)?;
                     Ok(v.clone())
                 }
-                _ => Err(EvalError::runtime("array index not string")),
+                _ => Err(EvalError::runtime("array index not integer")),
             },
             _ => Err(EvalError::Runtime(format!(
                 "value {} is not indexable",
@@ -571,6 +570,15 @@ impl Intepreter {
             RangeV(rng) => {
                 let contains = rng.contains(left_value);
                 Ok(BoolV(contains))
+            }
+            ArrayV(a) => {
+                let arr = a.borrow();
+                for v in arr.iter() {
+                    if *v == left_value {
+                        return Ok(BoolV(true));
+                    }
+                }
+                Ok(BoolV(false))
             }
             _ => Err(EvalError::Runtime(format!(
                 "cannot perform in op on {}",
@@ -638,11 +646,15 @@ mod test {
             ("[6, 1, 2, -3][4]", "-3"),
             ("[2, 8,false,true]", "[2, 8, false, true]"),
             ("{a: 1, b: 2}", r#"{"a":1, "b":2}"#),
-            // ranges
+            // in operator over ranges and arrays
             ("5 in (5..8]", "false"),
             ("5 in [5..8)", "true"),
             ("8 in [5..8)", "false"),
             ("8 in [5..8]", "true"),
+            (r#" "c" in ["a".."z"]"#, "true"),
+            (r#" "f" in ["a".."f")"#, "false"),
+            ("7 in [2, 7, 8]", "true"),
+            ("7 in [3, 99, -1]", "false"),
             // if expr
             ("if 2 > 3 then 6 else 8", "8"),
             ("for a in [2, 3, 4] return a * 2", "[4, 6, 8]"), // simple for loop
