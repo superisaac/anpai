@@ -15,8 +15,9 @@ use crate::value::MacroCbT;
 use crate::value::RangeT;
 use crate::value::Value::{self, *};
 
-use rust_decimal::prelude::ToPrimitive;
+use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use rust_decimal::{Decimal, Error as DecimalError};
+use rust_decimal_macros::dec;
 
 // EvalError
 #[derive(Debug)]
@@ -277,19 +278,11 @@ impl Intepreter {
         end_open: bool,
     ) -> EvalResult {
         let start_value = self.eval(start_node)?;
-        let start = match start_value {
-            NumberV(v) => v,
-            _ => return Err(EvalError::runtime("start is not number")),
-        };
         let end_value = self.eval(end_node)?;
-        let end = match end_value {
-            NumberV(v) => v,
-            _ => return Err(EvalError::runtime("end is not number")),
-        };
         Ok(RangeV(RangeT {
             start_open,
-            start,
-            end,
+            start: Rc::new(start_value),
+            end: Rc::new(end_value),
             end_open,
         }))
     }
@@ -551,9 +544,16 @@ impl Intepreter {
             },
             ArrayV(a) => match right_value {
                 NumberV(idx) => {
-                    let idx0 = idx.to_usize().unwrap();
+                    // in FEEL language index starts from 1
                     let arr = a.borrow();
-                    let v = arr.get(idx0).ok_or(EvalError::IndexError)?;
+                    if !idx.is_integer()
+                        || idx < dec!(1)
+                        || idx > Decimal::from_usize(arr.len()).unwrap()
+                    {
+                        return Err(EvalError::IndexError);
+                    }
+                    let idx0 = idx.to_usize().unwrap();
+                    let v = arr.get(idx0 - 1).ok_or(EvalError::IndexError)?;
                     Ok(v.clone())
                 }
                 _ => Err(EvalError::runtime("array index not string")),
@@ -569,12 +569,8 @@ impl Intepreter {
     fn eval_binop_in(&mut self, left_value: Value, right_value: Value) -> EvalResult {
         match right_value {
             RangeV(rng) => {
-                if let NumberV(n) = left_value {
-                    let contains = rng.contains(n);
-                    Ok(BoolV(contains))
-                } else {
-                    Err(EvalError::runtime("cannot check in for non number"))
-                }
+                let contains = rng.contains(left_value);
+                Ok(BoolV(contains))
             }
             _ => Err(EvalError::Runtime(format!(
                 "cannot perform in op on {}",
@@ -639,7 +635,7 @@ mod test {
             (r#""abc" + "def""#, r#""abcdef""#),
             ("2 < 3 - 1", "false"),
             (r#""abc" <= "abd""#, "true"),
-            ("[6, 1, 2, -3][3]", "-3"),
+            ("[6, 1, 2, -3][4]", "-3"),
             ("[2, 8,false,true]", "[2, 8, false, true]"),
             ("{a: 1, b: 2}", r#"{"a":1, "b":2}"#),
             // ranges
@@ -661,11 +657,13 @@ mod test {
             (r#"set("?", 5); >6, =8, < 3"#, "false"), // multi tests
             (r#"set("?", 5); >6, <8, < 3"#, "true"),
             (r#"is defined(a)"#, "false"),
-            (r#"is defined([1, 2][0])"#, "true"),
+            (r#"is defined([1, 2][1])"#, "true"),
+            (r#"is defined([1, 2][-1])"#, "false"),
             (r#"is defined([1, 2][6])"#, "false"),
         ];
 
         for (input, output) in testcases {
+            println!("eval {}", input);
             let mut intp = super::Intepreter::new();
             let node = parse(input).unwrap();
             let v = intp.eval(node).unwrap();
