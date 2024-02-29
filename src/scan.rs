@@ -116,7 +116,7 @@ lazy_static! {
         });
         patterns.push(TokenPattern{
             token: "keyword",
-            reg: Some(Regex::new(r"^\b(true|false|and|or|null|function|if|then|else|loop|for|some|every|in|return|satisfies)\b").unwrap()),
+            reg: Some(Regex::new(r"^\b(true|false|and|or|not|null|function|if|then|else|loop|for|some|every|in|return|satisfies)\b").unwrap()),
         });
         patterns.push(TokenPattern {
             token: "temporal",

@@ -141,8 +141,10 @@ impl Intepreter {
             Temporal(value) => Ok(parse_temporal(value.as_str())?),
             Ident(value) => Ok(StrV(value)),
             Var(name) => self.eval_var(name),
-            Neg(value) => self.eval_neg(value),
+            Neg(value) => self.eval_neg_op(value),
+            Not(value) => self.eval_not_op(value),
             BinOp { op, left, right } => self.eval_binop(op, left, right),
+            LogicOp { op, left, right } => self.eval_logicop(op, left, right),
             DotOp { left, attr } => self.eval_dotop(left, attr),
             Range {
                 start_open,
@@ -241,9 +243,15 @@ impl Intepreter {
     }
 
     #[inline(always)]
-    fn eval_neg(&mut self, node: Box<Node>) -> EvalResult {
+    fn eval_neg_op(&mut self, node: Box<Node>) -> EvalResult {
         let pv = self.eval(node)?;
         Ok((-pv)?)
+    }
+
+    #[inline(always)]
+    fn eval_not_op(&mut self, node: Box<Node>) -> EvalResult {
+        let pv = self.eval(node)?;
+        Ok(!pv)
     }
 
     #[inline(always)]
@@ -485,6 +493,28 @@ impl Intepreter {
         }
     }
 
+    // logic ops
+    #[inline(always)]
+    fn eval_logicop(&mut self, op: String, left: Box<Node>, right: Box<Node>) -> EvalResult {
+        let left_value = self.eval(left)?;
+        let left_bool_value = left_value.bool_value();
+        match op.as_str() {
+            "and" => {
+                let right_value = self.eval(right)?;
+                Ok(BoolV(left_bool_value && right_value.bool_value()))
+            }
+            "or" => {
+                if left_bool_value {
+                    return Ok(BoolV(true));
+                } else {
+                    let right_value = self.eval(right)?;
+                    return Ok(BoolV(right_value.bool_value()));
+                }
+            }
+            _ => Err(EvalError::Runtime(format!("un expected logic op {}", op))),
+        }
+    }
+
     // binary ops
     #[inline(always)]
     fn eval_binop(&mut self, op: String, left: Box<Node>, right: Box<Node>) -> EvalResult {
@@ -590,6 +620,9 @@ mod test {
             ("4 * 9 + 1", "37"),
             ("8 % 5", "3"),
             ("8 / 5", "1.6"),
+            ("true and false", "false"),
+            ("false or 2", "true"),
+            ("not (false or 2)", "false"),
             (
                 r#"@"2023-06-01T10:33:20+01:00" + @"P3Y11M""#,
                 "2027-05-01T10:33:20+01:00",
@@ -609,6 +642,12 @@ mod test {
             ("[6, 1, 2, -3][3]", "-3"),
             ("[2, 8,false,true]", "[2, 8, false, true]"),
             ("{a: 1, b: 2}", r#"{"a":1, "b":2}"#),
+            // ranges
+            ("5 in (5..8]", "false"),
+            ("5 in [5..8)", "true"),
+            ("8 in [5..8)", "false"),
+            ("8 in [5..8]", "true"),
+            // if expr
             ("if 2 > 3 then 6 else 8", "8"),
             ("for a in [2, 3, 4] return a * 2", "[4, 6, 8]"), // simple for loop
             (

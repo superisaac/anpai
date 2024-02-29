@@ -37,6 +37,12 @@ pub enum NodeSyntax {
         right: Box<Node>,
     },
 
+    LogicOp {
+        op: String,
+        left: Box<Node>,
+        right: Box<Node>,
+    },
+
     DotOp {
         left: Box<Node>,
         attr: String,
@@ -71,6 +77,8 @@ pub enum NodeSyntax {
     Temporal(String),
 
     Neg(Box<Node>),
+
+    Not(Box<Node>),
 
     Array(Vec<Box<Node>>),
 
@@ -116,6 +124,7 @@ impl fmt::Display for NodeSyntax {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::BinOp { op, left, right } => write!(f, "({} {} {})", op, left, right),
+            Self::LogicOp { op, left, right } => write!(f, "({} {} {})", op, left, right),
             Self::DotOp { left, attr } => write!(f, "(. {} {})", left, attr),
             Self::FuncCall { func_ref, args } => write!(f, "(call {} ", func_ref)
                 .and_then(|_| fmt_vec(f, args.iter(), "[", "]"))
@@ -131,6 +140,7 @@ impl fmt::Display for NodeSyntax {
             Self::Str(value) => write!(f, "{}", value),
             Self::Temporal(value) => write!(f, "{}", value),
             Self::Neg(value) => write!(f, "(- {})", value),
+            Self::Not(value) => write!(f, "(not {})", value),
             Self::Range {
                 start_open,
                 start,

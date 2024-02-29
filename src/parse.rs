@@ -168,16 +168,32 @@ impl Parser<'_> {
         Ok(left)
     }
 
+    // logic ops
+    fn parse_logicop_keywords(
+        &mut self,
+        keywords: &[&str],
+        sub_func: fn(&mut Self) -> NodeResult,
+    ) -> NodeResult {
+        let mut left = sub_func(self)?;
+        while self.scanner.expect_keywords(keywords) {
+            let op = self.scanner.unwrap_current_token().value;
+            goahead!(self);
+            let right = sub_func(self)?;
+            left = Node::new(LogicOp { op, left, right });
+        }
+        Ok(left)
+    }
+
     fn parse_in_op(&mut self) -> NodeResult {
         self.parse_binop_keywords(&["in"], Parser::parse_logic_or)
     }
 
     fn parse_logic_or(&mut self) -> NodeResult {
-        self.parse_binop_keywords(&["or"], Parser::parse_logic_and)
+        self.parse_logicop_keywords(&["or"], Parser::parse_logic_and)
     }
 
     fn parse_logic_and(&mut self) -> NodeResult {
-        self.parse_binop_keywords(&["and"], Parser::parse_compare)
+        self.parse_logicop_keywords(&["and"], Parser::parse_compare)
     }
 
     fn parse_compare(&mut self) -> NodeResult {
@@ -290,6 +306,7 @@ impl Parser<'_> {
             "keyword" => match self.scanner.unwrap_current_token().value.as_str() {
                 "true" | "false" => self.parse_bool(),
                 "null" => self.parse_null(),
+                "not" => self.parse_not_expr(),
                 "if" => self.parse_if_expression(),
                 "for" => self.parse_for_expression(),
                 "some" | "every" => self.parse_some_or_every_expression(),
@@ -345,6 +362,12 @@ impl Parser<'_> {
         goahead!(self); // skip '-'
         let value = self.parse_expression()?;
         Ok(Node::new(Neg(value)))
+    }
+
+    fn parse_not_expr(&mut self) -> NodeResult {
+        goahead!(self); // skip 'not'
+        let node = self.parse_expression()?;
+        Ok(Node::new(Not(node)))
     }
 
     fn parse_string(&mut self) -> NodeResult {
