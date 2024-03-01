@@ -1,4 +1,5 @@
 use crate::helpers::{fmt_iter, fmt_vec};
+use crate::scan::TextPosition;
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -190,6 +191,7 @@ impl fmt::Display for NodeSyntax {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Node {
     pub syntax: Box<NodeSyntax>,
+    pub start_pos: TextPosition,
 }
 
 impl fmt::Display for Node {
@@ -199,9 +201,10 @@ impl fmt::Display for Node {
 }
 
 impl Node {
-    pub fn new(syntax: NodeSyntax) -> Box<Node> {
+    pub fn new(syntax: NodeSyntax, start_pos: TextPosition) -> Box<Node> {
         Box::new(Node {
             syntax: Box::new(syntax),
+            start_pos,
         })
     }
 }

@@ -156,7 +156,7 @@ impl Intepreter {
             Array(elements) => self.eval_array(&elements),
             Map(items) => self.eval_map(&items),
             FuncDef { arg_names, body } => Ok(FuncV {
-                func_def: Node::new(FuncDef { arg_names, body }),
+                func_def: Node::new(FuncDef { arg_names, body }, node.start_pos),
             }),
             FuncCall { func_ref, args } => self.eval_func_call(func_ref, args),
             IfExpr {

@@ -25,7 +25,7 @@ impl ScanError {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct TextPosition {
     pub chars: usize,
     pub lines: usize,
