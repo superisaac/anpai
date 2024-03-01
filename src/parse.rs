@@ -67,7 +67,7 @@ impl Parser<'_> {
     fn unexpect(&self, expects: &str) -> ParseError {
         ParseError::new(format!(
             "unexpected token {}, expect {}",
-            self.scanner.unwrap_current_token().kind,
+            self.scanner.current_token().kind,
             expects
         ))
     }
@@ -75,7 +75,7 @@ impl Parser<'_> {
     fn unexpect_keyword(&self, expects: &str) -> ParseError {
         ParseError::new(format!(
             "unexpected keyword {}, expect {}",
-            self.scanner.unwrap_current_token().value,
+            self.scanner.current_token().value,
             expects
         ))
     }
@@ -103,7 +103,7 @@ impl Parser<'_> {
             .expect_kinds(&[">", ">=", "<", "<=", "!=", "="])
         {
             // unary tests
-            let op = self.scanner.unwrap_current_token().kind;
+            let op = self.scanner.current_token().kind;
             goahead!(self); // skip op
             let right = self.parse_expression()?;
             let left = Node::new(Var("?".to_owned()));
@@ -145,7 +145,7 @@ impl Parser<'_> {
     ) -> NodeResult {
         let mut left = sub_func(self)?;
         while self.scanner.expect_keywords(keywords) {
-            let op = self.scanner.unwrap_current_token().value;
+            let op = self.scanner.current_token().value;
             goahead!(self);
             let right = sub_func(self)?;
             left = Node::new(BinOp { op, left, right });
@@ -160,7 +160,7 @@ impl Parser<'_> {
     ) -> NodeResult {
         let mut left = sub_parse(self)?;
         while self.scanner.expect_kinds(kinds) {
-            let op = self.scanner.unwrap_current_token().value;
+            let op = self.scanner.current_token().value;
             goahead!(self);
             let right = sub_parse(self)?;
             left = Node::new(BinOp { op, left, right });
@@ -176,7 +176,7 @@ impl Parser<'_> {
     ) -> NodeResult {
         let mut left = sub_func(self)?;
         while self.scanner.expect_keywords(keywords) {
-            let op = self.scanner.unwrap_current_token().value;
+            let op = self.scanner.current_token().value;
             goahead!(self);
             let right = sub_func(self)?;
             left = Node::new(LogicOp { op, left, right });
@@ -211,7 +211,7 @@ impl Parser<'_> {
     fn parse_funccall_or_index_or_dot(&mut self) -> NodeResult {
         let mut node = self.parse_single_element()?;
         loop {
-            match self.scanner.unwrap_current_token().kind {
+            match self.scanner.current_token().kind {
                 "(" => {
                     node = self.parse_func_call_rest(node)?;
                 }
@@ -293,7 +293,7 @@ impl Parser<'_> {
 
     // single element
     fn parse_single_element(&mut self) -> NodeResult {
-        match self.scanner.unwrap_current_token().kind {
+        match self.scanner.current_token().kind {
             "number" => self.parse_number(),
             "name" => self.parse_var(),
             "string" => self.parse_string(),
@@ -303,7 +303,7 @@ impl Parser<'_> {
             "(" => self.parse_bracket_or_range(),
             "[" => self.parse_range_or_array(),
             "?" => Ok(Node::new(Var("?".to_owned()))),
-            "keyword" => match self.scanner.unwrap_current_token().value.as_str() {
+            "keyword" => match self.scanner.current_token().value.as_str() {
                 "true" | "false" => self.parse_bool(),
                 "null" => self.parse_null(),
                 "not" => self.parse_not_expr(),
@@ -321,7 +321,7 @@ impl Parser<'_> {
         let mut names: Vec<String> = Vec::new();
 
         while self.scanner.expect_kinds(&["name", "keyword"]) {
-            let token = self.scanner.unwrap_current_token();
+            let token = self.scanner.current_token();
             if let ("keyword", Some(stop_keywords)) = (token.kind, stop_keywords) {
                 let token_keyword = token.value.as_str();
                 if stop_keywords.into_iter().any(|x| *x == token_keyword) {
@@ -347,13 +347,13 @@ impl Parser<'_> {
 
     fn parse_var(&mut self) -> NodeResult {
         let var_name = self.parse_name(None)?;
-        // let token = self.scanner.unwrap_current_token();
+        // let token = self.scanner.current_token();
         // goahead!(self);
         Ok(Node::new(Var(var_name)))
     }
 
     fn parse_number(&mut self) -> NodeResult {
-        let token = self.scanner.unwrap_current_token();
+        let token = self.scanner.current_token();
         goahead!(self);
         Ok(Node::new(Number(token.value)))
     }
@@ -371,19 +371,19 @@ impl Parser<'_> {
     }
 
     fn parse_string(&mut self) -> NodeResult {
-        let token = self.scanner.unwrap_current_token();
+        let token = self.scanner.current_token();
         goahead!(self);
         Ok(Node::new(Str(token.value)))
     }
 
     fn parse_temporal(&mut self) -> NodeResult {
-        let token = self.scanner.unwrap_current_token();
+        let token = self.scanner.current_token();
         goahead!(self);
         Ok(Node::new(Temporal(token.value)))
     }
 
     fn parse_bool(&mut self) -> NodeResult {
-        let bool_value = match self.scanner.unwrap_current_token().value.as_str() {
+        let bool_value = match self.scanner.current_token().value.as_str() {
             "true" => true,
             "false" => false,
             _ => return Err(self.unexpect_keyword("true, false")),
@@ -572,7 +572,7 @@ impl Parser<'_> {
     }
 
     fn parse_some_or_every_expression(&mut self) -> NodeResult {
-        let cmd = self.scanner.unwrap_current_token().value;
+        let cmd = self.scanner.current_token().value;
         goahead!(self); // skip 'for'
         let var_name = self.parse_name(Some(&["in"]))?;
 

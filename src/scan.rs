@@ -25,12 +25,47 @@ impl ScanError {
     }
 }
 
+#[derive(Clone, PartialEq)]
+pub struct TextPosition {
+    pub chars: usize,
+    pub lines: usize,
+    pub cols: usize,
+}
+impl fmt::Display for TextPosition {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "chars: {}, lines: {}, cols: {}",
+            self.chars, self.lines, self.cols
+        )
+    }
+}
+
+impl TextPosition {
+    pub fn zero() -> TextPosition {
+        TextPosition {
+            chars: 0,
+            lines: 0,
+            cols: 0,
+        }
+    }
+
+    pub fn increase(&self, chunk: &str) -> TextPosition {
+        let lines: Vec<&str> = chunk.split("\n").collect();
+        TextPosition {
+            chars: self.chars + chunk.len(),
+            lines: self.lines + lines.len(),
+            cols: lines.last().unwrap().len(),
+        }
+    }
+}
+
 // Token struct
 #[derive(Clone)]
 pub struct Token {
     pub kind: &'static str,
     pub value: String,
-    pub position: usize,
+    pub position: TextPosition,
 }
 
 impl fmt::Display for Token {
@@ -38,8 +73,8 @@ impl fmt::Display for Token {
         write!(
             f,
             "[{}..{}] {} '{}'",
-            self.position,
-            self.value.len() + self.position,
+            self.position.chars,
+            self.value.len() + self.position.chars,
             self.kind,
             self.value
         )
@@ -76,7 +111,7 @@ fn test_token_expect() {
     let token = Token {
         kind: "abc",
         value: "xyz".to_owned(),
-        position: 0,
+        position: TextPosition::zero(),
     };
     assert!(token.expect_kinds(&["abc", "kkk"]));
     assert!(!token.expect_kinds(&["abcdef", "kkk"]));
@@ -87,10 +122,22 @@ fn test_token_expect_keywords() {
     let token = Token {
         kind: "keyword",
         value: "xyz".to_owned(),
-        position: 0,
+        position: TextPosition::zero(),
     };
     assert!(!token.expect_keywords(&["abc", "kkk"]));
     assert!(token.expect_keywords(&["xyz", "kkk"]));
+}
+
+#[test]
+fn test_value_ahead() {
+    let text = r#"
+    abc 
+    def ghi
+    ok"#;
+    let cursor = TextPosition::zero().increase(text);
+    assert_eq!(cursor.chars, text.len());
+    assert_eq!(cursor.lines, 4);
+    assert_eq!(cursor.cols, 6); // "    ok".len()
 }
 
 #[derive(Clone)]
@@ -160,7 +207,7 @@ pub struct Scanner<'a> {
     // input text
     input: &'a str,
     // current scan position
-    cursor: usize,
+    cursor: TextPosition,
 
     // current abtained token
     current: Option<Token>,
@@ -170,7 +217,7 @@ impl Scanner<'_> {
     // constructor
     pub fn new(input: &str) -> Scanner {
         Scanner {
-            cursor: 0,
+            cursor: TextPosition::zero(),
             current: None,
             input: input,
         }
@@ -178,7 +225,7 @@ impl Scanner<'_> {
 
     // if the scan reached the end of input
     pub fn is_eof(&self) -> bool {
-        self.cursor >= self.input.len()
+        self.cursor.chars >= self.input.len()
     }
 
     // returns current token
@@ -187,7 +234,7 @@ impl Scanner<'_> {
     // }
 
     // returns the current token unwrapped
-    pub fn unwrap_current_token(&self) -> Token {
+    pub fn current_token(&self) -> Token {
         self.current.clone().unwrap()
     }
 
@@ -242,10 +289,10 @@ impl Scanner<'_> {
             return Ok(Token {
                 kind: "eof",
                 value: "".to_owned(),
-                position: self.cursor,
+                position: self.cursor.clone(),
             });
         }
-        let rest = &self.input[self.cursor..];
+        let rest = &self.input[(self.cursor.chars)..];
         for pattern in TOKEN_PATTERNS.iter() {
             if let Some(reg) = &pattern.reg {
                 if let Some(m) = reg.find(rest) {
@@ -253,18 +300,20 @@ impl Scanner<'_> {
                     let token = Token {
                         kind: pattern.token,
                         value: m.as_str().to_owned(),
-                        position: self.cursor,
+                        position: self.cursor.clone(),
                     };
-                    self.cursor += token.value.len();
+                    //self.cursor += token.value.len();
+                    self.cursor = self.cursor.increase(&token.value);
                     return Ok(token);
                 }
             } else if rest.starts_with(pattern.token) {
                 let token = Token {
                     kind: pattern.token,
                     value: String::from(pattern.token),
-                    position: self.cursor,
+                    position: self.cursor.clone(),
                 };
-                self.cursor += token.value.len();
+                //self.cursor += token.value.len();
+                self.cursor = self.cursor.increase(&token.value);
                 return Ok(token);
             }
         }
@@ -277,7 +326,7 @@ impl Scanner<'_> {
     //         if let Err(err) = self.next_token() {
     //             return Err(err);
     //         }
-    //         token_vecs.push(self.unwrap_current_token());
+    //         token_vecs.push(self.current_token());
     //     }
     //     Ok(token_vecs)
     // }
