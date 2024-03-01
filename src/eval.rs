@@ -8,12 +8,12 @@ use std::rc::Rc;
 use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use crate::parse::ParseError;
 use crate::prelude::PRELUDE;
-use crate::temporal::parse_temporal;
-use crate::value::{NativeFunc, ValueError};
+use crate::values::temporal::parse_temporal;
+use crate::values::value::ValueError;
 
-use crate::value::MacroCbT;
-use crate::value::RangeT;
-use crate::value::Value::{self, *};
+use crate::values::func::{MacroCbT, NativeFunc};
+use crate::values::range::RangeT;
+use crate::values::value::Value::{self, *};
 
 use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
 use rust_decimal::{Decimal, Error as DecimalError};

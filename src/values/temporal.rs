@@ -1,5 +1,5 @@
-use crate::value::Value;
-use crate::value::ValueError;
+use crate::values::value::Value;
+use crate::values::value::ValueError;
 
 use std::cmp;
 extern crate iso8601;
@@ -169,7 +169,7 @@ pub fn timedelta_to_duration(delta: chrono::TimeDelta) -> (iso8601::Duration, bo
 #[cfg(test)]
 mod test {
     use super::parse_temporal;
-    use crate::value::Value;
+    use crate::values::value::Value;
     use core::assert_matches::assert_matches;
     extern crate chrono;
     extern crate iso8601;
