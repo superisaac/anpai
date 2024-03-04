@@ -1,0 +1,12 @@
+[package]
+name = "feel-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono.workspace = true
+iso8601.workspace = true
+lazy_static.workspace = true
+rust_decimal.workspace = true
+rust_decimal_macros.workspace = true
+regex.workspace = true

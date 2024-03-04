@@ -3,19 +3,8 @@
 use clap::Parser;
 use fileinput::FileInput;
 use std::io::{BufRead, BufReader};
-
-mod ast;
-mod scan;
-
-mod parse;
-
-mod values;
-
-mod eval;
-
-mod helpers;
-
-mod prelude;
+use feel_core::eval;
+use feel_core::parse;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
