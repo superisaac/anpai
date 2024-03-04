@@ -38,9 +38,10 @@ impl FEELArgs {
         Ok(())
     }
 
-    fn execute(&self) -> Result<(), (eval::EvalError, TextPosition)> {
-        if let Some(code) = self.code.clone() {
-            self.parse_and_eval(code.as_str())
+    fn execute(&self) -> () {
+        let input = if let Some(code) = self.code.clone() {
+            //self.parse_and_eval(code.as_str())
+            code
         } else {
             let filenames: Vec<&str> = self.files.iter().map(|s| s.as_str()).collect();
             let fileinput = FileInput::new(&filenames);
@@ -53,18 +54,26 @@ impl FEELArgs {
                 buf.push_str(line.as_str());
                 buf.push_str("\n");
             }
-            self.parse_and_eval(buf.as_str())
+            //self.parse_and_eval(buf.as_str())
+            buf
+        };
+        match self.parse_and_eval(input.as_str()) {
+            Ok(_) => (),
+            Err((err, pos)) => {
+                eprintln!(
+                    "{}\nPosition: {}\n\n{}",
+                    err,
+                    pos,
+                    pos.line_pointers(input.as_str())
+                );
+            }
         }
+        ()
     }
 }
 
 fn main() {
     //let cmd = commands::FEELCommands::parse();
     let args = FEELArgs::parse();
-    match args.execute() {
-        Ok(_) => (),
-        Err((err, pos)) => {
-            eprintln!("{}, position: {}", err, pos);
-        }
-    }
+    args.execute()
 }

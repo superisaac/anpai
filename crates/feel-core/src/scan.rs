@@ -31,6 +31,7 @@ pub struct TextPosition {
     pub lines: usize,
     pub cols: usize,
 }
+
 impl fmt::Display for TextPosition {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -66,6 +67,16 @@ impl TextPosition {
             lines: self.lines + lines.len() - 1,
             cols: delta_cols + lines.last().unwrap().len(),
         }
+    }
+
+    pub fn line_pointers(&self, full_text: &str) -> String {
+        let lines: Vec<&str> = full_text.split("\n").collect();
+        let spaces = if self.cols > 0 {
+            " ".repeat(self.cols - 1)
+        } else {
+            "".to_string()
+        };
+        format!("{}\n{}^\n", lines[self.lines], spaces)
     }
 }
 
