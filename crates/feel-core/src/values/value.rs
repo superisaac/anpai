@@ -1,6 +1,6 @@
 use crate::ast::Node;
 use crate::helpers::{compare_value, fmt_map, fmt_vec};
-use crate::values::func::{NativeFuncT, MacroCbT};
+use crate::values::func::{MacroCbT, NativeFuncT};
 use crate::values::range::RangeT;
 extern crate chrono;
 extern crate iso8601;

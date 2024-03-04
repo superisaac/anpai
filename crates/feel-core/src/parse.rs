@@ -703,9 +703,12 @@ impl Parser<'_> {
     }
 }
 
-pub fn parse(input: &str) -> NodeResult {
+pub fn parse(input: &str) -> Result<Box<Node>, (ParseError, TextPosition)> {
     let mut parser = Parser::new(input);
-    parser.parse()
+    match parser.parse() {
+        Ok(n) => Ok(n),
+        Err(err) => Err((err, parser.scanner.current_token().position)),
+    }
 }
 
 #[test]

@@ -1,10 +1,11 @@
 #![feature(assert_matches)]
 
 use clap::Parser;
-use fileinput::FileInput;
-use std::io::{BufRead, BufReader};
 use feel_core::eval;
 use feel_core::parse;
+use feel_core::scan::TextPosition;
+use fileinput::FileInput;
+use std::io::{BufRead, BufReader};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -19,16 +20,27 @@ struct FEELArgs {
 }
 
 impl FEELArgs {
-    fn execute(&self) -> Result<(), eval::EvalError> {
-        let mut intp = eval::Intepreter::new();
+    fn parse_and_eval(&self, code: &str) -> Result<(), (eval::EvalError, TextPosition)> {
+        let n = match parse::parse(code) {
+            Ok(v) => v,
+            Err((err, pos)) => return Err((eval::EvalError::from(err), pos)),
+        };
+        if self.ast {
+            println!("{}", n);
+        } else {
+            let mut intp = eval::Intepreter::new();
+            let res = match intp.eval(n.clone()) {
+                Ok(v) => v,
+                Err(err) => return Err((err, n.start_pos)),
+            };
+            println!("{}", res);
+        }
+        Ok(())
+    }
+
+    fn execute(&self) -> Result<(), (eval::EvalError, TextPosition)> {
         if let Some(code) = self.code.clone() {
-            let n = parse::parse(code.as_str())?;
-            if self.ast {
-                println!("{}", n);
-            } else {
-                let res = intp.eval(n)?;
-                println!("{}", res);
-            }
+            self.parse_and_eval(code.as_str())
         } else {
             let filenames: Vec<&str> = self.files.iter().map(|s| s.as_str()).collect();
             let fileinput = FileInput::new(&filenames);
@@ -41,15 +53,8 @@ impl FEELArgs {
                 buf.push_str(line.as_str());
                 buf.push_str("\n");
             }
-            let n = parse::parse(buf.as_str())?;
-            if self.ast {
-                println!("{}", n);
-            } else {
-                let res = intp.eval(n)?;
-                println!("{}", res);
-            }
+            self.parse_and_eval(buf.as_str())
         }
-        Ok(())
     }
 }
 
@@ -58,6 +63,8 @@ fn main() {
     let args = FEELArgs::parse();
     match args.execute() {
         Ok(_) => (),
-        Err(err) => panic!("{}", err),
+        Err((err, pos)) => {
+            eprintln!("{}, position: {}", err, pos);
+        }
     }
 }

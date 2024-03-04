@@ -1,6 +1,6 @@
+use crate::values::value::Value;
 use std::fmt;
 use std::rc::Rc;
-use crate::values::value::Value;
 
 // range
 #[derive(Clone, PartialEq)]
@@ -26,7 +26,6 @@ impl fmt::Display for RangeT {
         write!(f, "{}{}..{}{}", start_sym, self.start, self.end, end_sym)
     }
 }
-
 
 impl RangeT {
     fn compare(a: &Value, b: &Value) -> i32 {

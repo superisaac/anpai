@@ -52,10 +52,19 @@ impl TextPosition {
 
     pub fn increase(&self, chunk: &str) -> TextPosition {
         let lines: Vec<&str> = chunk.split("\n").collect();
+        if lines.len() == 0 {
+            return self.clone();
+        }
+        let delta_cols = if lines.len() == 1 {
+            // the same line with the original pos
+            self.cols
+        } else {
+            0
+        };
         TextPosition {
             chars: self.chars + chunk.len(),
-            lines: self.lines + lines.len(),
-            cols: lines.last().unwrap().len(),
+            lines: self.lines + lines.len() - 1,
+            cols: delta_cols + lines.last().unwrap().len(),
         }
     }
 }
@@ -129,15 +138,33 @@ fn test_token_expect_keywords() {
 }
 
 #[test]
-fn test_value_ahead() {
+fn test_value_ahead_01() {
     let text = r#"
     abc 
     def ghi
     ok"#;
     let cursor = TextPosition::zero().increase(text);
     assert_eq!(cursor.chars, text.len());
-    assert_eq!(cursor.lines, 4);
+    assert_eq!(cursor.lines, 3);
     assert_eq!(cursor.cols, 6); // "    ok".len()
+}
+
+#[test]
+fn test_value_ahead_02() {
+    let text = "2 + +";
+    let cursor = TextPosition::zero().increase(text);
+    assert_eq!(cursor.chars, text.len());
+    assert_eq!(cursor.lines, 0);
+    assert_eq!(cursor.cols, 5);
+}
+
+#[test]
+fn test_value_ahead_03() {
+    let text = "\n\n2 + +";
+    let cursor = TextPosition::zero().increase(text);
+    assert_eq!(cursor.chars, text.len());
+    assert_eq!(cursor.lines, 2);
+    assert_eq!(cursor.cols, 5);
 }
 
 #[derive(Clone)]
@@ -219,7 +246,7 @@ impl Scanner<'_> {
         Scanner {
             cursor: TextPosition::zero(),
             current: None,
-            input: input,
+            input,
         }
     }
 

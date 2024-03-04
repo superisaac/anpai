@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-use std::fmt;
-use std::cmp;
+use crate::ast::Node;
+use crate::eval::EvalError;
 use crate::eval::Intepreter;
 use crate::values::value::Value;
-use crate::eval::EvalError;
-use crate::ast::Node;
+use std::cmp;
+use std::collections::HashMap;
+use std::fmt;
 
 // native func
 pub type NativeFunc =
