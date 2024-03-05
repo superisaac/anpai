@@ -10,10 +10,13 @@ use std::io::{BufRead, BufReader};
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct FEELArgs {
-    #[arg(short, long)]
+    #[arg(short, long, help = "dump AST node instead of evaluating")]
     ast: bool,
 
-    #[arg(short, long)]
+    #[arg(short, long, help = "output format is JSON")]
+    json: bool,
+
+    #[arg(short, long, help = "given input as string instead of from files")]
     code: Option<String>,
 
     files: Vec<String>,
@@ -26,9 +29,12 @@ impl FEELArgs {
             Err((err, pos)) => return Err((eval::EvalError::from(err), pos)),
         };
         if self.ast {
-            //println!("{}", n);
-            let serialized = serde_json::to_string_pretty(&n).unwrap();
-            println!("{}", serialized);
+            if self.json {
+                let serialized = serde_json::to_string_pretty(&n).unwrap();
+                println!("{}", serialized);
+            } else {
+                println!("{}", n);
+            }
         } else {
             let mut intp = eval::Intepreter::new();
             let res = match intp.eval(n.clone()) {

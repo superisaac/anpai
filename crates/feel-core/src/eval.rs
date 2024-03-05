@@ -124,7 +124,26 @@ impl Intepreter {
         PRELUDE.resolve(name)
     }
 
+    /// set the value of a variable by look up the stack
     pub fn set_var(&mut self, name: String, value: Value) {
+        if self.scopes.len() == 0 {
+            self.push_frame();
+        }
+
+        for frame_ref in self.scopes.iter().rev() {
+            let mut frame = frame_ref.borrow_mut();
+            if frame.vars.contains_key(&name) {
+                frame.vars.insert(name.clone(), value);
+                return;
+            }
+        }
+
+        // if the value not found then set it to the top bar
+        self.bind_var(name, value)
+    }
+
+    /// bind a variable to the top of stack
+    pub fn bind_var(&mut self, name: String, value: Value) {
         if self.scopes.len() == 0 {
             self.push_frame();
         }
