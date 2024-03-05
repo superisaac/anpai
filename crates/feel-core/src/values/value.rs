@@ -1,5 +1,5 @@
 use crate::ast::Node;
-use crate::helpers::{compare_value, fmt_map, fmt_vec};
+use crate::helpers::{compare_value, escape, fmt_map, fmt_vec};
 use crate::values::func::{MacroCbT, NativeFuncT};
 use crate::values::range::RangeT;
 extern crate chrono;
@@ -72,7 +72,7 @@ impl fmt::Display for Value {
             Self::NullV => write!(f, "{}", "null"),
             Self::BoolV(v) => write!(f, "{}", v),
             Self::NumberV(v) => write!(f, "{}", v.normalize()),
-            Self::StrV(v) => write!(f, "\"{}\"", v),
+            Self::StrV(v) => write!(f, "\"{}\"", escape(v)),
             Self::DateTimeV(v) => write!(f, "{}", v.format("%Y-%m-%dT%H:%M:%S%:z")),
             Self::DateV(v) => write!(f, "{}", v),
             Self::TimeV(v) => write!(f, "{}", v),

@@ -6,6 +6,7 @@ use std::fmt;
 use std::rc::Rc;
 
 use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
+use crate::helpers::unescape;
 use crate::parse::ParseError;
 use crate::prelude::PRELUDE;
 use crate::values::temporal::parse_temporal;
@@ -186,7 +187,8 @@ impl Intepreter {
 
     #[inline(always)]
     fn eval_string(&mut self, value: String) -> EvalResult {
-        let content = String::from(&value[1..(value.len() - 1)]);
+        //let content = String::from(&value[1..(value.len() - 1)]);
+        let content = unescape(&value[1..(value.len() - 1)]);
         Ok(StrV(content))
     }
 
@@ -640,7 +642,7 @@ mod test {
                 "P426DT0.2446661632S",
             ),
             (r#"@"2023-09-17" < @"2023-10-02""#, "true"),
-            (r#""abc" + "def""#, r#""abcdef""#),
+            (r#""abc" + "de\\nf""#, r#""abcde\nf""#),
             ("2 < 3 - 1", "false"),
             (r#""abc" <= "abd""#, "true"),
             ("[6, 1, 2, -3][4]", "-3"),

@@ -17,6 +17,7 @@ where
     }
 }
 
+/// format a vector of displayable
 pub fn fmt_vec<T: fmt::Display>(
     f: &mut fmt::Formatter,
     vec_iter: Iter<T>,
@@ -26,6 +27,7 @@ pub fn fmt_vec<T: fmt::Display>(
     fmt_iter(f, vec_iter, ", ", prefix, suffix)
 }
 
+/// format over iterators
 pub fn fmt_iter<T: fmt::Display>(
     f: &mut fmt::Formatter,
     vec_iter: Iter<T>,
@@ -44,6 +46,7 @@ pub fn fmt_iter<T: fmt::Display>(
     write!(f, "{}", suffix)
 }
 
+/// format over a map
 pub fn fmt_map<T: fmt::Display>(
     f: &mut fmt::Formatter,
     map: &BTreeMap<String, T>,
@@ -59,4 +62,57 @@ pub fn fmt_map<T: fmt::Display>(
         }
     }
     write!(f, "{}", suffix)
+}
+
+/// restore an escaped string
+pub fn unescape(input: &str) -> String {
+    let mut escaping = false;
+    let mut res = String::from("");
+    for c in input.chars() {
+        if escaping {
+            let mc = match c {
+                't' => '\t',
+                'r' => '\r',
+                'n' => '\n',
+                kc => kc,
+            };
+            res.push(mc);
+            escaping = false;
+        } else if c == '\\' {
+            escaping = true;
+        } else {
+            res.push(c);
+        }
+    }
+    res
+}
+
+/// escape special characters in a string
+pub fn escape(input: &str) -> String {
+    let mut res = String::from("");
+    for c in input.chars() {
+        match c {
+            '\t' => {
+                res.push_str("\\t");
+            }
+            '\r' => {
+                res.push_str("\\r");
+            }
+            '\n' => {
+                res.push_str("\\n");
+            }
+            '"' => res.push_str("\\\""),
+            xc => res.push(xc),
+        }
+    }
+    res
+}
+
+#[test]
+fn test_string_escape_unescape() {
+    let input = "abc\tdef\r\nte\"ck";
+    let escaped = escape(input);
+    assert_eq!(escaped, "abc\\tdef\\r\\nte\\\"ck");
+    let unescaped = unescape(escaped.as_str());
+    assert_eq!(unescaped.as_str(), input);
 }
