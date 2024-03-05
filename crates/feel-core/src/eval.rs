@@ -26,10 +26,11 @@ pub enum EvalError {
     VarNotFound,
     KeyError,
     IndexError,
+    TypeError(String),
     Runtime(String),
     Decimal(DecimalError),
     Parse(ParseError),
-    Value(String),
+    ValueError(String),
 }
 
 impl fmt::Display for EvalError {
@@ -37,9 +38,10 @@ impl fmt::Display for EvalError {
         match self {
             Self::VarNotFound => write!(f, "{}", "VarNotFound"),
             Self::KeyError => write!(f, "{}", "KeyError"),
+            Self::TypeError(expect) => write!(f, "TypeError: expect {}", expect),
             Self::IndexError => write!(f, "{}", "IndexError"),
             Self::Runtime(message) => write!(f, "RuntimeError: {}", message),
-            Self::Value(message) => write!(f, "ValueError: {}", message),
+            Self::ValueError(message) => write!(f, "ValueError: {}", message),
             Self::Decimal(err) => write!(f, "DecimalError: {}", err),
             Self::Parse(err) => write!(f, "{}", err),
         }
@@ -75,7 +77,7 @@ impl From<ParseError> for EvalError {
 
 impl From<ValueError> for EvalError {
     fn from(err: ValueError) -> EvalError {
-        Self::Value(err.0)
+        Self::ValueError(err.0)
     }
 }
 
@@ -144,7 +146,6 @@ impl Intepreter {
             Ident(value) => Ok(StrV(value)),
             Var(name) => self.eval_var(name),
             Neg(value) => self.eval_neg_op(value),
-            Not(value) => self.eval_not_op(value),
             BinOp { op, left, right } => self.eval_binop(op, left, right),
             LogicOp { op, left, right } => self.eval_logicop(op, left, right),
             DotOp { left, attr } => self.eval_dotop(left, attr),
@@ -192,7 +193,7 @@ impl Intepreter {
         Ok(StrV(content))
     }
 
-    pub fn is_defined(&mut self, value_node: Box<Node>) -> EvalResult {
+    pub fn is_defined(&mut self, value_node: &Box<Node>) -> EvalResult {
         if let Var(v) = *value_node.syntax.clone() {
             return match self.resolve(v) {
                 Some(_) => Ok(BoolV(true)),
@@ -249,12 +250,6 @@ impl Intepreter {
     fn eval_neg_op(&mut self, node: Box<Node>) -> EvalResult {
         let pv = self.eval(node)?;
         Ok((-pv)?)
-    }
-
-    #[inline(always)]
-    fn eval_not_op(&mut self, node: Box<Node>) -> EvalResult {
-        let pv = self.eval(node)?;
-        Ok(!pv)
     }
 
     #[inline(always)]
@@ -404,12 +399,14 @@ impl Intepreter {
     fn eval_func_call(&mut self, func_ref: Box<Node>, call_args: Vec<FuncCallArg>) -> EvalResult {
         let fref = self.eval(func_ref)?;
         match fref {
-            NativeFuncV { func, arg_names } => self.call_native_func(func.0, arg_names, call_args),
+            NativeFuncV { func, require_args } => {
+                self.call_native_func(func.0, require_args, call_args)
+            }
             FuncV { func_def } => self.call_func(func_def, call_args),
             MacroV {
                 callback,
-                arg_names,
-            } => self.call_macro(callback, arg_names, call_args),
+                require_args,
+            } => self.call_macro(callback, require_args, call_args),
             _ => {
                 return Err(EvalError::Runtime(format!(
                     "cannot call non function {}",
@@ -422,22 +419,24 @@ impl Intepreter {
     fn call_native_func(
         &mut self,
         func: NativeFunc,
-        arg_names: Vec<String>,
+        require_args: Vec<String>,
         call_args: Vec<FuncCallArg>,
     ) -> EvalResult {
+        if require_args.len() > call_args.len() {
+            return Err(EvalError::Runtime(format!(
+                "call function expect {} args, found {}",
+                require_args.len(),
+                call_args.len()
+            )));
+        }
         let mut arg_values: Vec<Value> = Vec::new();
         for a in call_args {
             let v = self.eval(a.arg)?;
             arg_values.push(v);
         }
 
-        if arg_names.len() > arg_values.len() {
-            return Err(EvalError::runtime(
-                "native func call with too few arguments",
-            ));
-        }
         let mut args: HashMap<String, Value> = HashMap::new();
-        for (i, arg_name) in arg_names.iter().enumerate() {
+        for (i, arg_name) in require_args.iter().enumerate() {
             let value = &arg_values[i];
             args.insert(arg_name.clone(), value.clone());
         }
@@ -447,15 +446,19 @@ impl Intepreter {
     fn call_macro(
         &mut self,
         callback: MacroCbT,
-        arg_names: Vec<String>,
+        require_args: Vec<String>,
         call_args: Vec<FuncCallArg>,
     ) -> EvalResult {
-        if arg_names.len() > call_args.len() {
-            return Err(EvalError::runtime("call macro with too few arguments"));
+        if require_args.len() > call_args.len() {
+            return Err(EvalError::Runtime(format!(
+                "call macro expect {} args, found {}",
+                require_args.len(),
+                call_args.len()
+            )));
         }
 
         let mut args: HashMap<String, Box<Node>> = HashMap::new();
-        for (i, arg_name) in arg_names.iter().enumerate() {
+        for (i, arg_name) in require_args.iter().enumerate() {
             args.insert(arg_name.clone(), call_args[i].arg.clone());
         }
         callback.0(self, args)
@@ -674,6 +677,10 @@ mod test {
             (r#"is defined([1, 2][1])"#, "true"),
             (r#"is defined([1, 2][-1])"#, "false"),
             (r#"is defined([1, 2][6])"#, "false"),
+            // test prelude functions
+            ("not(2>1)", "false"),
+            (r#"number("3000.888")"#, "3000.888"),
+            (r#"string length("hello world")"#, "11"),
         ];
 
         for (input, output) in testcases {

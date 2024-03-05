@@ -51,11 +51,11 @@ pub enum Value {
     MapV(RefCell<Rc<BTreeMap<String, Value>>>),
     NativeFuncV {
         func: NativeFuncT,
-        arg_names: Vec<String>,
+        require_args: Vec<String>,
     },
     MacroV {
         callback: MacroCbT,
-        arg_names: Vec<String>,
+        require_args: Vec<String>,
     },
     FuncV {
         func_def: Box<Node>,
@@ -84,11 +84,11 @@ impl fmt::Display for Value {
             Self::ArrayV(arr) => fmt_vec(f, arr.borrow().iter(), "[", "]"),
             Self::MapV(map) => fmt_map(f, &map.borrow(), "{", "}"),
             Self::NativeFuncV {
-                arg_names: _,
+                require_args: _,
                 func: _,
             } => write!(f, "{}", "function"),
             Self::MacroV {
-                arg_names: _,
+                require_args: _,
                 callback: _,
             } => write!(f, "{}", "macro"),
             Self::FuncV { func_def: _ } => write!(f, "{}", "function"),
@@ -114,11 +114,11 @@ impl Value {
             Self::ArrayV(_) => "array".to_owned(),
             Self::MapV(_) => "map".to_owned(),
             Self::NativeFuncV {
-                arg_names: _,
+                require_args: _,
                 func: _,
             } => "nativefunc".to_owned(),
             Self::MacroV {
-                arg_names: _,
+                require_args: _,
                 callback: _,
             } => "macro".to_owned(),
             Self::FuncV { func_def: _ } => "function".to_owned(),
@@ -134,6 +134,17 @@ impl Value {
             Self::ArrayV(v) => v.borrow().len() > 0,
             Self::MapV(v) => v.borrow().len() > 0,
             _ => true,
+        }
+    }
+
+    pub fn parse_number(&self) -> Result<Decimal, ValueError> {
+        match self {
+            Self::StrV(s) => match Decimal::from_str_exact(s) {
+                Ok(d) => Ok(d),
+                Err(err) => Err(ValueError(err.to_string())),
+            },
+            Self::NumberV(n) => Ok(*n),
+            _ => Err(ValueError("fail to parse number".to_owned())),
         }
     }
 }

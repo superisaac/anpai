@@ -79,8 +79,6 @@ pub enum NodeSyntax {
 
     Neg(Box<Node>),
 
-    Not(Box<Node>),
-
     Array(Vec<Box<Node>>),
 
     Map(Vec<MapNodeItem>),
@@ -141,7 +139,6 @@ impl fmt::Display for NodeSyntax {
             Self::Str(value) => write!(f, "{}", value),
             Self::Temporal(value) => write!(f, "{}", value),
             Self::Neg(value) => write!(f, "(- {})", value),
-            Self::Not(value) => write!(f, "(not {})", value),
             Self::Range {
                 start_open,
                 start,

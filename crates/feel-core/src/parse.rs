@@ -329,12 +329,13 @@ impl Parser<'_> {
             "keyword" => match self.scanner.current_token().value.as_str() {
                 "true" | "false" => self.parse_bool(),
                 "null" => self.parse_null(),
-                "not" => self.parse_not_expr(),
                 "if" => self.parse_if_expression(),
                 "for" => self.parse_for_expression(),
                 "some" | "every" => self.parse_some_or_every_expression(),
                 "function" => self.parse_function_defination(),
-                _ => return Err(self.unexpect_keyword("true, false")),
+                _ => {
+                    return Err(self.unexpect_keyword("true, false, if, for, some, every, function"))
+                }
             },
             _ => return Err(self.unexpect("name, number")),
         }
@@ -387,13 +388,6 @@ impl Parser<'_> {
         let start_pos = self.scanner.current_token().position;
         let value = self.parse_expression()?;
         Ok(Node::new(Neg(value), start_pos))
-    }
-
-    fn parse_not_expr(&mut self) -> NodeResult {
-        goahead!(self); // skip 'not'
-        let start_pos = self.scanner.current_token().position;
-        let node = self.parse_expression()?;
-        Ok(Node::new(Not(node), start_pos))
     }
 
     fn parse_string(&mut self) -> NodeResult {
