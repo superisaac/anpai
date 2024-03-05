@@ -264,6 +264,8 @@ dependencies = [
  "clap",
  "feel-core",
  "fileinput",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -276,6 +278,7 @@ dependencies = [
  "regex",
  "rust_decimal",
  "rust_decimal_macros",
+ "serde",
 ]
 
 [[package]]

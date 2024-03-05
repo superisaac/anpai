@@ -26,7 +26,9 @@ impl FEELArgs {
             Err((err, pos)) => return Err((eval::EvalError::from(err), pos)),
         };
         if self.ast {
-            println!("{}", n);
+            //println!("{}", n);
+            let serialized = serde_json::to_string_pretty(&n).unwrap();
+            println!("{}", serialized);
         } else {
             let mut intp = eval::Intepreter::new();
             let res = match intp.eval(n.clone()) {

@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
 
@@ -25,7 +26,7 @@ impl ScanError {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub struct TextPosition {
     pub chars: usize,
     pub lines: usize,
