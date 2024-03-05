@@ -42,6 +42,26 @@ impl Prelude {
         let func_value = NativeFuncV {
             func: func_t,
             require_args: require_arg_vec,
+            optional_args: Vec::new(),
+        };
+        self.set_var(name.to_owned(), func_value);
+    }
+
+    pub fn add_native_func_with_optional_args(
+        &mut self,
+        name: &str,
+        require_args: &[&str],
+        optional_args: &[&str],
+        func: NativeFunc,
+    ) {
+        let func_t = NativeFuncT(func);
+        let func_value = NativeFuncV {
+            func: func_t,
+            require_args: require_args.into_iter().map(|&s| String::from(s)).collect(),
+            optional_args: optional_args
+                .into_iter()
+                .map(|&s| String::from(s))
+                .collect(),
         };
         self.set_var(name.to_owned(), func_value);
     }

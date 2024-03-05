@@ -1,5 +1,5 @@
 use crate::ast::Node;
-use crate::eval::{EvalError, EvalResult};
+use crate::eval::EvalResult;
 use crate::helpers::{compare_value, escape, fmt_map, fmt_vec};
 use crate::values::func::{MacroCbT, NativeFuncT};
 use crate::values::range::RangeT;
@@ -34,6 +34,22 @@ impl From<&str> for ValueError {
 
 type ValueResult = Result<Value, ValueError>;
 
+// type error
+#[derive(Clone, Debug)]
+pub struct TypeError(pub String);
+
+impl From<String> for TypeError {
+    fn from(err: String) -> Self {
+        Self(err)
+    }
+}
+
+impl From<&str> for TypeError {
+    fn from(err: &str) -> Self {
+        Self(err.to_owned())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     NullV,
@@ -53,6 +69,7 @@ pub enum Value {
     NativeFuncV {
         func: NativeFuncT,
         require_args: Vec<String>,
+        optional_args: Vec<String>,
     },
     MacroV {
         callback: MacroCbT,
@@ -86,6 +103,7 @@ impl fmt::Display for Value {
             Self::MapV(map) => fmt_map(f, &map.borrow(), "{", "}"),
             Self::NativeFuncV {
                 require_args: _,
+                optional_args: _,
                 func: _,
             } => write!(f, "{}", "function"),
             Self::MacroV {
@@ -116,6 +134,7 @@ impl Value {
             Self::MapV(_) => "map".to_owned(),
             Self::NativeFuncV {
                 require_args: _,
+                optional_args: _,
                 func: _,
             } => "nativefunc".to_owned(),
             Self::MacroV {
@@ -147,6 +166,57 @@ impl Value {
             Self::NumberV(n) => Ok(*n),
             _ => Err(ValueError("fail to parse number".to_owned())),
         }
+    }
+
+    pub fn expect_string(&self, hint: &str) -> Result<String, ValueError> {
+        if let Self::StrV(s) = self {
+            return Ok(s.clone());
+        }
+        Err(ValueError(format!(
+            "{}, expect string, found {}",
+            hint,
+            self.data_type()
+        )))
+    }
+
+    pub fn expect_number(&self, hint: &str) -> Result<Decimal, ValueError> {
+        if let Self::NumberV(n) = self {
+            return Ok(n.clone());
+        }
+        Err(ValueError(format!(
+            "{}, expect number, but {} found",
+            hint,
+            self.data_type()
+        )))
+    }
+
+    pub fn expect_integer(&self) -> Result<isize, TypeError> {
+        if let Self::NumberV(n) = self {
+            if n.is_integer() {
+                return Ok(n.to_isize().unwrap());
+            }
+        }
+        Err(TypeError("integer".to_owned()))
+    }
+
+    pub fn expect_usize(&self, hint: &str) -> Result<usize, ValueError> {
+        if let Self::NumberV(n) = self {
+            if n.is_integer() {
+                if n.is_sign_positive() {
+                    return Ok(n.to_usize().unwrap());
+                } else {
+                    return Err(ValueError(format!(
+                        "{}, expect possitive integer, but negative found",
+                        hint
+                    )));
+                }
+            }
+        }
+        Err(ValueError(format!(
+            "{}, expect possitive integer, but {} found",
+            hint,
+            self.data_type()
+        )))
     }
 }
 
@@ -369,14 +439,75 @@ pub fn add_preludes(prelude: &mut crate::prelude::Prelude) {
         Ok(Value::BoolV(!v.bool_value()))
     });
 
+    // string functions
     prelude.add_native_func("string length", &["string"], |_, args| -> EvalResult {
         let v = args.get(&"string".to_owned()).unwrap();
-        if let Value::StrV(s) = v {
-            let lenn = Decimal::from_usize(s.len()).unwrap();
-            Ok(Value::NumberV(lenn))
-        } else {
-            Err(EvalError::TypeError("string".to_owned()))
-        }
+        let s = v.expect_string("argument[1]")?;
+        let lenn = Decimal::from_usize(s.len()).unwrap();
+        Ok(Value::NumberV(lenn))
+    });
+
+    prelude.add_native_func_with_optional_args(
+        "substring",
+        &["string", "start position"],
+        &["length"],
+        |_, args| -> EvalResult {
+            let v = args.get(&"string".to_owned()).unwrap();
+            let s = v.expect_string("argument[1] `string`")?;
+            let start_v = args.get(&"start position".to_owned()).unwrap();
+            let start_position = start_v.expect_usize("argument[2] `start position`")?;
+            if start_position < 1 || start_position > s.len() {
+                return Ok(Value::StrV("".to_owned()));
+            }
+            // 'length' is the optional value
+            let substr = if let Some(lenv) = args.get(&"length".to_owned()) {
+                let len = lenv.expect_usize("argument[3] `length`")?;
+                &s.as_str()[(start_position - 1)..(cmp::min(start_position - 1 + len, s.len()))]
+            } else {
+                &s.as_str()[(start_position - 1)..]
+            };
+            Ok(Value::StrV(substr.to_owned()))
+        },
+    );
+
+    prelude.add_native_func("upper case", &["string"], |_, args| -> EvalResult {
+        let v = args.get(&"string".to_owned()).unwrap();
+        let s = v.expect_string("argument[1] `string`")?;
+        Ok(Value::StrV(s.to_uppercase()))
+    });
+
+    prelude.add_native_func("lower case", &["string"], |_, args| -> EvalResult {
+        let v = args.get(&"string".to_owned()).unwrap();
+        let s = v.expect_string("argument[1] `string`")?;
+        Ok(Value::StrV(s.to_lowercase()))
+    });
+
+    prelude.add_native_func("contains", &["string", "match"], |_, args| -> EvalResult {
+        let v = args.get(&"string".to_owned()).unwrap();
+        let s = v.expect_string("argument[1] `string`")?;
+        let mv = args.get(&"match".to_owned()).unwrap();
+        let match_s = mv.expect_string("argument[2] `match`")?;
+        Ok(Value::BoolV(s.contains(match_s.as_str())))
+    });
+
+    prelude.add_native_func(
+        "starts with",
+        &["string", "match"],
+        |_, args| -> EvalResult {
+            let v = args.get(&"string".to_owned()).unwrap();
+            let s = v.expect_string("argument[1] `string`")?;
+            let mv = args.get(&"match".to_owned()).unwrap();
+            let match_s = mv.expect_string("argument[2] `match`")?;
+            Ok(Value::BoolV(s.starts_with(match_s.as_str())))
+        },
+    );
+
+    prelude.add_native_func("ends with", &["string", "match"], |_, args| -> EvalResult {
+        let v = args.get(&"string".to_owned()).unwrap();
+        let s = v.expect_string("argument[1] `string`")?;
+        let mv = args.get(&"match".to_owned()).unwrap();
+        let match_s = mv.expect_string("argument[2] `match`")?;
+        Ok(Value::BoolV(s.ends_with(match_s.as_str())))
     });
 }
 

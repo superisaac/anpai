@@ -10,7 +10,7 @@ use crate::helpers::unescape;
 use crate::parse::ParseError;
 use crate::prelude::PRELUDE;
 use crate::values::temporal::parse_temporal;
-use crate::values::value::ValueError;
+use crate::values::value::{TypeError, ValueError};
 
 use crate::values::func::{MacroCbT, NativeFunc};
 use crate::values::range::RangeT;
@@ -78,6 +78,12 @@ impl From<ParseError> for EvalError {
 impl From<ValueError> for EvalError {
     fn from(err: ValueError) -> EvalError {
         Self::ValueError(err.0)
+    }
+}
+
+impl From<TypeError> for EvalError {
+    fn from(err: TypeError) -> EvalError {
+        Self::TypeError(err.0)
     }
 }
 
@@ -418,9 +424,11 @@ impl Intepreter {
     fn eval_func_call(&mut self, func_ref: Box<Node>, call_args: Vec<FuncCallArg>) -> EvalResult {
         let fref = self.eval(func_ref)?;
         match fref {
-            NativeFuncV { func, require_args } => {
-                self.call_native_func(func.0, require_args, call_args)
-            }
+            NativeFuncV {
+                func,
+                require_args,
+                optional_args,
+            } => self.call_native_func(func.0, require_args, optional_args, call_args),
             FuncV { func_def } => self.call_func(func_def, call_args),
             MacroV {
                 callback,
@@ -439,27 +447,49 @@ impl Intepreter {
         &mut self,
         func: NativeFunc,
         require_args: Vec<String>,
+        optional_args: Vec<String>,
         call_args: Vec<FuncCallArg>,
     ) -> EvalResult {
         if require_args.len() > call_args.len() {
             return Err(EvalError::Runtime(format!(
-                "call function expect {} args, found {}",
+                "too few arguments, expect at least {} args, found {}",
                 require_args.len(),
                 call_args.len()
             )));
-        }
-        let mut arg_values: Vec<Value> = Vec::new();
-        for a in call_args {
-            let v = self.eval(a.arg)?;
-            arg_values.push(v);
+        } else if require_args.len() + optional_args.len() < call_args.len() {
+            return Err(EvalError::Runtime(format!(
+                "too many arguments, expect at most {} args, found {}",
+                require_args.len() + optional_args.len(),
+                call_args.len()
+            )));
         }
 
-        let mut args: HashMap<String, Value> = HashMap::new();
-        for (i, arg_name) in require_args.iter().enumerate() {
-            let value = &arg_values[i];
-            args.insert(arg_name.clone(), value.clone());
+        let mut named_args: HashMap<String, Value> = HashMap::new();
+        let mut positional_arg_index = 0;
+        for call_arg in call_args {
+            // resolve argument name
+            let arg_name = match call_arg.arg_name.as_str() {
+                "" => {
+                    let implicit_arg_name = if positional_arg_index < require_args.len() {
+                        require_args[positional_arg_index].as_str()
+                    } else {
+                        optional_args[positional_arg_index - require_args.len()].as_str()
+                    };
+                    positional_arg_index += 1;
+                    implicit_arg_name
+                }
+                a => a,
+            };
+            if named_args.contains_key(arg_name) {
+                return Err(EvalError::ValueError(format!(
+                    "argument {} already set",
+                    arg_name
+                )));
+            }
+            let arg_value = self.eval(call_arg.arg)?;
+            named_args.insert(arg_name.to_owned(), arg_value.clone());
         }
-        func(self, args)
+        func(self, named_args)
     }
 
     fn call_macro(
