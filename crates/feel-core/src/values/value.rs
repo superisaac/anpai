@@ -1,4 +1,5 @@
 use crate::ast::Node;
+use crate::eval::{EvalError, EvalResult};
 use crate::helpers::{compare_value, escape, fmt_map, fmt_vec};
 use crate::values::func::{MacroCbT, NativeFuncT};
 use crate::values::range::RangeT;
@@ -348,6 +349,35 @@ impl cmp::PartialOrd for Value {
             _ => None,
         }
     }
+}
+
+pub fn add_preludes(prelude: &mut crate::prelude::Prelude) {
+    // conversion functions
+    prelude.add_native_func("string", &["from"], |_, args| -> EvalResult {
+        let v = args.get(&"from".to_owned()).unwrap();
+        Ok(Value::StrV(v.to_string()))
+    });
+
+    prelude.add_native_func("number", &["from"], |_, args| -> EvalResult {
+        let v = args.get(&"from".to_owned()).unwrap();
+        let n = v.parse_number()?;
+        Ok(Value::NumberV(n))
+    });
+
+    prelude.add_native_func("not", &["from"], |_, args| -> EvalResult {
+        let v = args.get(&"from".to_owned()).unwrap();
+        Ok(Value::BoolV(!v.bool_value()))
+    });
+
+    prelude.add_native_func("string length", &["string"], |_, args| -> EvalResult {
+        let v = args.get(&"string".to_owned()).unwrap();
+        if let Value::StrV(s) = v {
+            let lenn = Decimal::from_usize(s.len()).unwrap();
+            Ok(Value::NumberV(lenn))
+        } else {
+            Err(EvalError::TypeError("string".to_owned()))
+        }
+    });
 }
 
 #[test]

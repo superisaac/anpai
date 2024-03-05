@@ -1,9 +1,7 @@
-use crate::eval::{EvalError, EvalResult};
+use crate::eval::EvalError;
 use crate::values::func::{MacroCb, MacroCbT, NativeFunc, NativeFuncT};
 use crate::values::value::Value::{self, *};
 use lazy_static::lazy_static;
-use rust_decimal::prelude::FromPrimitive;
-use rust_decimal::Decimal;
 use std::collections::HashMap;
 
 #[derive(Clone)]
@@ -88,32 +86,7 @@ impl Prelude {
             },
         );
 
-        // conversion functions
-        self.add_native_func("string", &["from"], |_, args| -> EvalResult {
-            let v = args.get(&"from".to_owned()).unwrap();
-            Ok(Value::StrV(v.to_string()))
-        });
-
-        self.add_native_func("number", &["from"], |_, args| -> EvalResult {
-            let v = args.get(&"from".to_owned()).unwrap();
-            let n = v.parse_number()?;
-            Ok(Value::NumberV(n))
-        });
-
-        self.add_native_func("not", &["from"], |_, args| -> EvalResult {
-            let v = args.get(&"from".to_owned()).unwrap();
-            Ok(Value::BoolV(!v.bool_value()))
-        });
-
-        self.add_native_func("string length", &["string"], |_, args| -> EvalResult {
-            let v = args.get(&"string".to_owned()).unwrap();
-            if let Value::StrV(s) = v {
-                let lenn = Decimal::from_usize(s.len()).unwrap();
-                Ok(Value::NumberV(lenn))
-            } else {
-                Err(EvalError::TypeError("string".to_owned()))
-            }
-        });
+        crate::values::value::add_preludes(self);
     }
 }
 
