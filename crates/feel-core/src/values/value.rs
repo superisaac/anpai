@@ -5,7 +5,7 @@ use super::super::helpers::{compare_value, escape, fmt_map, fmt_vec};
 extern crate chrono;
 extern crate iso8601;
 
-use super::func::{MacroCbT, NativeFuncT};
+use super::func::{MacroT, NativeFunc};
 use super::range::RangeT;
 use super::temporal::{compare_date, datetime_op, timedelta_to_duration};
 use rust_decimal::prelude::*;
@@ -68,12 +68,12 @@ pub enum Value {
     ArrayV(RefCell<Rc<Vec<Value>>>),
     MapV(RefCell<Rc<BTreeMap<String, Value>>>),
     NativeFuncV {
-        func: NativeFuncT,
+        func: NativeFunc,
         require_args: Vec<String>,
         optional_args: Vec<String>,
     },
     MacroV {
-        callback: MacroCbT,
+        macro_: MacroT,
         require_args: Vec<String>,
     },
     FuncV {
@@ -109,8 +109,8 @@ impl fmt::Display for Value {
             } => write!(f, "{}", "function"),
             Self::MacroV {
                 require_args: _,
-                callback: _,
-            } => write!(f, "{}", "macro"),
+                macro_: _,
+            } => write!(f, "{}", "function"),
             Self::FuncV { func_def: _ } => write!(f, "{}", "function"),
         }
     }
@@ -140,7 +140,7 @@ impl Value {
             } => "nativefunc".to_owned(),
             Self::MacroV {
                 require_args: _,
-                callback: _,
+                macro_: _,
             } => "macro".to_owned(),
             Self::FuncV { func_def: _ } => "function".to_owned(),
         }

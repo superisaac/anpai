@@ -12,7 +12,7 @@ use super::prelude::PRELUDE;
 use super::values::temporal::parse_temporal;
 use super::values::value::{TypeError, ValueError};
 
-use super::values::func::{MacroCbT, NativeFunc};
+use super::values::func::{MacroT, NativeFunc};
 use super::values::range::RangeT;
 use super::values::value::Value::{self, *};
 
@@ -428,12 +428,12 @@ impl Intepreter {
                 func,
                 require_args,
                 optional_args,
-            } => self.call_native_func(func.0, require_args, optional_args, call_args),
+            } => self.call_native_func(&func, require_args, optional_args, call_args),
             FuncV { func_def } => self.call_func(func_def, call_args),
             MacroV {
-                callback,
+                macro_,
                 require_args,
-            } => self.call_macro(callback, require_args, call_args),
+            } => self.call_macro(&macro_, require_args, call_args),
             _ => {
                 return Err(EvalError::Runtime(format!(
                     "cannot call non function {}",
@@ -445,7 +445,7 @@ impl Intepreter {
 
     fn call_native_func(
         &mut self,
-        func: NativeFunc,
+        func: &NativeFunc,
         require_args: Vec<String>,
         optional_args: Vec<String>,
         call_args: Vec<FuncCallArg>,
@@ -489,18 +489,19 @@ impl Intepreter {
             let arg_value = self.eval(call_arg.arg)?;
             named_args.insert(arg_name.to_owned(), arg_value.clone());
         }
-        func(self, named_args)
+        (func.body)(self, named_args)
     }
 
     fn call_macro(
         &mut self,
-        callback: MacroCbT,
+        macro_obj: &MacroT,
         require_args: Vec<String>,
         call_args: Vec<FuncCallArg>,
     ) -> EvalResult {
         if require_args.len() > call_args.len() {
             return Err(EvalError::Runtime(format!(
-                "call macro expect {} args, found {}",
+                "call macro {} expect {} args, found {}",
+                macro_obj.name,
                 require_args.len(),
                 call_args.len()
             )));
@@ -510,7 +511,7 @@ impl Intepreter {
         for (i, arg_name) in require_args.iter().enumerate() {
             args.insert(arg_name.clone(), call_args[i].arg.clone());
         }
-        callback.0(self, args)
+        (macro_obj.body)(self, args)
     }
 
     fn call_func(&mut self, func_def: Box<Node>, call_args: Vec<FuncCallArg>) -> EvalResult {

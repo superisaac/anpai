@@ -1,5 +1,5 @@
 use super::eval::EvalError;
-use super::values::func::{MacroCb, MacroCbT, NativeFunc, NativeFuncT};
+use super::values::func::{MacroBody, MacroT, NativeFunc, NativeFuncBody};
 use super::values::value::Value::{self, *};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
@@ -26,19 +26,25 @@ impl Prelude {
             None => None,
         }
     }
-    pub fn add_macro(&mut self, name: &str, require_args: &[&str], cb: MacroCb) {
+    pub fn add_macro(&mut self, name: &str, require_args: &[&str], body: MacroBody) {
         let require_args_vec = require_args.into_iter().map(|s| String::from(*s)).collect();
-        let macro_t = MacroCbT(cb);
+        let macro_ = MacroT {
+            name: name.to_owned(),
+            body,
+        };
         let macro_value = MacroV {
-            callback: macro_t,
+            macro_,
             require_args: require_args_vec,
         };
         self.set_var(name.to_owned(), macro_value);
     }
 
-    pub fn add_native_func(&mut self, name: &str, require_args: &[&str], func: NativeFunc) {
+    pub fn add_native_func(&mut self, name: &str, require_args: &[&str], func: NativeFuncBody) {
         let require_arg_vec = require_args.into_iter().map(|&s| String::from(s)).collect();
-        let func_t = NativeFuncT(func);
+        let func_t = NativeFunc {
+            name: name.to_owned(),
+            body: func,
+        };
         let func_value = NativeFuncV {
             func: func_t,
             require_args: require_arg_vec,
@@ -52,9 +58,12 @@ impl Prelude {
         name: &str,
         require_args: &[&str],
         optional_args: &[&str],
-        func: NativeFunc,
+        func: NativeFuncBody,
     ) {
-        let func_t = NativeFuncT(func);
+        let func_t = NativeFunc {
+            name: name.to_owned(),
+            body: func,
+        };
         let func_value = NativeFuncV {
             func: func_t,
             require_args: require_args.into_iter().map(|&s| String::from(s)).collect(),
