@@ -23,7 +23,7 @@ use rust_decimal_macros::dec;
 // EvalError
 #[derive(Debug)]
 pub enum EvalError {
-    VarNotFound,
+    VarNotFound(String),
     KeyError,
     IndexError,
     TypeError(String),
@@ -36,7 +36,7 @@ pub enum EvalError {
 impl fmt::Display for EvalError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::VarNotFound => write!(f, "{}", "VarNotFound"),
+            Self::VarNotFound(name) => write!(f, "VarNotFound: `{}`", name),
             Self::KeyError => write!(f, "{}", "KeyError"),
             Self::TypeError(expect) => write!(f, "TypeError: expect {}", expect),
             Self::IndexError => write!(f, "{}", "IndexError"),
@@ -227,9 +227,9 @@ impl Intepreter {
         }
         match self.eval(value_node.clone()) {
             Ok(_) => Ok(BoolV(true)),
-            Err(EvalError::IndexError) | Err(EvalError::KeyError) | Err(EvalError::VarNotFound) => {
-                Ok(BoolV(false))
-            }
+            Err(EvalError::IndexError)
+            | Err(EvalError::KeyError)
+            | Err(EvalError::VarNotFound(_)) => Ok(BoolV(false)),
             Err(err) => Err(err),
         }
     }
@@ -242,10 +242,10 @@ impl Intepreter {
 
     #[inline(always)]
     fn eval_var(&mut self, name: String) -> EvalResult {
-        if let Some(value) = self.resolve(name) {
+        if let Some(value) = self.resolve(name.clone()) {
             Ok(value)
         } else {
-            Err(EvalError::VarNotFound)
+            Err(EvalError::VarNotFound(name))
         }
     }
 

@@ -70,7 +70,7 @@ pub fn compare_date(a: &iso8601::Date, b: &iso8601::Date) -> Option<cmp::Orderin
     }
 }
 
-pub fn datetime_op(
+pub(crate) fn datetime_op(
     op_is_add: bool,
     cdt: chrono::DateTime<chrono::FixedOffset>,
     dur: iso8601::Duration,
@@ -84,7 +84,7 @@ pub fn datetime_op(
     }
 }
 
-pub fn datetime_add(
+pub(crate) fn datetime_add(
     cdt: chrono::DateTime<chrono::FixedOffset>,
     dur: iso8601::Duration,
 ) -> Result<chrono::DateTime<chrono::FixedOffset>, String> {
@@ -112,7 +112,7 @@ pub fn datetime_add(
     }
 }
 
-pub fn datetime_sub(
+pub(crate) fn datetime_sub(
     cdt: chrono::DateTime<chrono::FixedOffset>,
     dur: iso8601::Duration,
 ) -> Result<chrono::DateTime<chrono::FixedOffset>, String> {
@@ -140,7 +140,7 @@ pub fn datetime_sub(
     }
 }
 
-pub fn timedelta_to_duration(delta: chrono::TimeDelta) -> (iso8601::Duration, bool) {
+pub(crate) fn timedelta_to_duration(delta: chrono::TimeDelta) -> (iso8601::Duration, bool) {
     let mut nsecs = delta.num_seconds();
     let negative = nsecs < 0;
     if negative {
