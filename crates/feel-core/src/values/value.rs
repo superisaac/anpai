@@ -1,12 +1,13 @@
-use crate::ast::Node;
-use crate::eval::EvalResult;
-use crate::helpers::{compare_value, escape, fmt_map, fmt_vec};
-use crate::values::func::{MacroCbT, NativeFuncT};
-use crate::values::range::RangeT;
+use super::super::ast::Node;
+use super::super::eval::EvalResult;
+use super::super::helpers::{compare_value, escape, fmt_map, fmt_vec};
+
 extern crate chrono;
 extern crate iso8601;
 
-use crate::values::temporal::{compare_date, datetime_op, timedelta_to_duration};
+use super::func::{MacroCbT, NativeFuncT};
+use super::range::RangeT;
+use super::temporal::{compare_date, datetime_op, timedelta_to_duration};
 use rust_decimal::prelude::*;
 use rust_decimal_macros::*;
 use std::cell::RefCell;
@@ -421,7 +422,7 @@ impl cmp::PartialOrd for Value {
     }
 }
 
-pub fn add_preludes(prelude: &mut crate::prelude::Prelude) {
+pub fn add_preludes(prelude: &mut super::super::prelude::Prelude) {
     // conversion functions
     prelude.add_native_func("string", &["from"], |_, args| -> EvalResult {
         let v = args.get(&"from".to_owned()).unwrap();

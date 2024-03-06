@@ -1,6 +1,7 @@
+use core::hash::Hash;
 use core::slice::Iter;
 use std::cmp;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::fmt;
 
 #[inline(always)]
@@ -115,4 +116,18 @@ fn test_string_escape_unescape() {
     assert_eq!(escaped, "abc\\tdef\\r\\nte\\\"ck");
     let unescaped = unescape(escaped.as_str());
     assert_eq!(unescaped.as_str(), input);
+}
+
+pub fn find_duplicate<T>(elements: &Vec<T>) -> Option<T>
+where
+    T: Eq + Hash + Clone,
+{
+    let mut dup_checker = HashSet::new();
+    for elem in elements.iter() {
+        if dup_checker.contains(elem) {
+            return Some(elem.clone());
+        }
+        dup_checker.insert(elem);
+    }
+    None
 }

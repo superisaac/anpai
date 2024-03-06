@@ -1,4 +1,5 @@
 use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
+use crate::helpers::find_duplicate;
 use crate::scan::{ScanError, Scanner, TextPosition};
 use std::error::Error;
 use std::fmt;
@@ -674,6 +675,13 @@ impl Parser<'_> {
         while !self.scanner.expect(")") {
             let arg_name = self.parse_name(None)?;
             arg_names.push(arg_name);
+
+            if let Some(dup_arg_name) = find_duplicate(&arg_names) {
+                return Err(ParseError::Parse(format!(
+                    "function has duplication arg name `{}`",
+                    dup_arg_name
+                )));
+            }
             if self.scanner.expect(",") {
                 goahead!(self); // skip ','
             } else if !self.scanner.expect(")") {
@@ -705,18 +713,28 @@ pub fn parse(input: &str) -> Result<Box<Node>, (ParseError, TextPosition)> {
     }
 }
 
-#[test]
-fn test_parse_results() {
-    let testcases = [
-        ("a + b(4, 9)", "(+ a (call b [4, 9]))"),
-        ("if a > 6 then true else false", "(if (> a 6) true false)"),
-        ("{a: 1, \"bbb\": [2, 1]}", r#"{a: 1, "bbb": [2, 1]}"#),
-        ("> 2, <= 1, a>8", "(multi-tests (> ? 2) (<= ? 1) (> a 8))"),
-        ("2>8; 9; true", "(expr-list (> 2 8) 9 true)"),
-    ];
+#[cfg(test)]
+mod test {
+    use core::assert_matches::assert_matches;
+    #[test]
+    fn test_parse_results() {
+        let testcases = [
+            ("a + b(4, 9)", "(+ a (call b [4, 9]))"),
+            ("if a > 6 then true else false", "(if (> a 6) true false)"),
+            ("{a: 1, \"bbb\": [2, 1]}", r#"{a: 1, "bbb": [2, 1]}"#),
+            ("> 2, <= 1, a>8", "(multi-tests (> ? 2) (<= ? 1) (> a 8))"),
+            ("2>8; 9; true", "(expr-list (> 2 8) 9 true)"),
+        ];
 
-    for (input, output) in testcases {
-        let node = parse(input).unwrap();
-        assert_eq!(format!("{}", *node), output);
+        for (input, output) in testcases {
+            let node = super::parse(input).unwrap();
+            assert_eq!(format!("{}", *node), output);
+        }
+    }
+
+    #[test]
+    fn test_parse_dup_arg_name() {
+        let res = super::parse("function(a, b, a) a+ b");
+        assert_matches!(res, Err((super::ParseError::Parse(x), _)) if x == "function has duplication arg name `a`".to_owned());
     }
 }

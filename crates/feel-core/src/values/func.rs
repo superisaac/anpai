@@ -1,7 +1,8 @@
-use crate::ast::Node;
-use crate::eval::EvalError;
-use crate::eval::Intepreter;
-use crate::values::value::Value;
+use super::super::ast::Node;
+use super::super::eval::EvalError;
+use super::super::eval::Intepreter;
+use super::value::Value;
+
 use std::cmp;
 use std::collections::HashMap;
 use std::fmt;

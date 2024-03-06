@@ -1,6 +1,6 @@
-use crate::eval::EvalError;
-use crate::values::func::{MacroCb, MacroCbT, NativeFunc, NativeFuncT};
-use crate::values::value::Value::{self, *};
+use super::eval::EvalError;
+use super::values::func::{MacroCb, MacroCbT, NativeFunc, NativeFuncT};
+use super::values::value::Value::{self, *};
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
