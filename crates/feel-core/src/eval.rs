@@ -428,7 +428,8 @@ impl Engine {
                 func,
                 require_args,
                 optional_args,
-            } => self.call_native_func(&func, require_args, optional_args, call_args),
+                var_arg,
+            } => self.call_native_func(&func, require_args, optional_args, var_arg, call_args),
             FuncV { func_def } => self.call_func(func_def, call_args),
             MacroV {
                 macro_,
@@ -448,32 +449,46 @@ impl Engine {
         func: &NativeFunc,
         require_args: Vec<String>,
         optional_args: Vec<String>,
+        var_arg: Option<String>,
         call_args: Vec<FuncCallArg>,
     ) -> EvalResult {
-        if require_args.len() > call_args.len() {
+        let call_args_len = call_args.len();
+        if require_args.len() > call_args_len {
             return Err(EvalError::Runtime(format!(
                 "too few arguments, expect at least {} args, found {}",
                 require_args.len(),
-                call_args.len()
+                call_args_len
             )));
-        } else if require_args.len() + optional_args.len() < call_args.len() {
+        } else if var_arg.is_none() && require_args.len() + optional_args.len() < call_args.len() {
             return Err(EvalError::Runtime(format!(
                 "too many arguments, expect at most {} args, found {}",
                 require_args.len() + optional_args.len(),
-                call_args.len()
+                call_args_len
             )));
         }
 
         let mut named_args: HashMap<String, Value> = HashMap::new();
         let mut positional_arg_index = 0;
+        // build args
+        let mut var_arg_values: Vec<Value> = vec![];
+        let mut use_var_arg = false;
         for call_arg in call_args {
             // resolve argument name
             let arg_name = match call_arg.arg_name.as_str() {
                 "" => {
                     let implicit_arg_name = if positional_arg_index < require_args.len() {
                         require_args[positional_arg_index].as_str()
-                    } else {
+                    } else if positional_arg_index < require_args.len() + optional_args.len() {
                         optional_args[positional_arg_index - require_args.len()].as_str()
+                    } else if let Some(ref var_arg_name) = var_arg {
+                        use_var_arg = true;
+                        var_arg_name.as_str()
+                    } else {
+                        return Err(EvalError::Runtime(format!(
+                            "too many arguments, expect at most {} args, found {}",
+                            require_args.len() + optional_args.len(),
+                            call_args_len
+                        )));
                     };
                     positional_arg_index += 1;
                     implicit_arg_name
@@ -487,7 +502,16 @@ impl Engine {
                 )));
             }
             let arg_value = self.eval(call_arg.arg)?;
-            named_args.insert(arg_name.to_owned(), arg_value.clone());
+            if use_var_arg {
+                var_arg_values.push(arg_value);
+            } else {
+                named_args.insert(arg_name.to_owned(), arg_value.clone());
+            }
+        }
+        if var_arg_values.len() > 0 {
+            let var_arg_name = var_arg.unwrap_or("_".to_string());
+            let v = ArrayV(RefCell::new(Rc::new(var_arg_values)));
+            named_args.insert(var_arg_name, v);
         }
         (func.body)(self, named_args)
     }
@@ -731,6 +755,8 @@ mod test {
             ("not(2>1)", "false"),
             (r#"number("3000.888")"#, "3000.888"),
             (r#"string length("hello world")"#, "11"),
+            ("list contains([2, 8, -1], 8)", "true"),
+            (r#"list contains([2, 8, "hello"], "world")"#, "false"),
         ];
 
         for (input, output) in testcases {

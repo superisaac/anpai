@@ -1,6 +1,7 @@
 use super::super::ast::Node;
 use super::super::eval::EvalResult;
 use super::super::helpers::{compare_value, escape, fmt_map, fmt_vec};
+use core::cell::{Ref, RefMut};
 
 extern crate chrono;
 extern crate iso8601;
@@ -71,6 +72,7 @@ pub enum Value {
         func: NativeFunc,
         require_args: Vec<String>,
         optional_args: Vec<String>,
+        var_arg: Option<String>,
     },
     MacroV {
         macro_: MacroT,
@@ -105,6 +107,7 @@ impl fmt::Display for Value {
             Self::NativeFuncV {
                 require_args: _,
                 optional_args: _,
+                var_arg: _,
                 func: _,
             } => write!(f, "{}", "function"),
             Self::MacroV {
@@ -136,6 +139,7 @@ impl Value {
             Self::NativeFuncV {
                 require_args: _,
                 optional_args: _,
+                var_arg: _,
                 func: _,
             } => "nativefunc".to_owned(),
             Self::MacroV {
@@ -218,6 +222,20 @@ impl Value {
             hint,
             self.data_type()
         )))
+    }
+
+    pub fn expect_array(&self) -> Result<Ref<'_, Rc<Vec<Value>>>, TypeError> {
+        if let Self::ArrayV(arr) = self {
+            return Ok(arr.borrow());
+        }
+        Err(TypeError("array".to_owned()))
+    }
+
+    pub fn expect_array_mut(&self) -> Result<RefMut<'_, Rc<Vec<Value>>>, TypeError> {
+        if let Self::ArrayV(arr) = self {
+            return Ok(arr.borrow_mut());
+        }
+        Err(TypeError("array".to_owned()))
     }
 }
 
@@ -452,6 +470,7 @@ pub fn add_preludes(prelude: &mut super::super::prelude::Prelude) {
         "substring",
         &["string", "start position"],
         &["length"],
+        None,
         |_, args| -> EvalResult {
             let v = args.get(&"string".to_owned()).unwrap();
             let s = v.expect_string("argument[1] `string`")?;
@@ -510,6 +529,23 @@ pub fn add_preludes(prelude: &mut super::super::prelude::Prelude) {
         let match_s = mv.expect_string("argument[2] `match`")?;
         Ok(Value::BoolV(s.ends_with(match_s.as_str())))
     });
+
+    // list functions
+    prelude.add_native_func(
+        "list contains",
+        &["list", "element"],
+        |_, args| -> EvalResult {
+            let v = args.get(&"list".to_owned()).unwrap();
+            let elem = args.get(&"element".to_owned()).unwrap();
+            let arr = v.expect_array()?;
+            for arr_elem in arr.iter() {
+                if *arr_elem == *elem {
+                    return Ok(Value::BoolV(true));
+                }
+            }
+            Ok(Value::BoolV(false))
+        },
+    )
 }
 
 #[test]

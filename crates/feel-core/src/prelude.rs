@@ -49,6 +49,7 @@ impl Prelude {
             func: func_t,
             require_args: require_arg_vec,
             optional_args: Vec::new(),
+            var_arg: None,
         };
         self.set_var(name.to_owned(), func_value);
     }
@@ -58,6 +59,7 @@ impl Prelude {
         name: &str,
         require_args: &[&str],
         optional_args: &[&str],
+        var_arg: Option<&str>,
         func: NativeFuncBody,
     ) {
         let func_t = NativeFunc {
@@ -71,6 +73,7 @@ impl Prelude {
                 .into_iter()
                 .map(|&s| String::from(s))
                 .collect(),
+            var_arg: var_arg.map(|a| a.to_owned()),
         };
         self.set_var(name.to_owned(), func_value);
     }
