@@ -79,14 +79,14 @@ impl Prelude {
         self.add_native_func(
             "set",
             &["name", "value"],
-            |intp, args| -> Result<Value, EvalError> {
+            |eng, args| -> Result<Value, EvalError> {
                 let name_node = args.get(&"name".to_owned()).unwrap();
                 let var_name = match name_node {
                     StrV(value) => value.clone(),
                     _ => return Err(EvalError::runtime("argument name should be string")),
                 };
                 let value = args.get(&"value".to_owned()).unwrap();
-                intp.set_var(var_name, value.clone());
+                eng.set_var(var_name, value.clone());
                 Ok(value.clone())
             },
         );
@@ -94,14 +94,14 @@ impl Prelude {
         self.add_native_func(
             "bind",
             &["name", "value"],
-            |intp, args| -> Result<Value, EvalError> {
+            |eng, args| -> Result<Value, EvalError> {
                 let name_node = args.get(&"name".to_owned()).unwrap();
                 let var_name = match name_node {
                     StrV(value) => value.clone(),
                     _ => return Err(EvalError::runtime("argument name should be string")),
                 };
                 let value = args.get(&"value".to_owned()).unwrap();
-                intp.bind_var(var_name, value.clone());
+                eng.bind_var(var_name, value.clone());
                 Ok(value.clone())
             },
         );
@@ -109,9 +109,9 @@ impl Prelude {
         self.add_macro(
             "is defined",
             &["value"],
-            |intp, nodes| -> Result<Value, EvalError> {
+            |eng, nodes| -> Result<Value, EvalError> {
                 let value_node = nodes.get(&"value".to_owned()).unwrap();
-                intp.is_defined(value_node)
+                eng.is_defined(value_node)
             },
         );
 

@@ -1,6 +1,6 @@
 use super::super::ast::Node;
+use super::super::eval::Engine;
 use super::super::eval::EvalError;
-use super::super::eval::Intepreter;
 use super::value::Value;
 
 use std::cmp;
@@ -9,7 +9,7 @@ use std::fmt;
 
 // native func
 pub type NativeFuncBody =
-    fn(intp: &mut Intepreter, args: HashMap<String, Value>) -> Result<Value, EvalError>;
+    fn(eng: &mut Engine, args: HashMap<String, Value>) -> Result<Value, EvalError>;
 
 #[derive(Clone)]
 pub struct NativeFunc {
@@ -31,7 +31,7 @@ impl cmp::PartialEq for NativeFunc {
 
 // macro
 pub type MacroBody =
-    fn(intp: &mut Intepreter, nodes: HashMap<String, Box<Node>>) -> Result<Value, EvalError>;
+    fn(eng: &mut Engine, nodes: HashMap<String, Box<Node>>) -> Result<Value, EvalError>;
 
 #[derive(Clone)]
 pub struct MacroT {

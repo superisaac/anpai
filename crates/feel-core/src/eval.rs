@@ -99,15 +99,15 @@ pub struct ScopeFrame {
     vars: HashMap<String, Value>,
 }
 
-pub struct Intepreter {
+pub struct Engine {
     scopes: Vec<RefCell<ScopeFrame>>,
 }
 
-impl Intepreter {
-    pub fn new() -> Intepreter {
-        let mut intp = Intepreter { scopes: Vec::new() };
-        intp.push_frame(); // prelude frame
-        intp
+impl Engine {
+    pub fn new() -> Engine {
+        let mut eng = Engine { scopes: Vec::new() };
+        eng.push_frame(); // prelude frame
+        eng
     }
 
     fn push_frame(&mut self) {
@@ -735,46 +735,46 @@ mod test {
 
         for (input, output) in testcases {
             println!("eval {}", input);
-            let mut intp = super::Intepreter::new();
+            let mut eng = super::Engine::new();
             let node = parse(input).unwrap();
-            let v = intp.eval(node).unwrap();
+            let v = eng.eval(node).unwrap();
             assert_eq!(v.to_string(), output, "output mismatch input: '{}'", input);
         }
     }
 
     #[test]
     fn test_def_vars() {
-        let mut intp = super::Intepreter::new();
-        intp.set_var("v1".to_owned(), super::NumberV(dec!(2.3)));
+        let mut eng = super::Engine::new();
+        eng.set_var("v1".to_owned(), super::NumberV(dec!(2.3)));
         let input = "v1 + 3";
         let node = parse(input).unwrap();
-        let v = intp.eval(node).unwrap();
+        let v = eng.eval(node).unwrap();
         assert_eq!(v.to_string(), "5.3");
     }
 
     #[test]
     fn test_native_func_set() {
-        let mut intp = super::Intepreter::new();
+        let mut eng = super::Engine::new();
         let input = r#"set("hi", 5)"#;
         let node = parse(input).unwrap();
-        let _ = intp.eval(node).unwrap();
+        let _ = eng.eval(node).unwrap();
 
         let input1 = r#"hi + 3"#;
         let node1 = parse(input1).unwrap();
-        let v = intp.eval(node1).unwrap();
+        let v = eng.eval(node1).unwrap();
         assert_eq!(v.to_string(), "8");
     }
 
     #[test]
     fn test_func_call() {
-        let mut intp = super::Intepreter::new();
+        let mut eng = super::Engine::new();
         let input = r#"set("add2", function(a, b) a+b)"#;
         let node = parse(input).unwrap();
-        let _ = intp.eval(node).unwrap();
+        let _ = eng.eval(node).unwrap();
 
         let input1 = r#"add2(4.5, 9)"#;
         let node1 = parse(input1).unwrap();
-        let v = intp.eval(node1).unwrap();
+        let v = eng.eval(node1).unwrap();
         assert_eq!(v.to_string(), "13.5");
     }
 }

@@ -36,8 +36,8 @@ impl FEELArgs {
                 println!("{}", n);
             }
         } else {
-            let mut intp = eval::Intepreter::new();
-            let res = match intp.eval(n.clone()) {
+            let mut eng = eval::Engine::new();
+            let res = match eng.eval(n.clone()) {
                 Ok(v) => v,
                 Err(err) => return Err((err, n.start_pos)),
             };
