@@ -508,7 +508,8 @@ impl Engine {
                 named_args.insert(arg_name.to_owned(), arg_value.clone());
             }
         }
-        if var_arg_values.len() > 0 {
+
+        if var_arg.is_some() {
             let var_arg_name = var_arg.unwrap_or("_".to_string());
             let v = ArrayV(RefCell::new(Rc::new(var_arg_values)));
             named_args.insert(var_arg_name, v);
@@ -757,6 +758,8 @@ mod test {
             (r#"string length("hello world")"#, "11"),
             ("list contains([2, 8, -1], 8)", "true"),
             (r#"list contains([2, 8, "hello"], "world")"#, "false"),
+            ("count(1, 2, 4, 9, -3)", "5"),
+            ("count()", "0"),
         ];
 
         for (input, output) in testcases {

@@ -545,7 +545,20 @@ pub fn add_preludes(prelude: &mut super::super::prelude::Prelude) {
             }
             Ok(Value::BoolV(false))
         },
-    )
+    );
+
+    prelude.add_native_func_with_optional_args(
+        "count",
+        &[],
+        &[],
+        Some("list"),
+        |_, args| -> EvalResult {
+            let v = args.get(&"list".to_owned()).unwrap();
+            let arr = v.expect_array()?;
+            let count = Decimal::from_usize(arr.len()).unwrap();
+            Ok(Value::NumberV(count))
+        },
+    );
 }
 
 #[test]
