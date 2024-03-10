@@ -510,6 +510,7 @@ impl Engine {
         }
 
         if var_arg.is_some() {
+            // make var arg as an Array value
             let var_arg_name = var_arg.unwrap_or("_".to_string());
             let v = ArrayV(RefCell::new(Rc::new(var_arg_values)));
             named_args.insert(var_arg_name, v);
@@ -760,6 +761,9 @@ mod test {
             (r#"list contains([2, 8, "hello"], "world")"#, "false"),
             ("count(1, 2, 4, 9, -3)", "5"),
             ("count()", "0"),
+            ("min(31, -1, 9, 8, -1, -99)", "-99"),
+            ("min(31, -1, 9, false, -1, -99)", "-99"),
+            ("max(31, -1, 9, 8, -1, -99)", "31"),
         ];
 
         for (input, output) in testcases {

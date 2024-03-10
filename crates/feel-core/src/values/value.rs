@@ -559,6 +559,44 @@ pub fn add_preludes(prelude: &mut super::super::prelude::Prelude) {
             Ok(Value::NumberV(count))
         },
     );
+
+    prelude.add_native_func_with_optional_args(
+        "min",
+        &[],
+        &[],
+        Some("list"),
+        |_, args| -> EvalResult {
+            let arg0 = args.get(&"list".to_owned()).unwrap();
+            let arr = arg0.expect_array()?;
+            let mut min_value: Option<Value> = None;
+
+            for v in arr.iter() {
+                if min_value.is_none() || *v < min_value.clone().unwrap() {
+                    min_value = Some(v.clone())
+                }
+            }
+            Ok(min_value.unwrap_or(Value::NullV))
+        },
+    );
+
+    prelude.add_native_func_with_optional_args(
+        "max",
+        &[],
+        &[],
+        Some("list"),
+        |_, args| -> EvalResult {
+            let arg0 = args.get(&"list".to_owned()).unwrap();
+            let arr = arg0.expect_array()?;
+            let mut max_value: Option<Value> = None;
+
+            for v in arr.iter() {
+                if max_value.is_none() || *v > max_value.clone().unwrap() {
+                    max_value = Some(v.clone())
+                }
+            }
+            Ok(max_value.unwrap_or(Value::NullV))
+        },
+    );
 }
 
 #[test]
