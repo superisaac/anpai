@@ -1,8 +1,11 @@
 use core::hash::Hash;
 use core::slice::Iter;
 use std::cmp;
+
 use std::collections::{BTreeMap, HashSet};
 use std::fmt;
+
+use rust_decimal::prelude::*;
 
 #[inline(always)]
 pub fn compare_value<T>(a: T, b: T) -> cmp::Ordering
@@ -130,4 +133,28 @@ where
         dup_checker.insert(elem);
     }
     None
+}
+
+// calc the sqrt of number
+pub fn sqrt(n: Decimal) -> Option<Decimal> {
+    if let Some(f64v) = Decimal::to_f64(&n) {
+        Decimal::from_f64(f64v.sqrt())
+        // TODO: use BigDecimal to calc arbitrary prec number
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use core::assert_matches::assert_matches;
+    use rust_decimal::prelude::*;
+    #[test]
+    fn test_sqrt() {
+        let d0 = Decimal::from_str_exact("-1").unwrap();
+        assert_matches!(super::sqrt(d0), None);
+
+        let d1 = Decimal::from_i32(4).unwrap();
+        assert_eq!(super::sqrt(d1).unwrap(), Decimal::TWO);
+    }
 }

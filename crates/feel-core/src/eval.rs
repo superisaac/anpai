@@ -764,10 +764,10 @@ mod test {
             ("min(31, -1, 9, 8, -1, -99)", "-99"),
             ("min(31, -1, 9, false, -1, -99)", "-99"),
             ("max(31, -1, 9, 8, -1, -99)", "31"),
+            ("sum(31, -1, 9, false, -1, -99)", "-61"),
         ];
 
         for (input, output) in testcases {
-            println!("eval {}", input);
             let mut eng = super::Engine::new();
             let node = parse(input).unwrap();
             let v = eng.eval(node).unwrap();
