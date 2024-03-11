@@ -1,13 +1,11 @@
 use lazy_static::lazy_static;
 
-use rust_decimal::prelude::*;
-
 use std::cmp;
 use std::collections::HashMap;
 
 use super::eval::{EvalError, EvalResult};
-use super::helpers::sqrt;
 use super::values::func::{MacroBody, MacroT, NativeFunc, NativeFuncBody};
+use super::values::numeric::Numeric;
 use super::values::value::Value::{self, *};
 
 #[derive(Clone)]
@@ -133,7 +131,7 @@ impl Prelude {
         self.add_native_func("string length", &["string"], |_, args| -> EvalResult {
             let v = args.get(&"string".to_owned()).unwrap();
             let s = v.expect_string("argument[1]")?;
-            let lenn = Decimal::from_usize(s.len()).unwrap();
+            let lenn = Numeric::from_usize(s.len());
             Ok(Value::NumberV(lenn))
         });
 
@@ -226,7 +224,7 @@ impl Prelude {
             |_, args| -> EvalResult {
                 let v = args.get(&"list".to_owned()).unwrap();
                 let arr = v.expect_array()?;
-                let count = Decimal::from_usize(arr.len()).unwrap();
+                let count = Numeric::from_usize(arr.len());
                 Ok(Value::NumberV(count))
             },
         );
@@ -277,11 +275,11 @@ impl Prelude {
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"list".to_owned()).unwrap();
                 let arr = arg0.expect_array()?;
-                let mut sum: Decimal = Decimal::zero();
+                let mut sum: Numeric = Numeric::ZERO;
 
                 for v in arr.iter() {
-                    if let Value::NumberV(v) = *v {
-                        sum += v;
+                    if let Value::NumberV(v) = v {
+                        sum += v.clone();
                     }
                 }
                 Ok(Value::NumberV(sum))
@@ -296,11 +294,11 @@ impl Prelude {
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"list".to_owned()).unwrap();
                 let arr = arg0.expect_array()?;
-                let mut res: Decimal = Decimal::one();
+                let mut res = Numeric::ONE;
 
                 for v in arr.iter() {
-                    if let Value::NumberV(v) = *v {
-                        res *= v;
+                    if let Value::NumberV(v) = v {
+                        res *= v.clone();
                     }
                 }
                 Ok(Value::NumberV(res))
@@ -315,19 +313,19 @@ impl Prelude {
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"list".to_owned()).unwrap();
                 let arr = arg0.expect_array()?;
-                let mut sum: Decimal = Decimal::zero();
+                let mut sum = Numeric::ZERO;
                 let mut count = 0;
 
                 for v in arr.iter() {
-                    if let Value::NumberV(v) = *v {
-                        sum += v;
+                    if let Value::NumberV(v) = v {
+                        sum += v.clone();
                         count += 1;
                     }
                 }
                 if count == 0 {
                     Ok(Value::NullV)
                 } else {
-                    let cnt = Decimal::from_i32(count).unwrap();
+                    let cnt = Numeric::from_i32(count);
                     Ok(Value::NumberV(sum / cnt))
                 }
             },
@@ -341,27 +339,28 @@ impl Prelude {
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"list".to_owned()).unwrap();
                 let arr = arg0.expect_array()?;
-                let mut sum: Decimal = Decimal::ZERO;
+                let mut sum = Numeric::ZERO;
                 let mut count = 0;
                 for v in arr.iter() {
-                    if let Value::NumberV(v) = *v {
-                        sum += v;
+                    if let Value::NumberV(v) = v {
+                        sum += v.clone();
                         count += 1;
                     }
                 }
                 if count == 0 {
                     return Ok(Value::NullV);
                 }
-                let avg = sum / Decimal::from_i32(count).unwrap();
+                let avg = sum / Numeric::from_i32(count);
 
-                let mut dev = Decimal::ZERO;
+                let mut dev = Numeric::ZERO;
                 for v in arr.iter() {
-                    if let Value::NumberV(v) = *v {
-                        dev += (v - avg) * (v - avg);
+                    if let Value::NumberV(v) = v {
+                        let diff = v.clone() - avg.clone();
+                        dev += diff.clone() * diff;
                     }
                 }
-                dev = dev / Decimal::from_i32(count).unwrap();
-                sqrt(dev).map_or(Ok(NullV), |n| Ok(NumberV(n)))
+                dev = dev / Numeric::from_i32(count);
+                dev.sqrt().map_or(Ok(NullV), |n| Ok(NumberV(n)))
             },
         );
 
@@ -373,21 +372,24 @@ impl Prelude {
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"list".to_owned()).unwrap();
                 let arr = arg0.expect_array()?;
-                let mut value_arr: Vec<Decimal> = vec![];
+                let mut value_arr: Vec<Numeric> = vec![];
 
                 for v in arr.iter() {
-                    if let Value::NumberV(v) = *v {
-                        value_arr.push(v);
+                    if let Value::NumberV(v) = v {
+                        value_arr.push(v.clone());
                     }
                 }
                 value_arr.sort();
                 match value_arr.len() {
                     0 => Ok(NullV),
-                    1 => Ok(NumberV(value_arr[0])),
-                    x if x % 2 == 0 => Ok(NumberV(value_arr[x / 2])),
-                    y => Ok(NumberV(
-                        (value_arr[y / 2] + value_arr[(y / 2) + 1]) / Decimal::TWO,
-                    )),
+                    1 => Ok(NumberV(value_arr[0].clone())),
+                    x if x % 2 == 1 => Ok(NumberV(value_arr[x / 2].clone())),
+                    y => {
+                        let half = y / 2;
+                        Ok(NumberV(
+                            (value_arr[half - 1].clone() + value_arr[half].clone()) / Numeric::TWO,
+                        ))
+                    }
                 }
             },
         );

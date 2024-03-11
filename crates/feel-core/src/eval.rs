@@ -9,16 +9,13 @@ use super::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use super::helpers::unescape;
 use super::parse::ParseError;
 use super::prelude::PRELUDE;
+use super::values::numeric::Numeric;
 use super::values::temporal::parse_temporal;
 use super::values::value::{TypeError, ValueError};
 
 use super::values::func::{MacroT, NativeFunc};
 use super::values::range::RangeT;
 use super::values::value::Value::{self, *};
-
-use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
-use rust_decimal::{Decimal, Error as DecimalError};
-use rust_decimal_macros::dec;
 
 // EvalError
 #[derive(Debug)]
@@ -28,7 +25,6 @@ pub enum EvalError {
     IndexError,
     TypeError(String),
     Runtime(String),
-    Decimal(DecimalError),
     Parse(ParseError),
     ValueError(String),
 }
@@ -42,26 +38,19 @@ impl fmt::Display for EvalError {
             Self::IndexError => write!(f, "{}", "IndexError"),
             Self::Runtime(message) => write!(f, "RuntimeError: {}", message),
             Self::ValueError(message) => write!(f, "ValueError: {}", message),
-            Self::Decimal(err) => write!(f, "DecimalError: {}", err),
             Self::Parse(err) => write!(f, "{}", err),
         }
     }
 }
 
-impl error::Error for EvalError {
-    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-        match self {
-            Self::Decimal(err) => Some(err),
-            _ => None,
-        }
-    }
-}
-
-impl From<DecimalError> for EvalError {
-    fn from(err: DecimalError) -> EvalError {
-        Self::Decimal(err)
-    }
-}
+impl error::Error for EvalError {}
+//     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+//         match self {
+//             Self::Decimal(err) => Some(err),
+//             _ => None,
+//         }
+//     }
+// }
 
 impl From<String> for EvalError {
     fn from(err: String) -> EvalError {
@@ -236,7 +225,7 @@ impl Engine {
 
     #[inline(always)]
     fn eval_number(&mut self, number_str: String) -> EvalResult {
-        let d = Decimal::from_str_exact(number_str.as_str())?;
+        let d = Numeric::from_str(number_str.as_str())?;
         Ok(NumberV(d))
     }
 
@@ -627,8 +616,8 @@ impl Engine {
                     // in FEEL language index starts from 1
                     let arr = a.borrow();
                     if !idx.is_integer()
-                        || idx < dec!(1)
-                        || idx > Decimal::from_usize(arr.len()).unwrap()
+                        || idx < Numeric::ONE
+                        || idx > Numeric::from_usize(arr.len())
                     {
                         return Err(EvalError::IndexError);
                     }
@@ -684,9 +673,8 @@ impl Engine {
 
 #[cfg(test)]
 mod test {
-    use crate::parse::parse;
+    use crate::{parse::parse, values::numeric::Numeric};
     use core::assert_matches::assert_matches;
-    use rust_decimal_macros::dec;
 
     #[test]
     fn test_number_parse() {
@@ -701,7 +689,7 @@ mod test {
             ("2 -5", "-3"),
             ("8 - 2", "6"),
             ("7 / 2", "3.5"), // decimal display outputs normalized string
-            ("10 / 3", "3.3333333333333333333333333333"), // precision is up to 28
+            ("10 / 3", "3.333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333"), // precision is up to 28
             ("4 * 9 + 1", "37"),
             ("8 % 5", "3"),
             ("8 / 5", "1.6"),
@@ -778,7 +766,10 @@ mod test {
     #[test]
     fn test_def_vars() {
         let mut eng = super::Engine::new();
-        eng.set_var("v1".to_owned(), super::NumberV(dec!(2.3)));
+        eng.set_var(
+            "v1".to_owned(),
+            super::NumberV(Numeric::from_str("2.3").unwrap()),
+        );
         let input = "v1 + 3";
         let node = parse(input).unwrap();
         let v = eng.eval(node).unwrap();

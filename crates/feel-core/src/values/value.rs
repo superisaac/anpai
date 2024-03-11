@@ -1,15 +1,16 @@
 use super::super::ast::Node;
 use super::super::helpers::{compare_value, escape, fmt_map, fmt_vec};
+
 use core::cell::{Ref, RefMut};
 
 extern crate chrono;
 extern crate iso8601;
 
 use super::func::{MacroT, NativeFunc};
+use super::numeric::Numeric;
 use super::range::RangeT;
 use super::temporal::{compare_date, datetime_op, timedelta_to_duration};
-use rust_decimal::prelude::*;
-use rust_decimal_macros::*;
+
 use std::cell::RefCell;
 use std::cmp;
 use std::collections::BTreeMap;
@@ -55,7 +56,7 @@ impl From<&str> for TypeError {
 pub enum Value {
     NullV,
     BoolV(bool),
-    NumberV(Decimal),
+    NumberV(Numeric),
     StrV(String),
     DateTimeV(chrono::DateTime<chrono::FixedOffset>),
     DateV(iso8601::Date),
@@ -91,7 +92,7 @@ impl fmt::Display for Value {
         match self {
             Self::NullV => write!(f, "{}", "null"),
             Self::BoolV(v) => write!(f, "{}", v),
-            Self::NumberV(v) => write!(f, "{}", v.normalize()),
+            Self::NumberV(v) => write!(f, "{}", v), // .normalize
             Self::StrV(v) => write!(f, "\"{}\"", escape(v)),
             Self::DateTimeV(v) => write!(f, "{}", v.format("%Y-%m-%dT%H:%M:%S%:z")),
             Self::DateV(v) => write!(f, "{}", v),
@@ -153,7 +154,7 @@ impl Value {
         match self {
             Self::NullV => false,
             Self::BoolV(v) => *v,
-            Self::NumberV(v) => *v != dec!(0),
+            Self::NumberV(v) => *v != Numeric::ZERO,
             Self::StrV(v) => v.len() > 0,
             Self::ArrayV(v) => v.borrow().len() > 0,
             Self::MapV(v) => v.borrow().len() > 0,
@@ -161,13 +162,10 @@ impl Value {
         }
     }
 
-    pub fn parse_number(&self) -> Result<Decimal, ValueError> {
+    pub fn parse_number(&self) -> Result<Numeric, ValueError> {
         match self {
-            Self::StrV(s) => match Decimal::from_str_exact(s) {
-                Ok(d) => Ok(d),
-                Err(err) => Err(ValueError(err.to_string())),
-            },
-            Self::NumberV(n) => Ok(*n),
+            Self::StrV(s) => Numeric::from_str(s),
+            Self::NumberV(n) => Ok(n.clone()),
             _ => Err(ValueError("fail to parse number".to_owned())),
         }
     }
@@ -183,7 +181,7 @@ impl Value {
         )))
     }
 
-    pub fn expect_number(&self, hint: &str) -> Result<Decimal, ValueError> {
+    pub fn expect_number(&self, hint: &str) -> Result<Numeric, ValueError> {
         if let Self::NumberV(n) = self {
             return Ok(n.clone());
         }
@@ -439,11 +437,11 @@ impl cmp::PartialOrd for Value {
     }
 }
 
-#[test]
-fn test_decimal_trailing_zeros() {
-    let a = Decimal::from_str_exact("7").unwrap();
-    let b = Decimal::from_str_exact("2").unwrap();
-    let d = a / b;
-    assert_eq!(d.to_string(), "3.50");
-    assert_eq!(d.normalize().to_string(), "3.5");
-}
+// #[test]
+// fn test_decimal_trailing_zeros() {
+//     let a = Decimal::from_str_exact("7").unwrap();
+//     let b = Decimal::from_str_exact("2").unwrap();
+//     let d = a / b;
+//     assert_eq!(d.to_string(), "3.50");
+//     assert_eq!(d.normalize().to_string(), "3.5");
+// }
