@@ -1,12 +1,31 @@
 use lazy_static::lazy_static;
 
+use std::borrow::Borrow;
+use std::cell::RefCell;
 use std::cmp;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use super::eval::{EvalError, EvalResult};
 use super::values::func::{MacroBody, MacroT, NativeFunc, NativeFuncBody};
 use super::values::numeric::Numeric;
 use super::values::value::Value::{self, *};
+
+fn from_feel_index(idx: usize) -> usize {
+    idx - 1
+}
+
+fn to_feel_index(idx: usize) -> usize {
+    idx + 1
+}
+
+pub fn range_check(pos: usize, low: usize, high: usize) -> Result<usize, EvalError> {
+    if pos < low || pos > high {
+        Err(EvalError::IndexError)
+    } else {
+        Ok(pos)
+    }
+}
 
 #[derive(Clone)]
 pub struct Prelude {
@@ -205,8 +224,9 @@ impl Prelude {
             &["list", "element"],
             |_, args| -> EvalResult {
                 let v = args.get(&"list".to_owned()).unwrap();
+                let arr = v.expect_array("argument[1] `list`")?;
+
                 let elem = args.get(&"element".to_owned()).unwrap();
-                let arr = v.expect_array()?;
                 for arr_elem in arr.iter() {
                     if *arr_elem == *elem {
                         return Ok(Value::BoolV(true));
@@ -223,7 +243,7 @@ impl Prelude {
             Some("list"),
             |_, args| -> EvalResult {
                 let v = args.get(&"list".to_owned()).unwrap();
-                let arr = v.expect_array()?;
+                let arr = v.expect_array("arguments `list`")?;
                 let count = Numeric::from_usize(arr.len());
                 Ok(Value::NumberV(count))
             },
@@ -236,7 +256,7 @@ impl Prelude {
             Some("list"),
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"list".to_owned()).unwrap();
-                let arr = arg0.expect_array()?;
+                let arr = arg0.expect_array("arguments `list`")?;
                 let mut min_value: Option<Value> = None;
 
                 for v in arr.iter() {
@@ -255,7 +275,7 @@ impl Prelude {
             Some("list"),
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"list".to_owned()).unwrap();
-                let arr = arg0.expect_array()?;
+                let arr = arg0.expect_array("arguments `list`")?;
                 let mut max_value: Option<Value> = None;
 
                 for v in arr.iter() {
@@ -274,7 +294,7 @@ impl Prelude {
             Some("list"),
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"list".to_owned()).unwrap();
-                let arr = arg0.expect_array()?;
+                let arr = arg0.expect_array("arguments `list`")?;
                 let mut sum: Numeric = Numeric::ZERO;
 
                 for v in arr.iter() {
@@ -293,7 +313,7 @@ impl Prelude {
             Some("list"),
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"list".to_owned()).unwrap();
-                let arr = arg0.expect_array()?;
+                let arr = arg0.expect_array("arguments `list`")?;
                 let mut res = Numeric::ONE;
 
                 for v in arr.iter() {
@@ -312,7 +332,7 @@ impl Prelude {
             Some("list"),
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"list".to_owned()).unwrap();
-                let arr = arg0.expect_array()?;
+                let arr = arg0.expect_array("arguments `list`")?;
                 let mut sum = Numeric::ZERO;
                 let mut count = 0;
 
@@ -338,7 +358,7 @@ impl Prelude {
             Some("list"),
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"list".to_owned()).unwrap();
-                let arr = arg0.expect_array()?;
+                let arr = arg0.expect_array("arguments `list`")?;
                 let mut sum = Numeric::ZERO;
                 let mut count = 0;
                 for v in arr.iter() {
@@ -371,7 +391,7 @@ impl Prelude {
             Some("list"),
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"list".to_owned()).unwrap();
-                let arr = arg0.expect_array()?;
+                let arr = arg0.expect_array("arguments `list`")?;
                 let mut value_arr: Vec<Numeric> = vec![];
 
                 for v in arr.iter() {
@@ -393,6 +413,175 @@ impl Prelude {
                 }
             },
         );
+
+        self.add_native_func_with_optional_args(
+            "all",
+            &[],
+            &[],
+            Some("list"),
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"list".to_owned()).unwrap();
+                let arr = arg0.expect_array("arguments `list`")?;
+
+                for v in arr.iter() {
+                    if !v.bool_value() {
+                        return Ok(BoolV(false));
+                    }
+                }
+                Ok(BoolV(true))
+            },
+        );
+
+        self.add_native_func_with_optional_args(
+            "any",
+            &[],
+            &[],
+            Some("list"),
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"list".to_owned()).unwrap();
+                let arr = arg0.expect_array("arguments `list`")?;
+
+                for v in arr.iter() {
+                    if v.bool_value() {
+                        return Ok(BoolV(true));
+                    }
+                }
+                Ok(BoolV(false))
+            },
+        );
+
+        self.add_native_func_with_optional_args(
+            "sublist",
+            &["list", "start position"],
+            &["length"],
+            None,
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"list".to_owned()).unwrap();
+                let arr = arg0.expect_array("argument[1] `list`")?;
+
+                let start_v = args.get(&"start position".to_owned()).unwrap();
+                let feel_start_position = range_check(
+                    start_v.expect_usize("argument[2] `start position`")?,
+                    1,
+                    arr.len(),
+                )?;
+                // 'length' is the optional value
+                let start_pos = from_feel_index(feel_start_position);
+                let subarr = if let Some(lenv) = args.get(&"length".to_owned()) {
+                    let len = lenv.expect_usize("argument[3] `length`")?;
+                    arr[start_pos..(cmp::min(start_pos + len, arr.len()))].to_owned()
+                } else {
+                    arr[start_pos..].to_owned()
+                };
+                Ok(Value::ArrayV(RefCell::new(Rc::new(subarr))))
+            },
+        );
+
+        self.add_native_func_with_optional_args(
+            "append",
+            &["list"],
+            &[],
+            Some("items"),
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"list".to_owned()).unwrap();
+                let arr = arg0.expect_array("argument[1], `list`")?;
+
+                let vararg = args.get(&"items".to_owned()).unwrap();
+                let items = vararg.expect_array("arguments `items`")?;
+
+                let mut res: Vec<Value> = vec![];
+
+                for v in arr.iter() {
+                    res.push(v.clone());
+                }
+                for v in items.iter() {
+                    res.push(v.clone());
+                }
+                Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+            },
+        );
+
+        self.add_native_func_with_optional_args(
+            "concatenate",
+            &[],
+            &[],
+            Some("lists"),
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"lists".to_owned()).unwrap();
+                let arr = arg0.expect_array("arguments `lists`")?;
+
+                let mut lists: Vec<Vec<Value>> = vec![];
+                for (i, v) in arr.iter().enumerate() {
+                    let childlist = v.expect_array(format!("argument[{}]", (i + 1)).as_str())?;
+                    lists.push(childlist.iter().map(|v| v.clone()).collect());
+                }
+                let res = lists.concat();
+                Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+            },
+        );
+
+        self.add_native_func(
+            "insert before",
+            &["list", "position", "newItem"],
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"list".to_owned()).unwrap();
+                let arr = arg0.expect_array("argument[1] `list`")?;
+
+                let arg1 = args.get(&"position".to_owned()).unwrap();
+                let feel_position =
+                    range_check(arg1.expect_usize("argument[2] `position`")?, 1, arr.len())?;
+
+                let position = from_feel_index(feel_position);
+
+                let new_item = args.get(&"newItem".to_owned()).unwrap();
+
+                let pre = arr.borrow()[..position].to_owned();
+                let post = arr.borrow()[position..].to_owned();
+                let res = vec![pre, vec![new_item.clone()], post].concat();
+                Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+            },
+        );
+
+        self.add_native_func("remove", &["list", "position"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"list".to_owned()).unwrap();
+            let arr = arg0.expect_array("argument[1] `list`")?;
+
+            let arg1 = args.get(&"position".to_owned()).unwrap();
+            let feel_position =
+                range_check(arg1.expect_usize("argument[2] `position`")?, 1, arr.len())?;
+
+            let position = from_feel_index(feel_position);
+
+            let pre = arr.borrow()[..position].to_owned();
+            let post = arr.borrow()[(position + 1)..].to_owned();
+            let res = vec![pre, post].concat();
+            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+        });
+
+        self.add_native_func("reverse", &["list"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"list".to_owned()).unwrap();
+            let arr = arg0.expect_array("argument[1] `list`")?;
+
+            let res = arr.iter().rev().map(|v| v.clone()).collect();
+            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+        });
+
+        self.add_native_func("index of", &["list", "match"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"list".to_owned()).unwrap();
+            let arr = arg0.expect_array("argument[1] `list`")?;
+
+            let arg1 = args.get(&"match".to_owned()).unwrap();
+
+            let mut res: Vec<Value> = vec![];
+
+            for (i, v) in arr.iter().enumerate() {
+                if *v == *arg1 {
+                    //return Ok(Value::from_usize(to_feel_index(i)))
+                    res.push(Value::from_usize(to_feel_index(i)))
+                }
+            }
+            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+        });
     }
 }
 

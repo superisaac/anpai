@@ -6,17 +6,17 @@ use core::cell::{Ref, RefMut};
 extern crate chrono;
 extern crate iso8601;
 
-use super::func::{MacroT, NativeFunc};
-use super::numeric::Numeric;
-use super::range::RangeT;
-use super::temporal::{compare_date, datetime_op, timedelta_to_duration};
-
 use std::cell::RefCell;
 use std::cmp;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::ops;
 use std::rc::Rc;
+
+use super::func::{MacroT, NativeFunc};
+use super::numeric::Numeric;
+use super::range::RangeT;
+use super::temporal::{compare_date, datetime_op, timedelta_to_duration};
 
 // value error
 #[derive(Clone, Debug)]
@@ -120,6 +120,10 @@ impl fmt::Display for Value {
 }
 
 impl Value {
+    pub fn from_usize(n: usize) -> Value {
+        Self::NumberV(Numeric::from_usize(n))
+    }
+
     pub fn data_type(&self) -> String {
         match self {
             Self::NullV => "null".to_owned(),
@@ -221,18 +225,26 @@ impl Value {
         )))
     }
 
-    pub fn expect_array(&self) -> Result<Ref<'_, Rc<Vec<Value>>>, TypeError> {
+    pub fn expect_array(&self, hint: &str) -> Result<Ref<'_, Rc<Vec<Value>>>, TypeError> {
         if let Self::ArrayV(arr) = self {
             return Ok(arr.borrow());
         }
-        Err(TypeError("array".to_owned()))
+        Err(TypeError(format!(
+            "{}, expect array, but {} found",
+            hint,
+            self.data_type(),
+        )))
     }
 
-    pub fn expect_array_mut(&self) -> Result<RefMut<'_, Rc<Vec<Value>>>, TypeError> {
+    pub fn expect_array_mut(&self, hint: &str) -> Result<RefMut<'_, Rc<Vec<Value>>>, TypeError> {
         if let Self::ArrayV(arr) = self {
             return Ok(arr.borrow_mut());
         }
-        Err(TypeError("array".to_owned()))
+        Err(TypeError(format!(
+            "{}, expect array, but {} found",
+            hint,
+            self.data_type(),
+        )))
     }
 }
 
