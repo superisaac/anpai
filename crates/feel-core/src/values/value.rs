@@ -130,6 +130,10 @@ impl Value {
         Self::NumberV(Numeric::from_usize(n))
     }
 
+    pub fn from_str(s: &str) -> Value {
+        Self::StrV(s.to_owned())
+    }
+
     pub fn data_type(&self) -> String {
         match self {
             Self::NullV => "null".to_owned(),

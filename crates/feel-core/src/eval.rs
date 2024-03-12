@@ -745,6 +745,7 @@ mod test {
             ("not(2>1)", "false"),
             (r#"number("3000.888")"#, "3000.888"),
             (r#"string length("hello world")"#, "11"),
+            (r#"string join(["hello", "world", "again"], ", ")"#, r#""hello, world, again""#),
             ("list contains([2, 8, -1], 8)", "true"),
             (r#"list contains([2, 8, "hello"], "world")"#, "false"),
             ("count(1, 2, 4, 9, -3)", "5"),

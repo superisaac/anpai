@@ -178,6 +178,45 @@ impl Prelude {
             },
         );
 
+        self.add_native_func_with_optional_args(
+            "string join",
+            &["list"],
+            &["delimiter", "prefix", "suffix"],
+            None,
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"list".to_owned()).unwrap();
+                let arr = arg0.expect_array("argument[1] `list`")?;
+
+                let arg1 = args
+                    .get(&"delimiter".to_owned())
+                    .map_or(Value::from_str(""), |v| v.clone());
+                let delimiter = arg1.expect_string("argument[2] `delimiter`")?;
+
+                let arg2 = args
+                    .get(&"prefix".to_owned())
+                    .map_or(Value::from_str(""), |v| v.clone());
+                let prefix = arg2.expect_string("argument[2] `delimiter`")?;
+
+                let arg3 = args
+                    .get(&"suffix".to_owned())
+                    .map_or(Value::from_str(""), |v| v.clone());
+                let suffix = arg3.expect_string("argument[2] `delimiter`")?;
+
+                let mut res = String::new();
+                res.push_str(prefix.as_str());
+
+                for (i, v) in arr.iter().enumerate() {
+                    let sv = v.expect_string(format!("argument[1][{}]", i + 1).as_str())?;
+                    if i > 0 {
+                        res.push_str(delimiter.as_str());
+                    }
+                    res.push_str(sv.as_str());
+                }
+                res.push_str(suffix.as_str());
+                Ok(Value::StrV(res))
+            },
+        );
+
         self.add_native_func("upper case", &["string"], |_, args| -> EvalResult {
             let v = args.get(&"string".to_owned()).unwrap();
             let s = v.expect_string("argument[1] `string`")?;
@@ -609,6 +648,35 @@ impl Prelude {
             }
             Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
         });
+
+        self.add_native_func("distinct values", &["list"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"list".to_owned()).unwrap();
+            let arr = arg0.expect_array("argument[1] `list`")?;
+
+            let mut res: Vec<Value> = arr.iter().map(|x| x.clone()).collect();
+            res.dedup();
+            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+        });
+
+        self.add_native_func_with_optional_args(
+            "union",
+            &[],
+            &[],
+            Some("lists"),
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"lists".to_owned()).unwrap();
+                let arr = arg0.expect_array("arguments `lists`")?;
+
+                let mut lists: Vec<Vec<Value>> = vec![];
+                for (i, v) in arr.iter().enumerate() {
+                    let childlist = v.expect_array(format!("argument[{}]", (i + 1)).as_str())?;
+                    lists.push(childlist.iter().map(|v| v.clone()).collect());
+                }
+                let mut res = lists.concat();
+                res.dedup();
+                Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+            },
+        );
     }
 }
 
