@@ -3,7 +3,7 @@ use std::fmt;
 use std::rc::Rc;
 
 // range
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct RangeT {
     pub start_open: bool,
     pub start: Rc<Value>,

@@ -26,7 +26,7 @@ impl ScanError {
     }
 }
 
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct TextPosition {
     pub chars: usize,
     pub lines: usize,

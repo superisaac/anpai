@@ -11,7 +11,7 @@ use std::fmt;
 pub type NativeFuncBody =
     fn(eng: &mut Engine, args: HashMap<String, Value>) -> Result<Value, EvalError>;
 
-#[derive(Clone)]
+#[derive(Clone, Eq)]
 pub struct NativeFunc {
     pub name: String,
     pub body: NativeFuncBody,
@@ -33,7 +33,7 @@ impl cmp::PartialEq for NativeFunc {
 pub type MacroBody =
     fn(eng: &mut Engine, nodes: HashMap<String, Box<Node>>) -> Result<Value, EvalError>;
 
-#[derive(Clone)]
+#[derive(Clone, Eq)]
 pub struct MacroT {
     pub name: String,
     pub body: MacroBody,

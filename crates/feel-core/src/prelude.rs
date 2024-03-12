@@ -520,6 +520,33 @@ impl Prelude {
             },
         );
 
+        self.add_native_func("flatten", &["list"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"list".to_owned()).unwrap();
+            let arr = arg0.expect_array("argument[1] `list`")?;
+
+            let mut res: Vec<Value> = vec![];
+            for v in arr.iter() {
+                match v {
+                    Value::ArrayV(a) => {
+                        for x in a.borrow().iter() {
+                            res.push(x.clone());
+                        }
+                    }
+                    x => res.push(x.clone()),
+                }
+            }
+            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+        });
+
+        self.add_native_func("sort", &["list"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"list".to_owned()).unwrap();
+            let arr = arg0.expect_array("argument[1] `list`")?;
+
+            let mut res: Vec<Value> = arr.borrow().iter().map(|x| x.clone()).collect();
+            res.sort();
+            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+        });
+
         self.add_native_func(
             "insert before",
             &["list", "position", "newItem"],

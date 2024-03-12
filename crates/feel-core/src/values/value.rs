@@ -52,7 +52,13 @@ impl From<&str> for TypeError {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Ord, PartialOrd, PartialEq, Eq)]
+pub enum CompareKey {
+    Str(String),
+    Number(Numeric),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Value {
     NullV,
     BoolV(bool),
@@ -163,6 +169,15 @@ impl Value {
             Self::ArrayV(v) => v.borrow().len() > 0,
             Self::MapV(v) => v.borrow().len() > 0,
             _ => true,
+        }
+    }
+
+    pub(crate) fn compare_key(&self) -> CompareKey {
+        match self {
+            Self::StrV(v) => CompareKey::Str(v.clone()),
+            Self::NumberV(v) => CompareKey::Number(v.clone()),
+            Self::BoolV(v) if *v == true => CompareKey::Number(Numeric::ONE),
+            _ => CompareKey::Number(Numeric::ZERO),
         }
     }
 
@@ -445,6 +460,16 @@ impl cmp::PartialOrd for Value {
                 _ => None,
             },
             _ => None,
+        }
+    }
+}
+
+impl cmp::Ord for Value {
+    fn cmp(&self, other: &Value) -> cmp::Ordering {
+        if let Some(ord) = self.partial_cmp(other) {
+            ord
+        } else {
+            self.compare_key().cmp(&other.compare_key())
         }
     }
 }

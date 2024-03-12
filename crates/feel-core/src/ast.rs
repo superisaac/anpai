@@ -3,7 +3,7 @@ use crate::scan::TextPosition;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct FuncCallArg {
     pub arg_name: String,
     pub arg: Box<Node>,
@@ -19,7 +19,7 @@ impl fmt::Display for FuncCallArg {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct MapNodeItem {
     pub name: Box<Node>,
     pub value: Box<Node>,
@@ -31,7 +31,7 @@ impl fmt::Display for MapNodeItem {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub enum NodeSyntax {
     BinOp {
         op: String,
@@ -186,7 +186,7 @@ impl fmt::Display for NodeSyntax {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Node {
     pub syntax: Box<NodeSyntax>,
     pub start_pos: TextPosition,
