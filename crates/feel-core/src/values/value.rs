@@ -11,7 +11,7 @@ use std::fmt;
 use std::ops;
 use std::rc::Rc;
 
-use super::context::ContextRef;
+use super::context::{Context, ContextRef};
 use super::func::{MacroT, NativeFunc};
 use super::numeric::Numeric;
 use super::range::RangeT;
@@ -278,7 +278,18 @@ impl Value {
         )))
     }
 
-    pub fn expect_context(&self, hint: &str) -> Result<ContextRef, TypeError> {
+    pub fn expect_context(&self, hint: &str) -> Result<Ref<'_, Context>, TypeError> {
+        if let Self::ContextV(m) = self {
+            return Ok(m.as_ref().borrow());
+        }
+        Err(TypeError(format!(
+            "{}, expect map, but {} found",
+            hint,
+            self.data_type(),
+        )))
+    }
+
+    pub fn expect_context_ref(&self, hint: &str) -> Result<ContextRef, TypeError> {
         if let Self::ContextV(m) = self {
             return Ok(m.clone());
         }
@@ -288,17 +299,6 @@ impl Value {
             self.data_type(),
         )))
     }
-
-    // pub fn expect_context_mut(&self, hint: &str) -> Result<ContextRef, TypeError> {
-    //     if let Self::ContextV(m) = self {
-    //         return Ok(m.clone());
-    //     }
-    //     Err(TypeError(format!(
-    //         "{}, expect map, but {} found",
-    //         hint,
-    //         self.data_type(),
-    //     )))
-    // }
 }
 
 // ops traits

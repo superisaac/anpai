@@ -701,7 +701,7 @@ impl Prelude {
                 }
             };
 
-            if let Some(v) = m.clone().as_ref().borrow().get_path(path.as_slice()) {
+            if let Some(v) = m.get_path(path.as_slice()) {
                 Ok(v.clone())
             } else {
                 Ok(Value::NullV)
@@ -711,7 +711,7 @@ impl Prelude {
             let arg0 = args.get(&"context".to_owned()).unwrap();
             let m = arg0.expect_context("argument[1] `context`")?;
             let mut res = vec![];
-            for (k, v) in m.as_ref().borrow().entries() {
+            for (k, v) in m.entries() {
                 let mut ent_ctx = Context::new();
                 ent_ctx.insert("key".to_string(), Value::StrV(k));
                 ent_ctx.insert("value".to_string(), v);
@@ -725,7 +725,7 @@ impl Prelude {
             &["context", "key", "value"],
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"context".to_owned()).unwrap();
-                let m = arg0.expect_context("argument[1] `context`")?;
+                let m = arg0.expect_context_ref("argument[1] `context`")?;
 
                 let arg1 = args.get(&"key".to_owned()).unwrap();
                 let path = match arg1.clone() {
@@ -762,7 +762,7 @@ impl Prelude {
             let mut res_ctx = Context::new();
             for (i, ctx_v) in contexts.iter().enumerate() {
                 let ctx = ctx_v.expect_context(format!("argument[1][{}]", i + 1).as_str())?;
-                res_ctx.merge(&ctx.as_ref().borrow());
+                res_ctx.merge(&ctx);
             }
             Ok(Value::ContextV(Rc::new(RefCell::new(res_ctx))))
         }); // end `context merge`
