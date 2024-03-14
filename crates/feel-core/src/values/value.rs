@@ -1,5 +1,5 @@
 use super::super::ast::Node;
-use super::super::helpers::{compare_value, escape, fmt_map, fmt_vec};
+use super::super::helpers::{compare_value, escape, fmt_vec};
 
 use core::cell::{Ref, RefMut};
 
@@ -8,11 +8,11 @@ extern crate iso8601;
 
 use std::cell::RefCell;
 use std::cmp;
-use std::collections::BTreeMap;
 use std::fmt;
 use std::ops;
 use std::rc::Rc;
 
+use super::context::ContextRef;
 use super::func::{MacroT, NativeFunc};
 use super::numeric::Numeric;
 use super::range::RangeT;
@@ -73,7 +73,7 @@ pub enum Value {
     },
     RangeV(RangeT),
     ArrayV(RefCell<Rc<Vec<Value>>>),
-    MapV(RefCell<Rc<BTreeMap<String, Value>>>),
+    MapV(ContextRef),
     NativeFuncV {
         func: NativeFunc,
         require_args: Vec<String>,
@@ -109,7 +109,7 @@ impl fmt::Display for Value {
             }
             Self::RangeV(v) => write!(f, "{}", v),
             Self::ArrayV(arr) => fmt_vec(f, arr.borrow().iter(), "[", "]"),
-            Self::MapV(map) => fmt_map(f, &map.borrow(), "{", "}"),
+            Self::MapV(map) => write!(f, "{}", map.borrow()),
             Self::NativeFuncV {
                 require_args: _,
                 optional_args: _,
@@ -265,6 +265,28 @@ impl Value {
             self.data_type(),
         )))
     }
+
+    pub fn expect_map(&self, hint: &str) -> Result<ContextRef, TypeError> {
+        if let Self::MapV(m) = self {
+            return Ok(m.clone());
+        }
+        Err(TypeError(format!(
+            "{}, expect map, but {} found",
+            hint,
+            self.data_type(),
+        )))
+    }
+
+    // pub fn expect_map_mut(&self, hint: &str) -> Result<ContextRef, TypeError> {
+    //     if let Self::MapV(m) = self {
+    //         return Ok(m.clone());
+    //     }
+    //     Err(TypeError(format!(
+    //         "{}, expect map, but {} found",
+    //         hint,
+    //         self.data_type(),
+    //     )))
+    // }
 }
 
 // ops traits

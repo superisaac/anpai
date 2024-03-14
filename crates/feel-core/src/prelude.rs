@@ -677,6 +677,75 @@ impl Prelude {
                 Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
             },
         );
+
+        // context/map functions
+        self.add_native_func("get value", &["context", "key"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"context".to_owned()).unwrap();
+            let m = arg0.expect_map("argument[1] `context`")?;
+            //let mv:Ref<'_, Context> = m.as_ref().borrow();
+
+            let arg1 = args.get(&"key".to_owned()).unwrap();
+            let path = match arg1.clone() {
+                Value::StrV(s) => vec![s],
+                Value::ArrayV(a) => {
+                    let mut keys = vec![];
+                    for (i, v) in a.borrow().iter().enumerate() {
+                        let s = v.expect_string(format!("argument[2][{}]", (i + 1)).as_str())?;
+                        keys.push(s);
+                    }
+                    keys
+                }
+                _ => {
+                    return Err(EvalError::TypeError(format!(
+                        "expect string or string list, by {} found",
+                        arg1.data_type()
+                    )))
+                }
+            };
+
+            if let Some(v) = m.clone().as_ref().borrow().get_path(path.as_slice()) {
+                Ok(v.clone())
+            } else {
+                Ok(Value::NullV)
+            }
+        });
+
+        self.add_native_func(
+            "context put",
+            &["context", "key", "value"],
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"context".to_owned()).unwrap();
+                let m = arg0.expect_map("argument[1] `context`")?;
+
+                let arg1 = args.get(&"key".to_owned()).unwrap();
+                let path = match arg1.clone() {
+                    Value::StrV(s) => vec![s],
+                    Value::ArrayV(a) => {
+                        let mut keys = vec![];
+                        for (i, v) in a.borrow().iter().enumerate() {
+                            let s =
+                                v.expect_string(format!("argument[2][{}]", (i + 1)).as_str())?;
+                            keys.push(s);
+                        }
+                        keys
+                    }
+                    _ => {
+                        return Err(EvalError::TypeError(format!(
+                            "expect string or string list, by {} found",
+                            arg1.data_type()
+                        )))
+                    }
+                };
+
+                let arg2 = args.get(&"value".to_owned()).unwrap();
+
+                m.as_ref()
+                    .borrow_mut()
+                    .insert_path(path.as_slice(), arg2.clone());
+
+                Ok(Value::MapV(m.clone()))
+            },
+        );
     }
 }
 

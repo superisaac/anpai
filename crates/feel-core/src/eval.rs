@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::error;
 use std::fmt;
 
@@ -9,6 +9,7 @@ use super::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use super::helpers::unescape;
 use super::parse::ParseError;
 use super::prelude::PRELUDE;
+use super::values::context::Context;
 use super::values::numeric::Numeric;
 use super::values::temporal::parse_temporal;
 use super::values::value::{TypeError, ValueError};
@@ -250,14 +251,17 @@ impl Engine {
 
     #[inline(always)]
     fn eval_map(&mut self, items: &Vec<MapNodeItem>) -> EvalResult {
-        let mut value_map: BTreeMap<String, Value> = BTreeMap::new();
+        let mut value_map = Context::new();
         for item in items.iter() {
             let k = self.eval(item.name.clone())?;
-            let key = k.to_string();
+
+            let key = k.expect_string("opp")?;
+            println!("map item {:?}, kk {}", k, key);
+            //let key = k.to_string();
             let val = self.eval(item.value.clone())?;
             value_map.insert(key, val);
         }
-        Ok(MapV(RefCell::new(Rc::new(value_map))))
+        Ok(MapV(Rc::new(RefCell::new(value_map))))
     }
 
     #[inline(always)]
@@ -606,8 +610,8 @@ impl Engine {
             MapV(a) => match right_value {
                 StrV(k) => {
                     let m = a.borrow();
-                    let v = m.get(&k).ok_or(EvalError::KeyError)?;
-                    Ok(v.clone())
+                    let v = m.get(k).ok_or(EvalError::KeyError)?;
+                    Ok(v)
                 }
                 _ => Err(EvalError::runtime("map key not string")),
             },
@@ -663,8 +667,8 @@ impl Engine {
         match left_value {
             MapV(a) => {
                 let m = a.borrow();
-                let v = m.get(&attr).ok_or(EvalError::KeyError)?;
-                Ok(v.clone())
+                let v = m.get(attr).ok_or(EvalError::KeyError)?;
+                Ok(v)
             }
             _ => Err(EvalError::runtime("map is not indexable")),
         }
@@ -745,7 +749,8 @@ mod test {
             ("not(2>1)", "false"),
             (r#"number("3000.888")"#, "3000.888"),
             (r#"string length("hello world")"#, "11"),
-            (r#"string join(["hello", "world", "again"], ", ")"#, r#""hello, world, again""#),
+            (r#"string join(["hello", "world", "again"], ", ", ":")"#, r#"":hello, world, again""#),
+            // list functions
             ("list contains([2, 8, -1], 8)", "true"),
             (r#"list contains([2, 8, "hello"], "world")"#, "false"),
             ("count(1, 2, 4, 9, -3)", "5"),
@@ -753,8 +758,13 @@ mod test {
             ("min(31, -1, 9, 8, -1, -99)", "-99"),
             ("min(31, -1, 9, false, -1, -99)", "-99"),
             ("max(31, -1, 9, 8, -1, -99)", "31"),
-            ("sum(31, -1, 9, false, -1, -99)", "-61"),
+            ("sum(31, -1, 9, false, -1, -99)", "-61"),  
             ("sort([3, -1, 2])", "[-1, 2, 3]"),
+            // test context functions
+            (r#"get value({"a": 5, b: 9}, "b")"#, "9"),
+            (r#"get value({"a": 5, b: {"c k": {m: 5}}}, ["b", "c k", "m"])"#, "5"),
+            (r#"context put({"o":8}, ["a", "b", "c d"], 3)"#, r#"{"a":{"b":{"c d":3}}, "o":8}"#),
+            (r#"context put({a: {b: {"c d":3}}, o:8}, ["a", "b", "c d"], 6)"#, r#"{"a":{"b":{"c d":6}}, "o":8}"#),
         ];
 
         for (input, output) in testcases {
