@@ -1,7 +1,6 @@
 use super::super::ast::Node;
 use super::super::helpers::{compare_value, escape, fmt_vec};
-
-use core::cell::{Ref, RefMut};
+use core::cell::Ref;
 
 extern crate chrono;
 extern crate iso8601;
@@ -58,6 +57,8 @@ pub enum CompareKey {
     Number(Numeric),
 }
 
+pub type ArrayRef = Rc<RefCell<Vec<Value>>>;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Value {
     NullV,
@@ -72,7 +73,7 @@ pub enum Value {
         negative: bool,
     },
     RangeV(RangeT),
-    ArrayV(RefCell<Rc<Vec<Value>>>),
+    ArrayV(ArrayRef),
     ContextV(ContextRef),
     NativeFuncV {
         func: NativeFunc,
@@ -244,9 +245,20 @@ impl Value {
         )))
     }
 
-    pub fn expect_array(&self, hint: &str) -> Result<Ref<'_, Rc<Vec<Value>>>, TypeError> {
+    // pub fn expect_array(&self, hint: &str) -> Result<ArrayRef, TypeError> {
+    //     if let Self::ArrayV(arr) = self {
+    //         return Ok(arr.clone());
+    //     }
+    //     Err(TypeError(format!(
+    //         "{}, expect array, but {} found",
+    //         hint,
+    //         self.data_type(),
+    //     )))
+    // }
+
+    pub fn expect_array(&self, hint: &str) -> Result<Ref<'_, Vec<Value>>, TypeError> {
         if let Self::ArrayV(arr) = self {
-            return Ok(arr.borrow());
+            return Ok(arr.as_ref().borrow());
         }
         Err(TypeError(format!(
             "{}, expect array, but {} found",
@@ -255,9 +267,9 @@ impl Value {
         )))
     }
 
-    pub fn expect_array_mut(&self, hint: &str) -> Result<RefMut<'_, Rc<Vec<Value>>>, TypeError> {
+    pub fn expect_array_mut(&self, hint: &str) -> Result<ArrayRef, TypeError> {
         if let Self::ArrayV(arr) = self {
-            return Ok(arr.borrow_mut());
+            return Ok(arr.clone());
         }
         Err(TypeError(format!(
             "{}, expect array, but {} found",
@@ -266,7 +278,7 @@ impl Value {
         )))
     }
 
-    pub fn expect_map(&self, hint: &str) -> Result<ContextRef, TypeError> {
+    pub fn expect_context(&self, hint: &str) -> Result<ContextRef, TypeError> {
         if let Self::ContextV(m) = self {
             return Ok(m.clone());
         }
@@ -277,7 +289,7 @@ impl Value {
         )))
     }
 
-    // pub fn expect_map_mut(&self, hint: &str) -> Result<ContextRef, TypeError> {
+    // pub fn expect_context_mut(&self, hint: &str) -> Result<ContextRef, TypeError> {
     //     if let Self::ContextV(m) = self {
     //         return Ok(m.clone());
     //     }

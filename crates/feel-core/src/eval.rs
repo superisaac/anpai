@@ -246,7 +246,7 @@ impl Engine {
             let res = self.eval(elem.clone())?;
             results.push(res);
         }
-        Ok(ArrayV(RefCell::new(Rc::new(results))))
+        Ok(ArrayV(Rc::new(RefCell::new(results))))
     }
 
     #[inline(always)]
@@ -320,7 +320,7 @@ impl Engine {
                         Err(err) => return Err(err),
                     }
                 }
-                Ok(ArrayV(RefCell::new(Rc::new(results))))
+                Ok(ArrayV(Rc::new(RefCell::new(results))))
             }
             _ => Err(EvalError::runtime("for loop require a list")),
         }
@@ -379,7 +379,7 @@ impl Engine {
                         Err(err) => return Err(err),
                     }
                 }
-                Ok(ArrayV(RefCell::new(Rc::new(results))))
+                Ok(ArrayV(Rc::new(RefCell::new(results))))
             }
             _ => Err(EvalError::runtime("for loop require a list")),
         }
@@ -503,7 +503,7 @@ impl Engine {
         if var_arg.is_some() {
             // make var arg as an Array value
             let var_arg_name = var_arg.unwrap_or("_".to_string());
-            let v = ArrayV(RefCell::new(Rc::new(var_arg_values)));
+            let v = ArrayV(Rc::new(RefCell::new(var_arg_values)));
             named_args.insert(var_arg_name, v);
         }
         (func.body)(self, named_args)

@@ -513,7 +513,7 @@ impl Prelude {
                 } else {
                     arr[start_pos..].to_owned()
                 };
-                Ok(Value::ArrayV(RefCell::new(Rc::new(subarr))))
+                Ok(Value::ArrayV(Rc::new(RefCell::new(subarr))))
             },
         );
 
@@ -537,7 +537,7 @@ impl Prelude {
                 for v in items.iter() {
                     res.push(v.clone());
                 }
-                Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+                Ok(Value::ArrayV(Rc::new(RefCell::new(res))))
             },
         );
 
@@ -556,7 +556,7 @@ impl Prelude {
                     lists.push(childlist.iter().map(|v| v.clone()).collect());
                 }
                 let res = lists.concat();
-                Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+                Ok(Value::ArrayV(Rc::new(RefCell::new(res))))
             },
         );
 
@@ -568,23 +568,23 @@ impl Prelude {
             for v in arr.iter() {
                 match v {
                     Value::ArrayV(a) => {
-                        for x in a.borrow().iter() {
+                        for x in a.as_ref().borrow().iter() {
                             res.push(x.clone());
                         }
                     }
                     x => res.push(x.clone()),
                 }
             }
-            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+            Ok(Value::ArrayV(Rc::new(RefCell::new(res))))
         });
 
         self.add_native_func("sort", &["list"], |_, args| -> EvalResult {
             let arg0 = args.get(&"list".to_owned()).unwrap();
             let arr = arg0.expect_array("argument[1] `list`")?;
 
-            let mut res: Vec<Value> = arr.borrow().iter().map(|x| x.clone()).collect();
+            let mut res: Vec<Value> = arr.iter().map(|x| x.clone()).collect();
             res.sort();
-            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+            Ok(Value::ArrayV(Rc::new(RefCell::new(res))))
         });
 
         self.add_native_func(
@@ -605,7 +605,7 @@ impl Prelude {
                 let pre = arr.borrow()[..position].to_owned();
                 let post = arr.borrow()[position..].to_owned();
                 let res = vec![pre, vec![new_item.clone()], post].concat();
-                Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+                Ok(Value::ArrayV(Rc::new(RefCell::new(res))))
             },
         );
 
@@ -622,7 +622,7 @@ impl Prelude {
             let pre = arr.borrow()[..position].to_owned();
             let post = arr.borrow()[(position + 1)..].to_owned();
             let res = vec![pre, post].concat();
-            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+            Ok(Value::ArrayV(Rc::new(RefCell::new(res))))
         });
 
         self.add_native_func("reverse", &["list"], |_, args| -> EvalResult {
@@ -630,7 +630,7 @@ impl Prelude {
             let arr = arg0.expect_array("argument[1] `list`")?;
 
             let res = arr.iter().rev().map(|v| v.clone()).collect();
-            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+            Ok(Value::ArrayV(Rc::new(RefCell::new(res))))
         });
 
         self.add_native_func("index of", &["list", "match"], |_, args| -> EvalResult {
@@ -647,16 +647,15 @@ impl Prelude {
                     res.push(Value::from_usize(to_feel_index(i)))
                 }
             }
-            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+            Ok(Value::ArrayV(Rc::new(RefCell::new(res))))
         });
 
         self.add_native_func("distinct values", &["list"], |_, args| -> EvalResult {
             let arg0 = args.get(&"list".to_owned()).unwrap();
             let arr = arg0.expect_array("argument[1] `list`")?;
-
             let mut res: Vec<Value> = arr.iter().map(|x| x.clone()).collect();
             res.dedup();
-            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+            Ok(Value::ArrayV(Rc::new(RefCell::new(res))))
         });
 
         self.add_native_func_with_optional_args(
@@ -667,7 +666,6 @@ impl Prelude {
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"lists".to_owned()).unwrap();
                 let arr = arg0.expect_array("arguments `lists`")?;
-
                 let mut lists: Vec<Vec<Value>> = vec![];
                 for (i, v) in arr.iter().enumerate() {
                     let childlist = v.expect_array(format!("argument[{}]", (i + 1)).as_str())?;
@@ -675,22 +673,21 @@ impl Prelude {
                 }
                 let mut res = lists.concat();
                 res.dedup();
-                Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+                Ok(Value::ArrayV(Rc::new(RefCell::new(res))))
             },
         );
 
         // context/map functions
         self.add_native_func("get value", &["context", "key"], |_, args| -> EvalResult {
             let arg0 = args.get(&"context".to_owned()).unwrap();
-            let m = arg0.expect_map("argument[1] `context`")?;
-            //let mv:Ref<'_, Context> = m.as_ref().borrow();
+            let m = arg0.expect_context("argument[1] `context`")?;
 
             let arg1 = args.get(&"key".to_owned()).unwrap();
             let path = match arg1.clone() {
                 Value::StrV(s) => vec![s],
                 Value::ArrayV(a) => {
                     let mut keys = vec![];
-                    for (i, v) in a.borrow().iter().enumerate() {
+                    for (i, v) in a.as_ref().borrow().iter().enumerate() {
                         let s = v.expect_string(format!("argument[2][{}]", (i + 1)).as_str())?;
                         keys.push(s);
                     }
@@ -712,7 +709,7 @@ impl Prelude {
         });
         self.add_native_func("get entries", &["context"], |_, args| -> EvalResult {
             let arg0 = args.get(&"context".to_owned()).unwrap();
-            let m = arg0.expect_map("argument[1] `context`")?;
+            let m = arg0.expect_context("argument[1] `context`")?;
             let mut res = vec![];
             for (k, v) in m.as_ref().borrow().entries() {
                 let mut ent_ctx = Context::new();
@@ -720,7 +717,7 @@ impl Prelude {
                 ent_ctx.insert("value".to_string(), v);
                 res.push(Value::ContextV(Rc::new(RefCell::new(ent_ctx))));
             }
-            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+            Ok(Value::ArrayV(Rc::new(RefCell::new(res))))
         });
 
         self.add_native_func(
@@ -728,14 +725,14 @@ impl Prelude {
             &["context", "key", "value"],
             |_, args| -> EvalResult {
                 let arg0 = args.get(&"context".to_owned()).unwrap();
-                let m = arg0.expect_map("argument[1] `context`")?;
+                let m = arg0.expect_context("argument[1] `context`")?;
 
                 let arg1 = args.get(&"key".to_owned()).unwrap();
                 let path = match arg1.clone() {
                     Value::StrV(s) => vec![s],
                     Value::ArrayV(a) => {
                         let mut keys = vec![];
-                        for (i, v) in a.borrow().iter().enumerate() {
+                        for (i, v) in a.as_ref().borrow().iter().enumerate() {
                             let s =
                                 v.expect_string(format!("argument[2][{}]", (i + 1)).as_str())?;
                             keys.push(s);
@@ -764,7 +761,7 @@ impl Prelude {
             let contexts = arg0.expect_array("argument[1] `contexts`")?;
             let mut res_ctx = Context::new();
             for (i, ctx_v) in contexts.iter().enumerate() {
-                let ctx = ctx_v.expect_map(format!("argument[1][{}]", i + 1).as_str())?;
+                let ctx = ctx_v.expect_context(format!("argument[1][{}]", i + 1).as_str())?;
                 res_ctx.merge(&ctx.as_ref().borrow());
             }
             Ok(Value::ContextV(Rc::new(RefCell::new(res_ctx))))
