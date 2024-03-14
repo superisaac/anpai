@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::eval::{EvalError, EvalResult};
+use super::values::context::Context;
 use super::values::func::{MacroBody, MacroT, NativeFunc, NativeFuncBody};
 use super::values::numeric::Numeric;
 use super::values::value::Value::{self, *};
@@ -709,6 +710,18 @@ impl Prelude {
                 Ok(Value::NullV)
             }
         });
+        self.add_native_func("get entries", &["context"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"context".to_owned()).unwrap();
+            let m = arg0.expect_map("argument[1] `context`")?;
+            let mut res = vec![];
+            for (k, v) in m.as_ref().borrow().entries() {
+                let mut ent_ctx = Context::new();
+                ent_ctx.insert("key".to_string(), Value::StrV(k));
+                ent_ctx.insert("value".to_string(), v);
+                res.push(Value::ContextV(Rc::new(RefCell::new(ent_ctx))));
+            }
+            Ok(Value::ArrayV(RefCell::new(Rc::new(res))))
+        });
 
         self.add_native_func(
             "context put",
@@ -738,14 +751,24 @@ impl Prelude {
                 };
 
                 let arg2 = args.get(&"value".to_owned()).unwrap();
-
                 m.as_ref()
                     .borrow_mut()
                     .insert_path(path.as_slice(), arg2.clone());
 
                 Ok(Value::ContextV(m.clone()))
             },
-        );
+        ); // end `context put`
+
+        self.add_native_func("context merge", &["contexts"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"contexts".to_owned()).unwrap();
+            let contexts = arg0.expect_array("argument[1] `contexts`")?;
+            let mut res_ctx = Context::new();
+            for (i, ctx_v) in contexts.iter().enumerate() {
+                let ctx = ctx_v.expect_map(format!("argument[1][{}]", i + 1).as_str())?;
+                res_ctx.merge(&ctx.as_ref().borrow());
+            }
+            Ok(Value::ContextV(Rc::new(RefCell::new(res_ctx))))
+        }); // end `context merge`
     }
 }
 

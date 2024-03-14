@@ -39,6 +39,12 @@ impl Context {
         self.0.get_mut(&key)
     }
 
+    pub fn entries(&self) -> Vec<(String, Value)> {
+        self.0.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+        // let res: Vec<(String, Value)> = self.0.iter().map(|(k, v)| (k.clone(), v.clone()) ).collect();
+        // res
+    }
+
     pub fn get_path(&self, path: &[String]) -> Option<Value> {
         match path.len() {
             0 => None,
@@ -83,6 +89,12 @@ impl Context {
                     _ => None,
                 }
             }
+        }
+    }
+
+    pub fn merge(&mut self, other: &Context) {
+        for (k, v) in other.0.iter() {
+            self.0.insert(k.clone(), v.clone());
         }
     }
 }

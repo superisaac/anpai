@@ -763,6 +763,8 @@ mod test {
             (r#"get value({"a": 5, b: {"c k": {m: 5}}}, ["b", "c k", "m"])"#, "5"),
             (r#"context put({"o":8}, ["a", "b", "c d"], 3)"#, r#"{"a":{"b":{"c d":3}}, "o":8}"#),
             (r#"context put({a: {b: {"c d":3}}, o:8}, ["a", "b", "c d"], 6)"#, r#"{"a":{"b":{"c d":6}}, "o":8}"#),
+            ("context merge([{a:1}, {b:2}, {c:3}])", r#"{"a":1, "b":2, "c":3}"#),
+            ("get entries({a: 2, b: 8})", r#"[{"key":"a", "value":2}, {"key":"b", "value":8}]"#),
         ];
 
         for (input, output) in testcases {
