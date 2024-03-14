@@ -743,7 +743,7 @@ impl Prelude {
                     .borrow_mut()
                     .insert_path(path.as_slice(), arg2.clone());
 
-                Ok(Value::MapV(m.clone()))
+                Ok(Value::ContextV(m.clone()))
             },
         );
     }

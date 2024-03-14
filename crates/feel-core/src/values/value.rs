@@ -73,7 +73,7 @@ pub enum Value {
     },
     RangeV(RangeT),
     ArrayV(RefCell<Rc<Vec<Value>>>),
-    MapV(ContextRef),
+    ContextV(ContextRef),
     NativeFuncV {
         func: NativeFunc,
         require_args: Vec<String>,
@@ -109,7 +109,7 @@ impl fmt::Display for Value {
             }
             Self::RangeV(v) => write!(f, "{}", v),
             Self::ArrayV(arr) => fmt_vec(f, arr.borrow().iter(), "[", "]"),
-            Self::MapV(map) => write!(f, "{}", map.borrow()),
+            Self::ContextV(map) => write!(f, "{}", map.borrow()),
             Self::NativeFuncV {
                 require_args: _,
                 optional_args: _,
@@ -149,7 +149,7 @@ impl Value {
             } => "duration".to_owned(),
             Self::RangeV(_) => "range".to_owned(),
             Self::ArrayV(_) => "array".to_owned(),
-            Self::MapV(_) => "map".to_owned(),
+            Self::ContextV(_) => "map".to_owned(),
             Self::NativeFuncV {
                 require_args: _,
                 optional_args: _,
@@ -171,7 +171,7 @@ impl Value {
             Self::NumberV(v) => *v != Numeric::ZERO,
             Self::StrV(v) => v.len() > 0,
             Self::ArrayV(v) => v.borrow().len() > 0,
-            Self::MapV(v) => v.borrow().len() > 0,
+            Self::ContextV(v) => v.borrow().len() > 0,
             _ => true,
         }
     }
@@ -267,7 +267,7 @@ impl Value {
     }
 
     pub fn expect_map(&self, hint: &str) -> Result<ContextRef, TypeError> {
-        if let Self::MapV(m) = self {
+        if let Self::ContextV(m) = self {
             return Ok(m.clone());
         }
         Err(TypeError(format!(
@@ -278,7 +278,7 @@ impl Value {
     }
 
     // pub fn expect_map_mut(&self, hint: &str) -> Result<ContextRef, TypeError> {
-    //     if let Self::MapV(m) = self {
+    //     if let Self::ContextV(m) = self {
     //         return Ok(m.clone());
     //     }
     //     Err(TypeError(format!(

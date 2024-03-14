@@ -254,14 +254,12 @@ impl Engine {
         let mut value_map = Context::new();
         for item in items.iter() {
             let k = self.eval(item.name.clone())?;
-
-            let key = k.expect_string("opp")?;
-            println!("map item {:?}, kk {}", k, key);
+            let key = k.expect_string(format!("context item {}", item.name).as_str())?;
             //let key = k.to_string();
             let val = self.eval(item.value.clone())?;
             value_map.insert(key, val);
         }
-        Ok(MapV(Rc::new(RefCell::new(value_map))))
+        Ok(ContextV(Rc::new(RefCell::new(value_map))))
     }
 
     #[inline(always)]
@@ -607,7 +605,7 @@ impl Engine {
     #[inline(always)]
     fn eval_binop_index(&mut self, left_value: Value, right_value: Value) -> EvalResult {
         match left_value {
-            MapV(a) => match right_value {
+            ContextV(a) => match right_value {
                 StrV(k) => {
                     let m = a.borrow();
                     let v = m.get(k).ok_or(EvalError::KeyError)?;
@@ -665,7 +663,7 @@ impl Engine {
     fn eval_dotop(&mut self, left: Box<Node>, attr: String) -> EvalResult {
         let left_value = self.eval(left)?;
         match left_value {
-            MapV(a) => {
+            ContextV(a) => {
                 let m = a.borrow();
                 let v = m.get(attr).ok_or(EvalError::KeyError)?;
                 Ok(v)

@@ -40,12 +40,11 @@ impl Context {
     }
 
     pub fn get_path(&self, path: &[String]) -> Option<Value> {
-        println!("get path {:?} from {:?}", path, self.0);
         match path.len() {
             0 => None,
             1 => self.get(path[0].clone()),
             _ => {
-                if let Some(Value::MapV(ctx)) = self.get(path[0].clone()) {
+                if let Some(Value::ContextV(ctx)) = self.get(path[0].clone()) {
                     let rest = &path[1..];
                     ctx.borrow().get_path(rest)
                 } else {
@@ -66,7 +65,7 @@ impl Context {
             _ => {
                 let first_key = path[0].clone();
                 match self.get_mut(first_key.clone()) {
-                    Some(Value::MapV(ctx)) => {
+                    Some(Value::ContextV(ctx)) => {
                         let rest = &path[1..];
                         let mut r = ctx.borrow_mut();
 
@@ -79,7 +78,7 @@ impl Context {
                         //Rc::get_mut(r)
                         childmap.insert_path(rest, value);
                         self.0
-                            .insert(first_key, Value::MapV(Rc::new(RefCell::new(childmap))))
+                            .insert(first_key, Value::ContextV(Rc::new(RefCell::new(childmap))))
                     }
                     _ => None,
                 }
