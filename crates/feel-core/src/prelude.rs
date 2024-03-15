@@ -678,6 +678,7 @@ impl Prelude {
         );
 
         // context/map functions
+        // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-context/
         self.add_native_func("get value", &["context", "key"], |_, args| -> EvalResult {
             let arg0 = args.get(&"context".to_owned()).unwrap();
             let m = arg0.expect_context("argument[1] `context`")?;
@@ -768,6 +769,7 @@ impl Prelude {
         }); // end `context merge`
 
         // range functions
+        // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-range/
         self.add_native_func("before", &["a", "b"], |_, args| -> EvalResult {
             let arg0 = args.get(&"a".to_owned()).unwrap();
             let arg1 = args.get(&"b".to_owned()).unwrap();

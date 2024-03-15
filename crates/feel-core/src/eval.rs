@@ -292,6 +292,13 @@ impl Engine {
     ) -> EvalResult {
         let start_value = self.eval(start_node)?;
         let end_value = self.eval(end_node)?;
+        if start_value.data_type() != end_value.data_type() {
+            return Err(EvalError::ValueError(format!(
+                "range start type {} != end type {}",
+                start_value.data_type(),
+                end_value.data_type()
+            )));
+        }
         Ok(RangeV(RangeT {
             start_open,
             start: Rc::new(start_value),
@@ -758,6 +765,16 @@ mod test {
             ("max(31, -1, 9, 8, -1, -99)", "31"),
             ("sum(31, -1, 9, false, -1, -99)", "-61"),  
             ("sort([3, -1, 2])", "[-1, 2, 3]"),
+            ("sublist([1,2,3], 2)", "[2, 3]"),
+            ("sublist([1,2,3], 1, 2)", "[1, 2]"),
+            ("append([1], 2, 3)", "[1, 2, 3]"),
+            ("append([1, 2, 3])", "[1, 2, 3]"),
+            ("concatenate([1,2],[3])", "[1, 2, 3]"),
+            ("concatenate([1],[2],[3])", "[1, 2, 3]"),
+            ("insert before([1, 3], 1, 2)", "[2, 1, 3]"),
+            ("remove([1,2,3], 2)", "[1, 3]"),
+            ("reverse([1,2,3])", "[3, 2, 1]"),
+            ("index of([1,2,3,2], 2)", "[2, 4]"),
             // test context functions
             (r#"get value({"a": 5, b: 9}, "b")"#, "9"),
             (r#"get value({"a": 5, b: {"c k": {m: 5}}}, ["b", "c k", "m"])"#, "5"),
@@ -765,8 +782,8 @@ mod test {
             (r#"context put({a: {b: {"c d":3}}, o:8}, ["a", "b", "c d"], 6)"#, r#"{"a":{"b":{"c d":6}}, "o":8}"#),
             ("context merge([{a:1}, {b:2}, {c:3}])", r#"{"a":1, "b":2, "c":3}"#),
             ("get entries({a: 2, b: 8})", r#"[{"key":"a", "value":2}, {"key":"b", "value":8}]"#),
+
             // test range functions
-            // range functions
             ("before(1, 10)", "true"),
             ("before(10, 1)", "false"),
             ("before([1..5], 10)", "true"),
@@ -822,9 +839,9 @@ mod test {
             ("finished by([5..10], 10)", "true"),
             ("finished by([3..4], 2)", "false"),
 
-            ("finished by([3..5], [1..5])", "true"),
+            ("finished by([1..5], [3..5])", "true"),
             ("finished by((5..8], [1..5))", "false"),
-            ("finished by([5..10], (1..10))", "true"),
+            ("finished by([5..10], (1..10))", "false"),
 
             ("includes([5..10], 6)", "true"),
             ("includes([3..4], 5)", "false"),

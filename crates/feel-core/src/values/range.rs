@@ -153,6 +153,8 @@ impl RangeT {
             false
         } else if self.end_open != other.end_open {
             false
+        } else if !self.includes(other) {
+            false
         } else {
             true
         }
@@ -172,6 +174,8 @@ impl RangeT {
         if Self::compare(self.start.as_ref(), other.start.as_ref()) != 0 {
             false
         } else if self.start_open != other.start_open {
+            false
+        } else if !self.includes(other) {
             false
         } else {
             true
