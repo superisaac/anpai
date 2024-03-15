@@ -283,7 +283,7 @@ impl Value {
             return Ok(m.as_ref().borrow());
         }
         Err(TypeError(format!(
-            "{}, expect map, but {} found",
+            "{}, expect context, but {} found",
             hint,
             self.data_type(),
         )))
@@ -294,7 +294,18 @@ impl Value {
             return Ok(m.clone());
         }
         Err(TypeError(format!(
-            "{}, expect map, but {} found",
+            "{}, expect context, but {} found",
+            hint,
+            self.data_type(),
+        )))
+    }
+
+    pub fn expect_range(&self, hint: &str) -> Result<&RangeT, TypeError> {
+        if let Self::RangeV(r) = self {
+            return Ok(r);
+        }
+        Err(TypeError(format!(
+            "{}, expect range, but {} found",
             hint,
             self.data_type(),
         )))

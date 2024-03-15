@@ -4,6 +4,8 @@ use crate::scan::{ScanError, Scanner, TextPosition};
 use std::error::Error;
 use std::fmt;
 
+/// parse FEEL refer to https://www.omg.org/spec/DMN/1.2/PDF
+
 // Parse error
 #[derive(Debug)]
 pub enum ParseError {

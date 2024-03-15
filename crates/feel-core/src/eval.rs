@@ -640,7 +640,7 @@ impl Engine {
     fn eval_binop_in(&mut self, left_value: Value, right_value: Value) -> EvalResult {
         match right_value {
             RangeV(rng) => {
-                let contains = rng.contains(left_value);
+                let contains = rng.contains(&left_value);
                 Ok(BoolV(contains))
             }
             ArrayV(a) => {
@@ -765,6 +765,95 @@ mod test {
             (r#"context put({a: {b: {"c d":3}}, o:8}, ["a", "b", "c d"], 6)"#, r#"{"a":{"b":{"c d":6}}, "o":8}"#),
             ("context merge([{a:1}, {b:2}, {c:3}])", r#"{"a":1, "b":2, "c":3}"#),
             ("get entries({a: 2, b: 8})", r#"[{"key":"a", "value":2}, {"key":"b", "value":8}]"#),
+            // test range functions
+            // range functions
+            ("before(1, 10)", "true"),
+            ("before(10, 1)", "false"),
+            ("before([1..5], 10)", "true"),
+            ("before(1, [2..5])", "true"),
+            ("before(3, [2..5])", "false"),
+
+            ("before([1..5),[5..10])", "true"),
+            ("before([1..5),(5..10])", "true"),
+            ("before([1..5],[5..10])", "false"),
+            ("before([1..5),(5..10])", "true"),
+
+            ("after([5..10], [1..5))", "true"),
+            ("after((5..10], [1..5))", "true"),
+            ("after([5..10], [1..5])", "false"),
+            ("after((5..10], [1..5))", "true"),
+
+            ("meets([1..5], [5..10])", "true"),
+            ("meets([1..3], [4..6])", "false"),
+            ("meets([1..3], [3..5])", "true"),
+            ("meets([1..5], (5..8])", "false"),
+
+            ("met by([5..10], [1..5])", "true"),
+            ("met by([3..4], [1..2])", "false"),
+            ("met by([3..5], [1..3])", "true"),
+            ("met by((5..8], [1..5))", "false"),
+            ("met by([5..10], [1..5))", "false"),
+
+
+            ("overlaps([5..10], [1..6])", "true"),
+            ("overlaps((3..7], [1..4])", "true"),
+            ("overlaps([1..3], (3..6])", "false"),
+            ("overlaps((5..8], [1..5))", "false"),
+            ("overlaps([4..10], [1..5))", "true"),
+
+            ("overlaps before([1..5], [4..10])", "true"),
+            ("overlaps before([3..4], [1..2])", "false"),
+            ("overlaps before([1..3], (3..5])", "false"),
+            ("overlaps before([1..5), (3..8])", "true"),
+            ("overlaps before([1..5), [5..10])", "false"),
+
+            ("overlaps after([4..10], [1..5])", "true"),
+            ("overlaps after([3..4], [1..2])", "false"),
+            ("overlaps after([3..5], [1..3))", "false"),
+            ("overlaps after((5..8], [1..5))", "false"),
+            ("overlaps after([4..10], [1..5))", "true"),
+
+            ("finishes(5, [1..5])", "true"),
+            ("finishes(10, [1..7])", "false"),
+            ("finishes([3..5], [1..5])", "true"),
+            ("finishes((1..5], [1..5))", "false"),
+            ("finishes([5..10], [1..10))", "false"),
+
+            ("finished by([5..10], 10)", "true"),
+            ("finished by([3..4], 2)", "false"),
+
+            ("finished by([3..5], [1..5])", "true"),
+            ("finished by((5..8], [1..5))", "false"),
+            ("finished by([5..10], (1..10))", "true"),
+
+            ("includes([5..10], 6)", "true"),
+            ("includes([3..4], 5)", "false"),
+            ("includes([1..10], [4..6])", "true"),
+            ("includes((5..8], [1..5))", "false"),
+            ("includes([1..10], [1..5))", "true"),
+
+            ("during(5, [1..10])", "true"),
+            ("during(12, [1..10])", "false"),
+            ("during(1, (1..10])", "false"),
+            ("during([4..6], [1..10))", "true"),
+            ("during((1..5], (1..10])", "true"),
+
+            ("starts(1, [1..5])", "true"),
+            ("starts(1, (1..8])", "false"),
+            ("starts((1..5], [1..5])", "false"),
+            ("starts([1..10], [1..10])", "true"),
+            ("starts((1..10), (1..10))", "true"),
+
+            ("started by([1..10], 1)", "true"),
+            ("started by((1..10], 1)", "false"),
+            ("started by([1..10], [1..5])", "true"),
+            ("started by((1..10], [1..5))", "false"),
+            ("started by([1..10], [1..10))", "true"),
+
+            ("coincides([1..5], [1..5])", "true"),
+            ("coincides((1..5], [1..5))", "false"),
+            ("coincides([1..5], [2..6])", "false"),
+
         ];
 
         for (input, output) in testcases {

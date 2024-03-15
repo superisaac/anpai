@@ -766,6 +766,147 @@ impl Prelude {
             }
             Ok(Value::ContextV(Rc::new(RefCell::new(res_ctx))))
         }); // end `context merge`
+
+        // range functions
+        self.add_native_func("before", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            match arg0 {
+                Value::RangeV(rng_a) => match arg1 {
+                    Value::RangeV(rng_b) => Ok(Value::BoolV(rng_a.before(rng_b))),
+                    b => Ok(Value::BoolV(rng_a.before_point(b))),
+                },
+                a => match arg1 {
+                    Value::RangeV(rng_b) => Ok(Value::BoolV(rng_b.after_point(a))),
+                    b => Ok(Value::BoolV(a < b)),
+                },
+            }
+        });
+
+        self.add_native_func("after", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            match arg0 {
+                Value::RangeV(rng_a) => match arg1 {
+                    Value::RangeV(rng_b) => Ok(Value::BoolV(rng_a.after(rng_b))),
+                    b => Ok(Value::BoolV(rng_a.after_point(b))),
+                },
+                a => match arg1 {
+                    Value::RangeV(rng_b) => Ok(Value::BoolV(rng_b.before_point(a))),
+                    b => Ok(Value::BoolV(a > b)),
+                },
+            }
+        });
+
+        self.add_native_func("meets", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            let rng0 = arg0.expect_range("argument[1] `a`")?;
+            let rng1 = arg1.expect_range("argument[2] `b`")?;
+            Ok(Value::BoolV(rng0.meets(rng1)))
+        });
+
+        self.add_native_func("met by", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            let rng0 = arg0.expect_range("argument[1] `a`")?;
+            let rng1 = arg1.expect_range("argument[2] `b`")?;
+            Ok(Value::BoolV(rng1.meets(rng0)))
+        });
+
+        self.add_native_func("overlaps", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            let rng0 = arg0.expect_range("argument[1] `a`")?;
+            let rng1 = arg1.expect_range("argument[2] `b`")?;
+            Ok(Value::BoolV(
+                rng0.overlaps_before(rng1) || rng0.overlaps_after(rng1),
+            ))
+        });
+
+        self.add_native_func("overlaps before", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            let rng0 = arg0.expect_range("argument[1] `a`")?;
+            let rng1 = arg1.expect_range("argument[2] `b`")?;
+            Ok(Value::BoolV(rng0.overlaps_before(rng1)))
+        });
+
+        self.add_native_func("overlaps after", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            let rng0 = arg0.expect_range("argument[1] `a`")?;
+            let rng1 = arg1.expect_range("argument[2] `b`")?;
+            Ok(Value::BoolV(rng0.overlaps_after(rng1)))
+        });
+
+        self.add_native_func("starts", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            let rng1 = arg1.expect_range("argument[2] `b`")?;
+            match arg0 {
+                Value::RangeV(rng0) => Ok(Value::BoolV(rng1.started_by_range(rng0))),
+                x => Ok(Value::BoolV(rng1.started_by(x))),
+            }
+        });
+
+        self.add_native_func("started by", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            let rng0 = arg0.expect_range("argument[1] `a`")?;
+            match arg1 {
+                Value::RangeV(rng1) => Ok(Value::BoolV(rng0.started_by_range(rng1))),
+                x => Ok(Value::BoolV(rng0.started_by(x))),
+            }
+        });
+
+        self.add_native_func("finishes", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            let rng1 = arg1.expect_range("argument[2] `b`")?;
+            match arg0 {
+                Value::RangeV(rng0) => Ok(Value::BoolV(rng1.finished_by_range(rng0))),
+                x => Ok(Value::BoolV(rng1.finished_by(x))),
+            }
+        });
+
+        self.add_native_func("finished by", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            let rng0 = arg0.expect_range("argument[1] `a`")?;
+            match arg1 {
+                Value::RangeV(rng1) => Ok(Value::BoolV(rng0.finished_by_range(rng1))),
+                x => Ok(Value::BoolV(rng0.finished_by(x))),
+            }
+        });
+
+        self.add_native_func("includes", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            let rng0 = arg0.expect_range("argument[1] `a`")?;
+            match arg1 {
+                Value::RangeV(rng1) => Ok(Value::BoolV(rng0.includes(rng1))),
+                x => Ok(Value::BoolV(rng0.position(x) == 0)),
+            }
+        });
+
+        self.add_native_func("during", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            let rng1 = arg1.expect_range("argument[1] `a`")?;
+            match arg0 {
+                Value::RangeV(rng0) => Ok(Value::BoolV(rng1.includes(rng0))),
+                x => Ok(Value::BoolV(rng1.position(x) == 0)),
+            }
+        });
+
+        self.add_native_func("coincides", &["a", "b"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"a".to_owned()).unwrap();
+            let arg1 = args.get(&"b".to_owned()).unwrap();
+            let rng0 = arg0.expect_range("argument[1] `a`")?;
+            let rng1 = arg1.expect_range("argument[2] `b`")?;
+            Ok(Value::BoolV(*rng0 == *rng1))
+        });
     }
 }
 
