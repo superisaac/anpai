@@ -755,6 +755,10 @@ mod test {
             (r#"number("3000.888")"#, "3000.888"),
             (r#"string length("hello world")"#, "11"),
             (r#"string join(["hello", "world", "again"], ", ", ":")"#, r#"":hello, world, again""#),
+            // boolean functions
+            (r#"get or else("this", "default")"#, r#""this""#),
+            (r#"get or else(null, "default")"#, r#""default""#),
+            ("get or else(null, null)", "null"),
             // list functions
             ("list contains([2, 8, -1], 8)", "true"),
             (r#"list contains([2, 8, "hello"], "world")"#, "false"),

@@ -125,12 +125,8 @@ impl Prelude {
             Ok(value.clone())
         });
 
-        self.add_macro("is defined", &["value"], |eng, nodes| -> EvalResult {
-            let value_node = nodes.get(&"value".to_owned()).unwrap();
-            eng.is_defined(value_node)
-        });
-
         // conversion functions
+        // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-conversion/
         self.add_native_func("string", &["from"], |_, args| -> EvalResult {
             let v = args.get(&"from".to_owned()).unwrap();
             Ok(Value::StrV(v.to_string()))
@@ -142,10 +138,29 @@ impl Prelude {
             Ok(Value::NumberV(n))
         });
 
+        // boolean functions
+        // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-boolean/
         self.add_native_func("not", &["from"], |_, args| -> EvalResult {
             let v = args.get(&"from".to_owned()).unwrap();
             Ok(Value::BoolV(!v.bool_value()))
         });
+        self.add_macro("is defined", &["value"], |eng, nodes| -> EvalResult {
+            let value_node = nodes.get(&"value".to_owned()).unwrap();
+            eng.is_defined(value_node)
+        });
+
+        self.add_native_func(
+            "get or else",
+            &["value", "default"],
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"value".to_owned()).unwrap();
+                let default_value = args.get(&"default".to_owned()).unwrap();
+                match arg0 {
+                    Value::NullV => Ok(default_value.clone()),
+                    _ => Ok(arg0.clone()),
+                }
+            },
+        );
 
         // string functions
         self.add_native_func("string length", &["string"], |_, args| -> EvalResult {
