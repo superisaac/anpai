@@ -216,13 +216,17 @@ impl Value {
         )))
     }
 
-    pub fn expect_integer(&self) -> Result<isize, TypeError> {
+    pub fn expect_integer(&self, hint: &str) -> Result<isize, ValueError> {
         if let Self::NumberV(n) = self {
             if n.is_integer() {
                 return Ok(n.to_isize().unwrap());
             }
         }
-        Err(TypeError("integer".to_owned()))
+        Err(ValueError(format!(
+            "{}, expect integer, but {} found",
+            hint,
+            self.data_type()
+        )))
     }
 
     pub fn expect_usize(&self, hint: &str) -> Result<usize, ValueError> {

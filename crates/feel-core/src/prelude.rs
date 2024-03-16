@@ -273,7 +273,81 @@ impl Prelude {
             Ok(Value::BoolV(s.ends_with(match_s.as_str())))
         });
 
+        // number functions
+        // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-numeric/
+        self.add_native_func("decimal", &["n", "scale"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"n".to_owned()).unwrap();
+            let n = arg0.expect_number("argument[1] `n`")?;
+            let arg1 = args.get(&"scale".to_owned()).unwrap();
+            let scale = arg1.expect_integer("argument[2] `scale`")?;
+
+            Ok(Value::NumberV(n.with_scale_even(scale as i64)))
+        });
+
+        self.add_native_func_with_optional_args(
+            "floor",
+            &["n"],
+            &["scale"],
+            None,
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"n".to_owned()).unwrap();
+                let n = arg0.expect_number("argument[1] `n`")?;
+                let zero = Value::from_usize(0);
+                let arg1 = args.get(&"scale".to_owned()).unwrap_or(&zero);
+                let scale = arg1.expect_integer("argument[2] `scale`")?;
+                Ok(Value::NumberV(n.with_scale_down(scale as i64)))
+            },
+        );
+
+        // round down is the same as floor
+        self.add_native_func_with_optional_args(
+            "round down",
+            &["n"],
+            &["scale"],
+            None,
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"n".to_owned()).unwrap();
+                let n = arg0.expect_number("argument[1] `n`")?;
+                let zero = Value::from_usize(0);
+                let arg1 = args.get(&"scale".to_owned()).unwrap_or(&zero);
+                let scale = arg1.expect_integer("argument[2] `scale`")?;
+                Ok(Value::NumberV(n.with_scale_down(scale as i64)))
+            },
+        );
+
+        self.add_native_func_with_optional_args(
+            "ceiling",
+            &["n"],
+            &["scale"],
+            None,
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"n".to_owned()).unwrap();
+                let n = arg0.expect_number("argument[1] `n`")?;
+                let zero = Value::from_usize(0);
+                let arg1 = args.get(&"scale".to_owned()).unwrap_or(&zero);
+                let scale = arg1.expect_integer("argument[2] `scale`")?;
+                Ok(Value::NumberV(n.with_scale_up(scale as i64)))
+            },
+        );
+
+        // round up is the same with ceiling
+        self.add_native_func_with_optional_args(
+            "round up",
+            &["n"],
+            &["scale"],
+            None,
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"n".to_owned()).unwrap();
+                let n = arg0.expect_number("argument[1] `n`")?;
+                let zero = Value::from_usize(0);
+                let arg1 = args.get(&"scale".to_owned()).unwrap_or(&zero);
+                let scale = arg1.expect_integer("argument[2] `scale`")?;
+                Ok(Value::NumberV(n.with_scale_up(scale as i64)))
+            },
+        );
+
         // list functions
+        // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-list/
         self.add_native_func(
             "list contains",
             &["list", "element"],

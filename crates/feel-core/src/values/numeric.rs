@@ -1,5 +1,6 @@
 use super::value::ValueError;
 use bigdecimal::*;
+use num_bigint::Sign;
 use std::cmp;
 use std::fmt;
 use std::ops;
@@ -97,6 +98,33 @@ impl Numeric {
         }
     }
 
+    pub fn floor(&self) -> Numeric {
+        self.with_scale_down(0)
+    }
+
+    pub fn with_scale_down(&self, scale: i64) -> Numeric {
+        let v = self.to_decimal();
+        if v.sign() == Sign::Minus {
+            Self::from_decimal(v.with_scale_round(scale, RoundingMode::Up))
+        } else {
+            Self::from_decimal(v.with_scale_round(scale, RoundingMode::Down))
+        }
+    }
+
+    pub fn with_scale_up(&self, scale: i64) -> Numeric {
+        let v = self.to_decimal();
+        if v.sign() == Sign::Minus {
+            Self::from_decimal(v.with_scale_round(scale, RoundingMode::Down))
+        } else {
+            Self::from_decimal(v.with_scale_round(scale, RoundingMode::Up))
+        }
+    }
+
+    pub fn with_scale_even(&self, scale: i64) -> Numeric {
+        let v = self.to_decimal();
+        Self::from_decimal(v.with_scale_round(scale, RoundingMode::HalfEven))
+    }
+
     pub fn to_usize(&self) -> Option<usize> {
         match self {
             Self::Integer(v) => {
@@ -112,13 +140,7 @@ impl Numeric {
 
     pub fn to_isize(&self) -> Option<isize> {
         match self {
-            Self::Integer(v) => {
-                if *v > 0 {
-                    Some(*v as isize)
-                } else {
-                    None
-                }
-            }
+            Self::Integer(v) => Some(*v as isize),
             Self::Decimal(v) => v.to_isize(),
         }
     }

@@ -759,6 +759,16 @@ mod test {
             (r#"get or else("this", "default")"#, r#""this""#),
             (r#"get or else(null, "default")"#, r#""default""#),
             ("get or else(null, null)", "null"),
+            // number functions
+            ("decimal(1/3, 2)", "0.33"),
+            ("decimal(1.5, 0)", "2"),
+            ("floor(1.5)", "1"),
+            ("floor(-1.5)", "-2"),
+            ("floor(-1.56, 1)", "-1.6"),
+            ("ceiling(1.5)", "2"),
+            ("ceiling(-1.5)", "-1"),
+            ("ceiling(-1.56, 1)", "-1.5"),
+
             // list functions
             ("list contains([2, 8, -1], 8)", "true"),
             (r#"list contains([2, 8, "hello"], "world")"#, "false"),
