@@ -188,7 +188,8 @@ impl Value {
 
     pub fn parse_number(&self) -> Result<Numeric, ValueError> {
         match self {
-            Self::StrV(s) => Numeric::from_str(s),
+            Self::StrV(s) => Numeric::from_str(s)
+                .ok_or(ValueError("fail to parse number from string".to_owned())),
             Self::NumberV(n) => Ok(n.clone()),
             _ => Err(ValueError("fail to parse number".to_owned())),
         }

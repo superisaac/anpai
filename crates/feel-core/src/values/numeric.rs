@@ -1,4 +1,4 @@
-use super::value::ValueError;
+use super::value::Value;
 use bigdecimal::*;
 use num_bigint::Sign;
 use std::cmp;
@@ -43,12 +43,12 @@ impl Numeric {
         BigDecimal::from(i32::MIN)
     }
 
-    pub fn from_str(input: &str) -> Result<Numeric, ValueError> {
+    pub fn from_str(input: &str) -> Option<Numeric> {
         let bign = match BigDecimal::from_str(input) {
             Ok(v) => v,
-            Err(_) => return Err(ValueError("fail to parse numeric".to_owned())),
+            Err(_) => return None,
         };
-        Ok(Self::from_decimal(bign))
+        Some(Self::from_decimal(bign))
     }
 
     pub fn from_decimal(bign: BigDecimal) -> Numeric {
@@ -59,6 +59,14 @@ impl Numeric {
         }
 
         Self::Decimal(bign)
+    }
+
+    pub fn from_value(value: &Value) -> Option<Numeric> {
+        match value {
+            Value::NumberV(v) => Some(v.clone()),
+            Value::StrV(v) => Self::from_str(v.as_str()),
+            _ => None,
+        }
     }
 
     pub fn from_usize(v: usize) -> Numeric {

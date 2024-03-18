@@ -226,7 +226,8 @@ impl Engine {
 
     #[inline(always)]
     fn eval_number(&mut self, number_str: String) -> EvalResult {
-        let d = Numeric::from_str(number_str.as_str())?;
+        let d = Numeric::from_str(number_str.as_str())
+            .ok_or(ValueError("fail to parse numger".to_owned()))?;
         Ok(NumberV(d))
     }
 
@@ -762,6 +763,8 @@ mod test {
             // number functions
             ("decimal(1/3, 2)", "0.33"),
             ("decimal(1.5, 0)", "2"),
+            (r#"decimal("1.56", 9)"#, "1.560000000"),
+
             ("floor(1.5)", "1"),
             ("floor(-1.5)", "-2"),
             ("floor(-1.56, 1)", "-1.6"),

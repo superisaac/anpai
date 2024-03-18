@@ -11,6 +11,7 @@ use super::values::context::Context;
 use super::values::func::{MacroBody, MacroT, NativeFunc, NativeFuncBody};
 use super::values::numeric::Numeric;
 use super::values::value::Value::{self, *};
+use super::values::value::ValueError;
 
 fn from_feel_index(idx: usize) -> usize {
     idx - 1
@@ -277,7 +278,8 @@ impl Prelude {
         // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-numeric/
         self.add_native_func("decimal", &["n", "scale"], |_, args| -> EvalResult {
             let arg0 = args.get(&"n".to_owned()).unwrap();
-            let n = arg0.expect_number("argument[1] `n`")?;
+            let n = Numeric::from_value(arg0)
+                .ok_or(ValueError("argument[1] `n`, is not number".to_owned()))?;
             let arg1 = args.get(&"scale".to_owned()).unwrap();
             let scale = arg1.expect_integer("argument[2] `scale`")?;
 
