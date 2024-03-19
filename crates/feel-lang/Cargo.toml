@@ -1,5 +1,5 @@
 [package]
-name = "feel-core"
+name = "feel-lang"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,5 +10,3 @@ lazy_static.workspace = true
 regex.workspace = true
 serde.workspace = true
 bigdecimal = "0.4.3"
-
-

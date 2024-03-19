@@ -1,4 +1,7 @@
-# feel
+# workflow kits
+BPMN and DMN spec implementations in rust language
+
+## feel-lang
 
 The interpreter of the FEEL language(Friendly Enough Expression
 Language) in rust, FEEL is broadly used in DMN and BPMN to provide rule
@@ -13,20 +16,20 @@ interpreter.
 ## Examples
 ```shell
 
-% ./target/debug/feel -c '"hello " + "world"'
+% ./target/debug/wfkit feel -c '"hello " + "world"'
 "hello world"
 
-% ./target/debug/feel -c '(function(a, b) a + b)(5, 8)'
+% ./target/debug/wfkit feel -c '(function(a, b) a + b)(5, 8)'
 13
 
 # dump AST tree instead of evaluating the script
-% ./target/debug/feel -c 'bind("a", 5); if a > 3 then "larger" else "smaller"' --ast
+% ./target/debug/wfkit feel -c 'bind("a", 5); if a > 3 then "larger" else "smaller"' --ast
 (expr-list (call bind ["a", 5]) (if (> a 3) "larger" "smaller"))
 
-% ./target/debug/feel -c 'some x in [3, 4, 8, 9] satisfies x % 2 = 0'
+% ./target/debug/wfkit feel -c 'some x in [3, 4, 8, 9] satisfies x % 2 = 0'
 4
 
-% ./target/debug/feel -c 'every x in [3, 4, 8, 9] satisfies x % 2 = 0'
+% ./target/debug/wfkit feel -c 'every x in [3, 4, 8, 9] satisfies x % 2 = 0'
 [4, 8]
 ```
 

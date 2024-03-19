@@ -178,18 +178,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06ea2b9bc92be3c2baa9334a323ebca2d6f074ff852cd1d7b11064035cd3868f"
 
 [[package]]
-name = "feel"
-version = "0.1.0"
-dependencies = [
- "clap",
- "feel-core",
- "fileinput",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "feel-core"
+name = "feel-lang"
 version = "0.1.0"
 dependencies = [
  "bigdecimal",
@@ -508,6 +497,17 @@ name = "wasm-bindgen-shared"
 version = "0.2.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f186bd2dcf04330886ce82d6f33dd75a7bfcf69ecf5763b89fcde53b6ac9838"
+
+[[package]]
+name = "wfkit"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "feel-lang",
+ "fileinput",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "windows-core"

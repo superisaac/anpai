@@ -1,8 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
-        "crates/feel-core",
-        "crates/feel",
+        "crates/feel-lang",
+        "crates/wfkit",
 ]
 
 [workspace.dependencies]
@@ -10,6 +10,6 @@ chrono = {version="0.4.34"}
 iso8601 = {version="0.6.1", features = ["chrono"]}
 lazy_static = "1.4.0"
 regex = "1.10.3"
-feel-core = { path="crates/feel-core" }
+feel-lang = { path="crates/feel-lang" }
 serde = {version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.114"
