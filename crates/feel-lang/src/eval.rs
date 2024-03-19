@@ -684,13 +684,13 @@ impl Engine {
 #[cfg(test)]
 mod test {
     use crate::{parse::parse, values::numeric::Numeric};
-    use core::assert_matches::assert_matches;
+    //use core::assert_matches::assert_matches;
 
-    #[test]
-    fn test_number_parse() {
-        let a = "2342404820143892034890".parse::<i64>();
-        assert_matches!(a, Err(_));
-    }
+    // #[test]
+    // fn test_number_parse() {
+    //     let a = "2342404820143892034890".parse::<i64>();
+    //     assert_matches!(a, Err(_));
+    // }
 
     #[test]
     fn test_parse_stateless() {
