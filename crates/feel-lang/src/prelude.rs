@@ -388,16 +388,35 @@ impl Prelude {
             }
         });
 
-        self.add_native_func("log", &["number"], |_, args| -> EvalResult {
-            let arg0 = args.get(&"number".to_owned()).unwrap();
-            let n = arg0.expect_number("argument[1] `number`")?;
+        self.add_native_func_with_optional_args(
+            "log",
+            &["number"],
+            &["base"],
+            None,
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"number".to_owned()).unwrap();
+                let n = arg0.expect_number("argument[1] `number`")?;
+                let ln = match n.ln() {
+                    Some(v) => v,
+                    None => return Err(EvalError::ValueError("log() failed".to_owned())),
+                };
 
-            if let Some(v) = n.ln() {
-                Ok(Value::NumberV(v))
-            } else {
-                Err(EvalError::ValueError("log() failed".to_owned()))
-            }
-        });
+                if let Some(arg1) = args.get(&"base".to_owned()) {
+                    let base = arg1.expect_number("argument[2] `base`")?;
+                    if base <= Numeric::ONE {
+                        Err(EvalError::ValueError(
+                            "argument[2] `base`, negative base".to_owned(),
+                        ))
+                    } else if let Some(base_ln) = base.ln() {
+                        Ok(Value::NumberV(ln / base_ln))
+                    } else {
+                        Err(EvalError::ValueError("log(base) failed".to_owned()))
+                    }
+                } else {
+                    Ok(Value::NumberV(ln))
+                }
+            },
+        );
 
         self.add_native_func("odd", &["number"], |_, args| -> EvalResult {
             let arg0 = args.get(&"number".to_owned()).unwrap();
