@@ -763,6 +763,7 @@ mod test {
             // number functions
             ("decimal(1/3, 2)", "0.33"),
             ("decimal(1.5, 0)", "2"),
+            ("decimal(1.5)", "1.5"),
             (r#"decimal("1.56", 9)"#, "1.560000000"),
 
             ("floor(1.5)", "1"),
@@ -771,6 +772,7 @@ mod test {
             ("ceiling(1.5)", "2"),
             ("ceiling(-1.5)", "-1"),
             ("ceiling(-1.56, 1)", "-1.5"),
+            ("decimal(log(10), 12)", "2.302585092994"),
 
             // list functions
             ("list contains([2, 8, -1], 8)", "true"),

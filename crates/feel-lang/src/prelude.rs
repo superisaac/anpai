@@ -276,15 +276,23 @@ impl Prelude {
 
         // number functions
         // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-numeric/
-        self.add_native_func("decimal", &["n", "scale"], |_, args| -> EvalResult {
-            let arg0 = args.get(&"n".to_owned()).unwrap();
-            let n = Numeric::from_value(arg0)
-                .ok_or(ValueError("argument[1] `n`, is not number".to_owned()))?;
-            let arg1 = args.get(&"scale".to_owned()).unwrap();
-            let scale = arg1.expect_integer("argument[2] `scale`")?;
-
-            Ok(Value::NumberV(n.with_scale_even(scale as i64)))
-        });
+        self.add_native_func_with_optional_args(
+            "decimal",
+            &["n"],
+            &["scale"],
+            None,
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"n".to_owned()).unwrap();
+                let n = Numeric::from_value(arg0)
+                    .ok_or(ValueError("argument[1] `n`, is not number".to_owned()))?;
+                if let Some(arg1) = args.get(&"scale".to_owned()) {
+                    let scale = arg1.expect_integer("argument[2] `scale`")?;
+                    Ok(Value::NumberV(n.with_scale_even(scale as i64)))
+                } else {
+                    Ok(Value::NumberV(n))
+                }
+            },
+        );
 
         self.add_native_func_with_optional_args(
             "floor",
@@ -347,6 +355,48 @@ impl Prelude {
                 Ok(Value::NumberV(n.with_scale_up(scale as i64)))
             },
         );
+
+        self.add_native_func("abs", &["number"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"number".to_owned()).unwrap();
+            let n = arg0.expect_number("argument[1] `number`")?;
+            Ok(Value::NumberV(n.abs()))
+        });
+
+        self.add_native_func(
+            "modulo",
+            &["dividend", "divisor"],
+            |_, args| -> EvalResult {
+                let arg0 = args.get(&"dividend".to_owned()).unwrap();
+                let dividend = arg0.expect_number("argument[1] `dividend`")?;
+
+                let arg1 = args.get(&"divisor".to_owned()).unwrap();
+                let divisor = arg1.expect_number("argument[2] `divisor`")?;
+
+                Ok(Value::NumberV(dividend % divisor))
+            },
+        );
+
+        self.add_native_func("sqrt", &["number"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"number".to_owned()).unwrap();
+            let n = arg0.expect_number("argument[1] `number`")?;
+
+            if let Some(v) = n.sqrt() {
+                Ok(Value::NumberV(v))
+            } else {
+                Err(EvalError::ValueError("sqrt() failed".to_owned()))
+            }
+        });
+
+        self.add_native_func("log", &["number"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"number".to_owned()).unwrap();
+            let n = arg0.expect_number("argument[1] `number`")?;
+
+            if let Some(v) = n.ln() {
+                Ok(Value::NumberV(v))
+            } else {
+                Err(EvalError::ValueError("log() failed".to_owned()))
+            }
+        });
 
         // list functions
         // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-list/

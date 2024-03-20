@@ -92,6 +92,25 @@ impl Numeric {
         }
     }
 
+    pub fn abs(&self) -> Numeric {
+        match self {
+            Self::Integer(v) => Self::Integer(v.abs()),
+            Self::Decimal(v) => Self::Decimal(v.abs()),
+        }
+    }
+
+    pub fn sqrt(&self) -> Option<Numeric> {
+        self.to_decimal().sqrt().map(|n| Self::from_decimal(n))
+    }
+
+    pub fn ln(&self) -> Option<Numeric> {
+        let n = self.to_decimal();
+        if n <= BigDecimal::zero() {
+            return None;
+        }
+        n.to_f64().map(|f| Numeric::from_f64(f.ln()))
+    }
+
     pub fn is_integer(&self) -> bool {
         match self {
             Self::Integer(_) => true,
@@ -151,10 +170,6 @@ impl Numeric {
             Self::Integer(v) => Some(*v as isize),
             Self::Decimal(v) => v.to_isize(),
         }
-    }
-
-    pub fn sqrt(&self) -> Option<Numeric> {
-        self.to_decimal().sqrt().map(|v| Self::from_decimal(v))
     }
 }
 
