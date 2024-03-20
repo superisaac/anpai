@@ -215,13 +215,16 @@ impl Engine {
                 None => Ok(BoolV(false)),
             };
         }
-        match self.eval(value_node.clone()) {
+        self.push_frame();
+        let r = match self.eval(value_node.clone()) {
             Ok(_) => Ok(BoolV(true)),
             Err(EvalError::IndexError)
             | Err(EvalError::KeyError)
             | Err(EvalError::VarNotFound(_)) => Ok(BoolV(false)),
             Err(err) => Err(err),
-        }
+        };
+        self.pop_frame();
+        r
     }
 
     #[inline(always)]
