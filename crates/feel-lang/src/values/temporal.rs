@@ -168,31 +168,31 @@ pub(crate) fn timedelta_to_duration(delta: chrono::TimeDelta) -> (iso8601::Durat
 
 #[cfg(test)]
 mod test {
-    //use super::parse_temporal;
-    //use crate::values::value::Value;
-    //use core::assert_matches::assert_matches;
+    use super::parse_temporal;
+    use crate::values::value::Value;
+    use core::assert_matches::assert_matches;
     extern crate chrono;
     extern crate iso8601;
     use chrono::Datelike;
 
-    // #[test]
-    // fn test_parse_temp_value() {
-    //     assert_matches!(
-    //         parse_temporal(r#"@"2020-04-06T08:00:00@Europe/Berlin""#),
-    //         Ok(Value::DateTimeV(_))
-    //     );
-    //     assert_matches!(
-    //         parse_temporal("2020-04-06T08:00:00@Europe/Berlin"),
-    //         Ok(Value::DateTimeV(_))
-    //     );
-    //     assert_matches!(
-    //         parse_temporal("PT2H3M"),
-    //         Ok(Value::DurationV {
-    //             duration: _,
-    //             negative: false
-    //         })
-    //     );
-    // }
+    #[test]
+    fn test_parse_temp_value() {
+        assert_matches!(
+            parse_temporal(r#"@"2020-04-06T08:00:00@Europe/Berlin""#),
+            Ok(Value::DateTimeV(_))
+        );
+        assert_matches!(
+            parse_temporal("2020-04-06T08:00:00@Europe/Berlin"),
+            Ok(Value::DateTimeV(_))
+        );
+        assert_matches!(
+            parse_temporal("PT2H3M"),
+            Ok(Value::DurationV {
+                duration: _,
+                negative: false
+            })
+        );
+    }
 
     #[test]
     fn test_chrono_functions() {

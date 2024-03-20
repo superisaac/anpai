@@ -1,4 +1,4 @@
-//#![feature(assert_matches)]
+#![feature(assert_matches)]
 
 pub mod ast;
 pub mod scan;

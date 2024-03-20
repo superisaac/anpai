@@ -717,7 +717,7 @@ pub fn parse(input: &str) -> Result<Box<Node>, (ParseError, TextPosition)> {
 
 #[cfg(test)]
 mod test {
-    //use std::assert_matches::assert_matches;
+    use core::assert_matches::assert_matches;
     #[test]
     fn test_parse_results() {
         let testcases = [
@@ -734,9 +734,9 @@ mod test {
         }
     }
 
-    // #[test]
-    // fn test_parse_dup_arg_name() {
-    //     let res = super::parse("function(a, b, a) a+ b");
-    //     assert_matches!(res, Err((super::ParseError::Parse(x), _)) if x == "function has duplication arg name `a`".to_owned());
-    // }
+    #[test]
+    fn test_parse_dup_arg_name() {
+        let res = super::parse("function(a, b, a) a+ b");
+        assert_matches!(res, Err((super::ParseError::Parse(x), _)) if x == "function has duplication arg name `a`".to_owned());
+    }
 }

@@ -1,5 +1,3 @@
-//#![feature(assert_matches)]
-
 use clap::*;
 use feel_lang::eval;
 use feel_lang::parse;

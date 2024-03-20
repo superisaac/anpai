@@ -45,13 +45,6 @@ impl fmt::Display for EvalError {
 }
 
 impl error::Error for EvalError {}
-//     fn source(&self) -> Option<&(dyn error::Error + 'static)> {
-//         match self {
-//             Self::Decimal(err) => Some(err),
-//             _ => None,
-//         }
-//     }
-// }
 
 impl From<String> for EvalError {
     fn from(err: String) -> EvalError {
@@ -687,13 +680,13 @@ impl Engine {
 #[cfg(test)]
 mod test {
     use crate::{parse::parse, values::numeric::Numeric};
-    //use core::assert_matches::assert_matches;
+    use core::assert_matches::assert_matches;
 
-    // #[test]
-    // fn test_number_parse() {
-    //     let a = "2342404820143892034890".parse::<i64>();
-    //     assert_matches!(a, Err(_));
-    // }
+    #[test]
+    fn test_number_parse() {
+        let a = "2342404820143892034890".parse::<i64>();
+        assert_matches!(a, Err(_));
+    }
 
     #[test]
     fn test_parse_stateless() {
