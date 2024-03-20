@@ -773,6 +773,10 @@ mod test {
             ("ceiling(-1.5)", "-1"),
             ("ceiling(-1.56, 1)", "-1.5"),
             ("decimal(log(10), 12)", "2.302585092994"),
+            ("odd(5)", "true"),
+            ("odd(2)", "false"),
+            ("even(5)", "false"),
+            ("even(2)", "true"),
 
             // list functions
             ("list contains([2, 8, -1], 8)", "true"),

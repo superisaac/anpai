@@ -398,6 +398,22 @@ impl Prelude {
             }
         });
 
+        self.add_native_func("odd", &["number"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"number".to_owned()).unwrap();
+            let n = arg0.expect_number("argument[1] `number`")?;
+            Ok(Value::BoolV(
+                n.is_integer() && n % Numeric::TWO == Numeric::ONE,
+            ))
+        });
+
+        self.add_native_func("even", &["number"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"number".to_owned()).unwrap();
+            let n = arg0.expect_number("argument[1] `number`")?;
+            Ok(Value::BoolV(
+                n.is_integer() && n % Numeric::TWO == Numeric::ZERO,
+            ))
+        });
+
         // list functions
         // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-list/
         self.add_native_func(
