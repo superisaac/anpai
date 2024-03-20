@@ -10,3 +10,4 @@ lazy_static.workspace = true
 regex.workspace = true
 serde.workspace = true
 bigdecimal = "0.4.3"
+rand = "0.8.5"

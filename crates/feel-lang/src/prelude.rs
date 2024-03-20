@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 
+use rand::prelude::*;
 use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::cmp;
@@ -412,6 +413,12 @@ impl Prelude {
             Ok(Value::BoolV(
                 n.is_integer() && n % Numeric::TWO == Numeric::ZERO,
             ))
+        });
+
+        self.add_native_func("random number", &[], |_, _| -> EvalResult {
+            let mut rng = rand::thread_rng();
+            let y: f64 = rng.gen();
+            Ok(Value::NumberV(Numeric::from_f64(y)))
         });
 
         // list functions
