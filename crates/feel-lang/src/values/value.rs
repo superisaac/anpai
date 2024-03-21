@@ -101,12 +101,14 @@ impl fmt::Display for Value {
             Self::BoolV(v) => write!(f, "{}", v),
             Self::NumberV(v) => write!(f, "{}", v), // .normalize
             Self::StrV(v) => write!(f, "\"{}\"", escape(v)),
-            Self::DateTimeV(v) => write!(f, "{}", v.format("%Y-%m-%dT%H:%M:%S%:z")),
-            Self::DateV(v) => write!(f, "{}", v),
-            Self::TimeV(v) => write!(f, "{}", v),
+            Self::DateTimeV(v) => {
+                write!(f, "date and time(\"{}\")", v.format("%Y-%m-%dT%H:%M:%S%:z"))
+            }
+            Self::DateV(v) => write!(f, "date(\"{}\")", v),
+            Self::TimeV(v) => write!(f, "time(\"{}\")", v),
             Self::DurationV { duration, negative } => {
                 let sign = if *negative { "-" } else { "" };
-                write!(f, "{}{}", sign, duration)
+                write!(f, "duration(\"{}{}\")", sign, duration)
             }
             Self::RangeV(v) => write!(f, "{}", v),
             Self::ArrayV(arr) => fmt_vec(f, arr.borrow().iter(), "[", "]"),

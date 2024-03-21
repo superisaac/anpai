@@ -1,7 +1,10 @@
 use super::value::Value;
 use super::value::ValueError;
+use chrono::Datelike;
+use lazy_static::lazy_static;
 
 use std::cmp;
+use std::str::FromStr;
 extern crate iso8601;
 use crate::helpers::compare_value;
 
@@ -12,9 +15,13 @@ pub fn parse_temporal(temp_str: &str) -> Result<Value, ValueError> {
     }
 
     if temp_str.starts_with("-") {
-        if let Ok(dur) = iso8601::duration(&temp_str[1..]) {
+        if let Ok(Value::DurationV {
+            duration,
+            negative: _,
+        }) = parse_duration(&temp_str[1..])
+        {
             Ok(Value::DurationV {
-                duration: dur,
+                duration,
                 negative: true,
             })
         } else {
@@ -22,23 +29,81 @@ pub fn parse_temporal(temp_str: &str) -> Result<Value, ValueError> {
                 "fail to parse negative temporal value".to_owned(),
             ))
         }
-    } else if let Ok(dt) = iso8601::datetime(temp_str) {
+    } else {
+        parse_datetime(temp_str)
+            .or_else(|_| parse_date(temp_str))
+            .or_else(|_| parse_time(temp_str))
+            .or_else(|_| parse_duration(temp_str))
+    }
+    // }if let Ok(dt) = iso8601::datetime(temp_str) {
+    //     let cdt = match chrono::DateTime::try_from(dt) {
+    //         Ok(v) => v,
+    //         Err(err) => return Err(ValueError(format!("{:?}", err))),
+    //     };
+    //     Ok(Value::DateTimeV(cdt))
+    // } else if let Ok(date) = iso8601::date(temp_str) {
+    //     Ok(Value::DateV(date))
+    // } else if let Ok(time) = iso8601::time(temp_str) {
+    //     Ok(Value::TimeV(time))
+    // } else if let Ok(dur) = iso8601::duration(temp_str) {
+    //     Ok(Value::DurationV {
+    //         duration: dur,
+    //         negative: false,
+    //     })
+    // } else {
+    //     Err(ValueError("fail to parse temporal value".to_owned()))
+    // }
+}
+
+pub(crate) fn parse_datetime(s: &str) -> Result<Value, ValueError> {
+    if let Ok(dt) = iso8601::datetime(s) {
         let cdt = match chrono::DateTime::try_from(dt) {
             Ok(v) => v,
             Err(err) => return Err(ValueError(format!("{:?}", err))),
         };
         Ok(Value::DateTimeV(cdt))
-    } else if let Ok(date) = iso8601::date(temp_str) {
+    } else {
+        Err(ValueError("fail to parse date".to_owned()))
+    }
+}
+
+pub(crate) fn parse_date(s: &str) -> Result<Value, ValueError> {
+    if let Ok(date) = iso8601::date(s) {
         Ok(Value::DateV(date))
-    } else if let Ok(time) = iso8601::time(temp_str) {
+    } else {
+        Err(ValueError("fail to parse date".to_owned()))
+    }
+}
+
+pub(crate) fn parse_time(s: &str) -> Result<Value, ValueError> {
+    if let Ok(time) = iso8601::time(s) {
         Ok(Value::TimeV(time))
-    } else if let Ok(dur) = iso8601::duration(temp_str) {
+    } else {
+        Err(ValueError("fail to parse time".to_owned()))
+    }
+}
+
+pub(crate) fn parse_duration(s: &str) -> Result<Value, ValueError> {
+    if let Ok(dur) = iso8601::duration(s) {
         Ok(Value::DurationV {
             duration: dur,
             negative: false,
         })
     } else {
-        Err(ValueError("fail to parse temporal value".to_owned()))
+        Err(ValueError("fail to parse duration".to_owned()))
+    }
+}
+
+pub(crate) fn now() -> chrono::DateTime<chrono::FixedOffset> {
+    chrono::Local::now().into()
+}
+
+pub(crate) fn today() -> iso8601::Date {
+    let dn = chrono::Local::now().date_naive();
+    iso8601::Date::YMD {
+        year: dn.year(),
+        month: dn.month(),
+        day: dn.day(),
     }
 }
 
@@ -164,6 +229,36 @@ pub(crate) fn timedelta_to_duration(delta: chrono::TimeDelta) -> (iso8601::Durat
         },
         negative,
     )
+}
+
+lazy_static! {
+    static ref WEEK_NAMES: Vec<String> = {
+        let week_strs = vec![
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ];
+        let week_names: Vec<String> = week_strs.into_iter().map(|s| s.to_owned()).collect();
+        week_names
+    };
+}
+
+pub(crate) fn day_of_week_of_date(date: iso8601::Date) -> String {
+    let ndate = chrono::NaiveDate::try_from(date).unwrap();
+    let ntime = chrono::NaiveTime::from_str("00:00:00").unwrap();
+    let ndt = chrono::NaiveDateTime::new(ndate, ntime);
+    let nowdt = chrono::Local::now();
+    let cdt: chrono::prelude::DateTime<chrono::prelude::Local> =
+        chrono::DateTime::<chrono::Local>::from_naive_utc_and_offset(ndt, nowdt.offset().clone());
+    WEEK_NAMES[cdt.weekday().num_days_from_monday() as usize].clone()
+}
+
+pub(crate) fn day_of_week_of_datetime(cdt: chrono::DateTime<chrono::FixedOffset>) -> String {
+    WEEK_NAMES[cdt.weekday().num_days_from_monday() as usize].clone()
 }
 
 #[cfg(test)]

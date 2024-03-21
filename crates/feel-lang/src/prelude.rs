@@ -11,6 +11,7 @@ use super::eval::{EvalError, EvalResult};
 use super::values::context::Context;
 use super::values::func::{MacroBody, MacroT, NativeFunc, NativeFuncBody};
 use super::values::numeric::Numeric;
+use super::values::temporal::*;
 use super::values::value::Value::{self, *};
 use super::values::value::ValueError;
 
@@ -1091,6 +1092,54 @@ impl Prelude {
             let rng0 = arg0.expect_range("argument[1] `a`")?;
             let rng1 = arg1.expect_range("argument[2] `b`")?;
             Ok(Value::BoolV(*rng0 == *rng1))
+        });
+
+        // temporal functions
+        // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-temporal/
+        self.add_native_func("date and time", &["from"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"from".to_owned()).unwrap();
+            let s = arg0.expect_string("argument[1] `from`")?;
+            Ok(parse_datetime(s.as_str())?)
+        });
+
+        self.add_native_func("date", &["from"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"from".to_owned()).unwrap();
+            let s = arg0.expect_string("argument[1] `from`")?;
+            Ok(parse_date(s.as_str())?)
+        });
+
+        self.add_native_func("time", &["from"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"from".to_owned()).unwrap();
+            let s = arg0.expect_string("argument[1] `from`")?;
+            Ok(parse_time(s.as_str())?)
+        });
+
+        self.add_native_func("duration", &["from"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"from".to_owned()).unwrap();
+            let s = arg0.expect_string("argument[1] `from`")?;
+            Ok(parse_duration(s.as_str())?)
+        });
+
+        self.add_native_func("now", &[], |_, _args| -> EvalResult {
+            let datetime = now();
+            Ok(Value::DateTimeV(datetime))
+        });
+
+        self.add_native_func("today", &[], |_, _args| -> EvalResult {
+            let date = today();
+            Ok(Value::DateV(date))
+        });
+
+        self.add_native_func("day of week", &["date"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"date".to_owned()).unwrap();
+            match arg0 {
+                Value::DateTimeV(v) => Ok(StrV(day_of_week_of_datetime(v.clone()))),
+                Value::DateV(v) => Ok(StrV(day_of_week_of_date(v.clone()))),
+                _ => Err(EvalError::TypeError(format!(
+                    "argument[1] `date`, expect date|date and time, but {} found",
+                    arg0.data_type(),
+                ))),
+            }
         });
     }
 }
