@@ -891,7 +891,7 @@ mod test {
             ("coincides([1..5], [2..6])", "false"),
 
             // temporal functions
-            (r#"date and time("2018-04-29T09:30:00")"#, r#"date and time("2018-04-29T09:30:00+00:00")"# ),
+            (r#"date and time("2018-04-29T09:30:00+07:00")"#, r#"date and time("2018-04-29T09:30:00+07:00")"# ),
         ];
 
         for (input, output) in testcases {

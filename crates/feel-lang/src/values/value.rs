@@ -15,7 +15,7 @@ use super::context::{Context, ContextRef};
 use super::func::{MacroT, NativeFunc};
 use super::numeric::Numeric;
 use super::range::RangeT;
-use super::temporal::{compare_date, datetime_op, timedelta_to_duration};
+use super::temporal::{compare_date, datetime_op, timedelta_to_duration, DateTimeT};
 
 // value error
 #[derive(Clone, Debug)]
@@ -65,7 +65,7 @@ pub enum Value {
     BoolV(bool),
     NumberV(Numeric),
     StrV(String),
-    DateTimeV(chrono::DateTime<chrono::FixedOffset>),
+    DateTimeV(DateTimeT),
     DateV(iso8601::Date),
     TimeV(iso8601::Time),
     DurationV {

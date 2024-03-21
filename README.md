@@ -10,8 +10,8 @@ other rust projects or used as command line executable as FEEL
 interpreter.
 
 ## Build
-* run `cargo build` to build feel interpreter feel
-* run `cargo test` to run testing
+* run `cargo +nightly build` to build feel interpreter feel
+* run `cargo +nightly test` to run testing
 
 ## Examples
 ```shell

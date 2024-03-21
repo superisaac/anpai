@@ -358,10 +358,22 @@ impl Prelude {
             },
         );
 
-        self.add_native_func("abs", &["number"], |_, args| -> EvalResult {
-            let arg0 = args.get(&"number".to_owned()).unwrap();
-            let n = arg0.expect_number("argument[1] `number`")?;
-            Ok(Value::NumberV(n.abs()))
+        self.add_native_func("abs", &["n"], |_, args| -> EvalResult {
+            let arg0 = args.get(&"n".to_owned()).unwrap();
+            match arg0 {
+                Value::NumberV(n) => Ok(Value::NumberV(n.abs())),
+                Value::DurationV {
+                    duration,
+                    negative: _,
+                } => Ok(Value::DurationV {
+                    duration: duration.clone(),
+                    negative: true,
+                }),
+                _ => Err(EvalError::ValueError(format!(
+                    "argument[1] `n`, expect number|duration, but {} found",
+                    arg0.data_type(),
+                ))),
+            }
         });
 
         self.add_native_func(
@@ -1133,8 +1145,8 @@ impl Prelude {
         self.add_native_func("day of week", &["date"], |_, args| -> EvalResult {
             let arg0 = args.get(&"date".to_owned()).unwrap();
             match arg0 {
-                Value::DateTimeV(v) => Ok(StrV(day_of_week_of_datetime(v.clone()))),
-                Value::DateV(v) => Ok(StrV(day_of_week_of_date(v.clone()))),
+                Value::DateTimeV(v) => Ok(StrV(day_of_week(v.clone()))),
+                Value::DateV(v) => Ok(StrV(day_of_week(date_to_datetime(v.clone())))),
                 _ => Err(EvalError::TypeError(format!(
                     "argument[1] `date`, expect date|date and time, but {} found",
                     arg0.data_type(),
