@@ -7,7 +7,7 @@ use std::io::{BufRead, BufReader};
 
 #[derive(Parser, Debug)]
 #[clap(
-    name = "wfkit",
+    name = "anpai",
     about = "workflow kits and tools",
     rename_all = "kebab-case"
 )]

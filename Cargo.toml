@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
         "crates/feel-lang",
-        "crates/wfkit",
+        "crates/anpai",
 ]
 
 [workspace.dependencies]
