@@ -1,5 +1,7 @@
 use super::value::Value;
 use super::value::ValueError;
+use crate::eval::{EvalError, EvalResult};
+use crate::prelude::Prelude;
 use chrono::Datelike;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -12,19 +14,15 @@ use crate::helpers::compare_value;
 pub(crate) type DateTimeT = chrono::DateTime<chrono::FixedOffset>;
 
 lazy_static! {
-    static ref WEEK_NAMES: Vec<String> = {
-        let week_strs = vec![
-            "Monday",
-            "Tuesday",
-            "Wednesday",
-            "Thursday",
-            "Friday",
-            "Saturday",
-            "Sunday",
-        ];
-        let week_names: Vec<String> = week_strs.into_iter().map(|s| s.to_owned()).collect();
-        week_names
-    };
+    static ref WEEK_NAMES: Vec<&'static str> = vec![
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ];
     static ref TZ_PATTERN: Regex = Regex::new(r"\+.*$").unwrap();
 }
 
@@ -246,8 +244,60 @@ pub(crate) fn date_to_datetime(date: iso8601::Date) -> DateTimeT {
     cdt
 }
 
-pub(crate) fn day_of_week(cdt: DateTimeT) -> String {
-    WEEK_NAMES[cdt.weekday().num_days_from_monday() as usize].clone()
+pub(crate) fn day_of_week(cdt: DateTimeT) -> &'static str {
+    WEEK_NAMES[cdt.weekday().num_days_from_monday() as usize]
+}
+
+pub(crate) fn install_temporal_prelude(prelude: &mut Prelude) {
+    // temporal functions
+    // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-temporal/
+    prelude.add_native_func("date and time", &["from"], |_, args| -> EvalResult {
+        let arg0 = args.get(&"from".to_owned()).unwrap();
+        let s = arg0.expect_string("argument[1] `from`")?;
+        Ok(parse_datetime(s.as_str())?)
+    });
+
+    prelude.add_native_func("date", &["from"], |_, args| -> EvalResult {
+        let arg0 = args.get(&"from".to_owned()).unwrap();
+        let s = arg0.expect_string("argument[1] `from`")?;
+        Ok(parse_date(s.as_str())?)
+    });
+
+    prelude.add_native_func("time", &["from"], |_, args| -> EvalResult {
+        let arg0 = args.get(&"from".to_owned()).unwrap();
+        let s = arg0.expect_string("argument[1] `from`")?;
+        Ok(parse_time(s.as_str())?)
+    });
+
+    prelude.add_native_func("duration", &["from"], |_, args| -> EvalResult {
+        let arg0 = args.get(&"from".to_owned()).unwrap();
+        let s = arg0.expect_string("argument[1] `from`")?;
+        Ok(parse_duration(s.as_str())?)
+    });
+
+    prelude.add_native_func("now", &[], |_, _args| -> EvalResult {
+        let datetime = now();
+        Ok(Value::DateTimeV(datetime))
+    });
+
+    prelude.add_native_func("today", &[], |_, _args| -> EvalResult {
+        let date = today();
+        Ok(Value::DateV(date))
+    });
+
+    prelude.add_native_func("day of week", &["date"], |_, args| -> EvalResult {
+        let arg0 = args.get(&"date".to_owned()).unwrap();
+        match arg0 {
+            Value::DateTimeV(v) => Ok(Value::StrV(day_of_week(v.clone()).to_owned())),
+            Value::DateV(v) => Ok(Value::StrV(
+                day_of_week(date_to_datetime(v.clone())).to_owned(),
+            )),
+            _ => Err(EvalError::TypeError(format!(
+                "argument[1] `date`, expect date|date and time, but {} found",
+                arg0.data_type(),
+            ))),
+        }
+    });
 }
 
 #[cfg(test)]
