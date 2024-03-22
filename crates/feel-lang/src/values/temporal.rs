@@ -173,10 +173,10 @@ pub(crate) fn datetime_add(cdt: DateTimeT, dur: iso8601::Duration) -> Result<Dat
         millisecond,
     } = dur
     {
-        let secs = second + 60 * minute + 3600 * hour + 86400 * day;
+        let secs = second + 60 * minute + 3600 * hour;
         let cdur = chrono::TimeDelta::new(secs as i64, millisecond * 1000_000).unwrap();
-        let mut d0 = cdt
-            .checked_add_months(chrono::Months::new(month + year * 12))
+        let mut d0: DateTimeT = cdt
+            .checked_add_months(chrono::Months::new(year * 12 + month))
             .unwrap();
         d0 = d0.checked_add_days(chrono::Days::new(day as u64)).unwrap();
         d0 = d0.checked_add_signed(cdur).unwrap();
@@ -198,7 +198,7 @@ pub(crate) fn datetime_sub(cdt: DateTimeT, dur: iso8601::Duration) -> Result<Dat
         millisecond,
     } = dur
     {
-        let secs = second + 60 * minute + 3600 * hour + 86400 * day;
+        let secs = second + 60 * minute + 3600 * hour;
         let cdur = chrono::TimeDelta::new(secs as i64, millisecond * 1000_000).unwrap();
         let mut d0 = cdt
             .checked_sub_months(chrono::Months::new(month + year * 12))
