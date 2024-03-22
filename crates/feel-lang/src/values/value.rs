@@ -87,6 +87,7 @@ pub enum Value {
     },
     FuncV {
         func_def: Box<Node>,
+        code: String,
     },
 }
 
@@ -123,7 +124,7 @@ impl fmt::Display for Value {
                 require_args: _,
                 macro_: _,
             } => write!(f, "{}", "function"),
-            Self::FuncV { func_def: _ } => write!(f, "{}", "function"),
+            Self::FuncV { func_def: _, code } => write!(f, "{}", code),
         }
     }
 }
@@ -163,7 +164,10 @@ impl Value {
                 require_args: _,
                 macro_: _,
             } => "macro".to_owned(),
-            Self::FuncV { func_def: _ } => "function".to_owned(),
+            Self::FuncV {
+                func_def: _,
+                code: _,
+            } => "function".to_owned(),
         }
     }
 

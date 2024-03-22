@@ -60,6 +60,7 @@ pub enum NodeSyntax {
     FuncDef {
         arg_names: Vec<String>,
         body: Box<Node>,
+        code: String,
     },
 
     // variable
@@ -129,7 +130,11 @@ impl fmt::Display for NodeSyntax {
             Self::FuncCall { func_ref, args } => write!(f, "(call {} ", func_ref)
                 .and_then(|_| fmt_vec(f, args.iter(), "[", "]"))
                 .and_then(|_| write!(f, "{}", ")")),
-            Self::FuncDef { arg_names, body } => write!(f, "(function ")
+            Self::FuncDef {
+                arg_names,
+                body,
+                code: _,
+            } => write!(f, "(function ")
                 .and_then(|_| fmt_vec(f, arg_names.iter(), "[", "]"))
                 .and_then(|_| write!(f, " {})", body)),
             Self::Var(name) => write!(f, "{}", name),

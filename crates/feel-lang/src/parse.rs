@@ -697,10 +697,14 @@ impl Parser<'_> {
         goahead!(self); // skip ')'
 
         let exp = self.parse_expression()?;
+        let end_pos = self.scanner.current_token().position;
+        let func_code = self.scanner.text_range(start_pos.chars, end_pos.chars);
+
         Ok(Node::new(
             FuncDef {
                 arg_names,
                 body: exp,
+                code: func_code.to_owned(),
             },
             start_pos,
         ))
@@ -731,6 +735,29 @@ mod test {
         for (input, output) in testcases {
             let node = super::parse(input).unwrap();
             assert_eq!(format!("{}", *node), output);
+        }
+    }
+
+    #[test]
+    fn test_parse_func_def() {
+        let input = "function(a, b) a + b   ";
+        let node = super::parse(input).unwrap();
+        println!("node syntax {:?}", node.syntax);
+        assert_matches!(
+            *(node.syntax),
+            crate::ast::NodeSyntax::FuncDef {
+                arg_names: _,
+                body: _,
+                code: _
+            }
+        );
+        if let crate::ast::NodeSyntax::FuncDef {
+            arg_names: _,
+            body: _,
+            code: c,
+        } = *node.syntax
+        {
+            assert_eq!(c.as_str(), "function(a, b) a + b   ");
         }
     }
 

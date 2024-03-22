@@ -165,8 +165,20 @@ impl Engine {
             } => self.eval_range(start_open, start, end, end_open),
             Array(elements) => self.eval_array(&elements),
             Map(items) => self.eval_map(&items),
-            FuncDef { arg_names, body } => Ok(FuncV {
-                func_def: Node::new(FuncDef { arg_names, body }, node.start_pos),
+            FuncDef {
+                arg_names,
+                body,
+                code,
+            } => Ok(FuncV {
+                func_def: Node::new(
+                    FuncDef {
+                        arg_names,
+                        body,
+                        code: code.clone(),
+                    },
+                    node.start_pos,
+                ),
+                code,
             }),
             FuncCall { func_ref, args } => self.eval_func_call(func_ref, args),
             IfExpr {
@@ -425,7 +437,7 @@ impl Engine {
                 optional_args,
                 var_arg,
             } => self.call_native_func(&func, require_args, optional_args, var_arg, call_args),
-            FuncV { func_def } => self.call_func(func_def, call_args),
+            FuncV { func_def, code: _ } => self.call_func(func_def, call_args),
             MacroV {
                 macro_,
                 require_args,
@@ -542,7 +554,12 @@ impl Engine {
             arg_values.push(v);
         }
 
-        if let FuncDef { arg_names, body } = *func_def.syntax {
+        if let FuncDef {
+            arg_names,
+            body,
+            code: _,
+        } = *func_def.syntax
+        {
             if arg_names.len() > arg_values.len() {
                 return Err(EvalError::runtime("func call with too few arguments"));
             }

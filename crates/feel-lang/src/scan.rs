@@ -267,6 +267,10 @@ impl Scanner<'_> {
         self.cursor.chars >= self.input.len()
     }
 
+    pub fn text_range(&self, start: usize, end: usize) -> String {
+        self.input[start..end].to_string()
+    }
+
     // returns current token
     // pub fn current_token(&self) -> Option<Token> {
     //     self.current.clone()
