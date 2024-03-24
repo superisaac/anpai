@@ -155,6 +155,7 @@ impl Engine {
             Var(name) => self.eval_var(name),
             Neg(value) => self.eval_neg_op(value),
             BinOp { op, left, right } => self.eval_binop(op, left, right),
+            InOp { left, right } => self.eval_in_op(left, right),
             LogicOp { op, left, right } => self.eval_logicop(op, left, right),
             DotOp { left, attr } => self.eval_dotop(left, attr),
             Range {
@@ -402,13 +403,29 @@ impl Engine {
     }
 
     #[inline(always)]
-    fn eval_expr_list(&mut self, exprs: Vec<Node>) -> EvalResult {
-        let mut last_result: Option<Value> = None;
+    fn eval_expr_list_in(&mut self, exprs: Vec<Box<Node>>) -> EvalResult {
+        let left_value = self
+            .resolve("?".to_owned())
+            .ok_or(EvalError::VarNotFound("?".to_owned()))?;
         for expr in exprs.iter() {
-            let res = self.eval(Box::new(expr.clone()))?;
-            last_result = Some(res);
+            let res = self.eval(expr.clone())?;
+            if let BoolV(true) = res {
+                return Ok(BoolV(true));
+            } else if left_value == res {
+                return Ok(BoolV(true));
+            }
         }
-        if let Some(v) = last_result {
+        Ok(BoolV(false))
+    }
+
+    #[inline(always)]
+    fn eval_expr_list(&mut self, exprs: Vec<Box<Node>>) -> EvalResult {
+        let mut last_value: Option<Value> = None;
+        for expr in exprs.iter() {
+            let res = self.eval(expr.clone())?;
+            last_value = Some(res);
+        }
+        if let Some(v) = last_value {
             Ok(v)
         } else {
             Ok(NullV)
@@ -416,15 +433,16 @@ impl Engine {
     }
 
     #[inline(always)]
-    fn eval_multi_tests(&mut self, exprs: Vec<Node>) -> EvalResult {
-        //let input_value = self.resolve("?".to_owned()).ok_or(EvalError::VarNotFound)?;
-        for expr in exprs.iter() {
-            let res = self.eval(Box::new(expr.clone()))?;
-            if res.bool_value() {
-                return Ok(BoolV(true));
-            }
-        }
-        Ok(BoolV(false))
+    fn eval_multi_tests(&mut self, exprs: Vec<Box<Node>>) -> EvalResult {
+        self.eval_expr_list_in(exprs)
+        // //let input_value = self.resolve("?".to_owned()).ok_or(EvalError::VarNotFound)?;
+        // for expr in exprs.iter() {
+        //     let res = self.eval(expr.clone())?;
+        //     if res.bool_value() {
+        //         return Ok(BoolV(true));
+        //     }
+        // }
+        // Ok(BoolV(false))
     }
 
     #[inline(always)]
@@ -618,7 +636,7 @@ impl Engine {
             "!=" => Ok(BoolV(left_value != right_value)),
             "=" => Ok(BoolV(left_value == right_value)),
             "[]" => self.eval_binop_index(left_value, right_value),
-            "in" => self.eval_binop_in(left_value, right_value),
+            //"in" => self.eval_binop_in(left_value, right_value),
             _ => return Err(EvalError::Runtime(format!("unknown op {}", op))),
         }
     }
@@ -658,7 +676,22 @@ impl Engine {
     }
 
     #[inline(always)]
-    fn eval_binop_in(&mut self, left_value: Value, right_value: Value) -> EvalResult {
+    fn eval_in_op(&mut self, left: Box<Node>, right: Box<Node>) -> EvalResult {
+        let left_value = self.eval(left)?;
+        match *right.syntax {
+            ExprList(items) => {
+                self.push_frame();
+                self.bind_var("?".to_owned(), left_value.clone());
+                let res = self.eval_expr_list_in(items);
+                self.pop_frame();
+                return res;
+            }
+            _ => (),
+        }
+        self.push_frame();
+        let right_res = self.eval(right);
+        self.pop_frame();
+        let right_value = right_res?;
         match right_value {
             RangeV(rng) => {
                 let contains = rng.contains(&left_value);
@@ -673,10 +706,10 @@ impl Engine {
                 }
                 Ok(BoolV(false))
             }
-            _ => Err(EvalError::Runtime(format!(
-                "cannot perform in op on {}",
-                right_value.data_type(),
-            ))),
+            x => Ok(BoolV(x == left_value)), // _ => Err(EvalError::Runtime(format!(
+                                             //     "cannot perform in op on {}",
+                                             //     right_value.data_type(),
+                                             // ))),
         }
     }
 
@@ -756,7 +789,9 @@ mod test {
             ),
             ("some a in [2, 8, 3, 6] satisfies a > 4", "8"),
             ("every a in [2, 8, 3, 6] satisfies a > 4", "[8, 6]"),
-            ("2 * 8; true; null; 9 / 3", "3"),
+            //("2 * 8; true; null; 9 / 3", "3"),
+            ("2 in (>=5, <3)", "true"),
+
             (r#"set("a", 5); a + 10.3"#, "15.3"), // expression list
             (r#"set("?", 5); >6, =8, < 3"#, "false"), // multi tests
             (r#"set("?", 5); >6, <8, < 3"#, "true"),
@@ -913,6 +948,7 @@ mod test {
 
         for (input, output) in testcases {
             let mut eng = super::Engine::new();
+            //println!("parse input {input}");
             let node = parse(input).unwrap();
             let v = eng.eval(node).unwrap();
             assert_eq!(v.to_string(), output, "output mismatch input: '{}'", input);

@@ -84,7 +84,7 @@ impl Parser<'_> {
     }
 
     pub fn parse(&mut self) -> NodeResult {
-        let mut exprs: Vec<Node> = Vec::new();
+        let mut exprs: Vec<Box<Node>> = Vec::new();
         goahead!(self);
         let start_pos = self.scanner.current_token().position;
         while !self.scanner.expect("eof") {
@@ -92,49 +92,49 @@ impl Parser<'_> {
                 goahead!(self);
             }
             let node = self.parse_multi_tests()?;
-            exprs.push(*node);
+            exprs.push(node);
         }
         if exprs.len() == 1 {
-            return Ok(Box::new(exprs[0].clone()));
+            return Ok(exprs[0].clone());
         } else {
             return Ok(Node::new(ExprList(exprs), start_pos));
         }
     }
 
-    fn parse_multi_tests_element(&mut self) -> NodeResult {
-        if self
-            .scanner
-            .expect_kinds(&[">", ">=", "<", "<=", "!=", "="])
-        {
-            // unary tests
-            let start_pos = self.scanner.current_token().position;
-            let op = self.scanner.current_token().kind;
-            goahead!(self); // skip op
-            let right = self.parse_expression()?;
-            let left = Node::new(Var("?".to_owned()), start_pos.clone());
-            Ok(Node::new(
-                BinOp {
-                    op: op.to_string(),
-                    left,
-                    right,
-                },
-                start_pos,
-            ))
-        } else {
-            self.parse_expression()
-        }
-    }
+    // fn parse_multi_tests_element(&mut self) -> NodeResult {
+    //     if self
+    //         .scanner
+    //         .expect_kinds(&[">", ">=", "<", "<=", "!=", "="])
+    //     {
+    //         // unary tests
+    //         let start_pos = self.scanner.current_token().position;
+    //         let op = self.scanner.current_token().kind;
+    //         goahead!(self); // skip op
+    //         let right = self.parse_expression()?;
+    //         let left = Node::new(Var("?".to_owned()), start_pos.clone());
+    //         Ok(Node::new(
+    //             BinOp {
+    //                 op: op.to_string(),
+    //                 left,
+    //                 right,
+    //             },
+    //             start_pos,
+    //         ))
+    //     } else {
+    //         self.parse_expression()
+    //     }
+    // }
 
     fn parse_multi_tests(&mut self) -> NodeResult {
         let start_pos = self.scanner.current_token().position;
-        let elem = self.parse_multi_tests_element()?;
+        let elem = self.parse_expression()?;
         if self.scanner.expect(",") {
             let mut elements = Vec::new();
-            elements.push(*elem);
+            elements.push(elem);
             while self.scanner.expect(",") {
                 goahead!(self); // skip ','
-                let elem1 = self.parse_multi_tests_element()?;
-                elements.push(*elem1);
+                let elem1 = self.parse_expression()?;
+                elements.push(elem1);
             }
             Ok(Node::new(MultiTests(elements), start_pos))
         } else {
@@ -143,26 +143,38 @@ impl Parser<'_> {
     }
 
     fn parse_expression(&mut self) -> NodeResult {
-        self.parse_in_op()
+        self.parse_in_op(Parser::parse_logic_or)
     }
 
-    // binary operators
-    fn parse_binop_keywords(
-        &mut self,
-        keywords: &[&str],
-        sub_func: fn(&mut Self) -> NodeResult,
-    ) -> NodeResult {
+    fn parse_in_op(&mut self, sub_func: fn(&mut Self) -> NodeResult) -> NodeResult {
         let mut start_pos = self.scanner.current_token().position;
         let mut left = sub_func(self)?;
-        while self.scanner.expect_keywords(keywords) {
-            let op = self.scanner.current_token().value;
+        while self.scanner.expect_keyword("in") {
             goahead!(self);
             let right = sub_func(self)?;
-            left = Node::new(BinOp { op, left, right }, start_pos.clone());
+            left = Node::new(InOp { left, right }, start_pos.clone());
             start_pos = self.scanner.current_token().position;
         }
         Ok(left)
     }
+
+    // binary operators
+    // fn parse_binop_keywords(
+    //     &mut self,
+    //     keywords: &[&str],
+    //     sub_func: fn(&mut Self) -> NodeResult,
+    // ) -> NodeResult {
+    //     let mut start_pos = self.scanner.current_token().position;
+    //     let mut left = sub_func(self)?;
+    //     while self.scanner.expect_keywords(keywords) {
+    //         let op = self.scanner.current_token().value;
+    //         goahead!(self);
+    //         let right = sub_func(self)?;
+    //         left = Node::new(BinOp { op, left, right }, start_pos.clone());
+    //         start_pos = self.scanner.current_token().position;
+    //     }
+    //     Ok(left)
+    // }
 
     fn parse_binop_kinds(
         &mut self,
@@ -197,10 +209,6 @@ impl Parser<'_> {
             start_pos = self.scanner.current_token().position;
         }
         Ok(left)
-    }
-
-    fn parse_in_op(&mut self) -> NodeResult {
-        self.parse_binop_keywords(&["in"], Parser::parse_logic_or)
     }
 
     fn parse_logic_or(&mut self) -> NodeResult {
@@ -322,6 +330,9 @@ impl Parser<'_> {
             "string" => self.parse_string(),
             "temporal" => self.parse_temporal(),
             "-" => self.parse_neg(),
+            ">" | ">=" | "<" | "<=" | "!=" | "=" => {
+                self.parse_unary_test(self.scanner.current_token().kind)
+            }
             "{" => self.parse_map(),
             "(" => self.parse_bracket_or_range(),
             "[" => self.parse_range_or_array(),
@@ -389,8 +400,23 @@ impl Parser<'_> {
     fn parse_neg(&mut self) -> NodeResult {
         goahead!(self); // skip '-'
         let start_pos = self.scanner.current_token().position;
-        let value = self.parse_expression()?;
-        Ok(Node::new(Neg(value), start_pos))
+        let node = self.parse_expression()?;
+        Ok(Node::new(Neg(node), start_pos))
+    }
+
+    fn parse_unary_test(&mut self, op: &str) -> NodeResult {
+        goahead!(self); // skip op
+        let start_pos = self.scanner.current_token().position;
+        let right = self.parse_expression()?;
+        let left = Node::new(Var("?".to_owned()), start_pos.clone());
+        Ok(Node::new(
+            BinOp {
+                op: op.to_string(),
+                left,
+                right,
+            },
+            start_pos,
+        ))
     }
 
     fn parse_string(&mut self) -> NodeResult {
@@ -515,8 +541,11 @@ impl Parser<'_> {
         } else if self.scanner.expect(")") {
             goahead!(self); // skip ')'
             return Ok(aexp);
+        } else if self.scanner.expect(",") {
+            //goahead!(self);
+            return self.parse_expr_list_given_first(aexp, start_pos);
         } else {
-            return Err(self.unexpect("')', '..'"));
+            return Err(self.unexpect("')', ',', '..'"));
         }
     }
 
@@ -538,6 +567,30 @@ impl Parser<'_> {
         goahead!(self); // skip '..'
 
         return self.parse_range_given_start(false, aexp, start_pos);
+    }
+
+    fn parse_expr_list_given_first(
+        &mut self,
+        first_element: Box<Node>,
+        start_pos: TextPosition,
+    ) -> NodeResult {
+        let mut elements = Vec::new();
+        elements.push(first_element);
+
+        while self.scanner.expect(",") {
+            goahead!(self); // skip ','
+            let elem = self.parse_expression()?;
+            elements.push(elem);
+        }
+        if !self.scanner.expect(")") {
+            return Err(self.unexpect("')'"));
+        }
+        goahead!(self); // skip ')'
+        if elements.len() <= 1 {
+            Ok(elements[0].clone())
+        } else {
+            Ok(Node::new(ExprList(elements), start_pos))
+        }
     }
 
     fn parse_array_given_first(
@@ -742,7 +795,6 @@ mod test {
     fn test_parse_func_def() {
         let input = "function(a, b) a + b   ";
         let node = super::parse(input).unwrap();
-        println!("node syntax {:?}", node.syntax);
         assert_matches!(
             *(node.syntax),
             crate::ast::NodeSyntax::FuncDef {

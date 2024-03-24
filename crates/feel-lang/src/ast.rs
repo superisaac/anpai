@@ -39,6 +39,11 @@ pub enum NodeSyntax {
         right: Box<Node>,
     },
 
+    InOp {
+        left: Box<Node>,
+        right: Box<Node>,
+    },
+
     LogicOp {
         op: String,
         left: Box<Node>,
@@ -116,15 +121,16 @@ pub enum NodeSyntax {
         filter_expr: Box<Node>,
     },
 
-    ExprList(Vec<Node>),
+    ExprList(Vec<Box<Node>>),
 
-    MultiTests(Vec<Node>),
+    MultiTests(Vec<Box<Node>>),
 }
 
 impl fmt::Display for NodeSyntax {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::BinOp { op, left, right } => write!(f, "({} {} {})", op, left, right),
+            Self::InOp { left, right } => write!(f, "(in {} {})", left, right),
             Self::LogicOp { op, left, right } => write!(f, "({} {} {})", op, left, right),
             Self::DotOp { left, attr } => write!(f, "(. {} {})", left, attr),
             Self::FuncCall { func_ref, args } => write!(f, "(call {} ", func_ref)
