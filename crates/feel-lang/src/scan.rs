@@ -5,7 +5,7 @@ use std::error::Error;
 use std::fmt;
 
 // Scan error
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScanError {
     pub message: String,
 }
@@ -50,6 +50,10 @@ impl TextPosition {
             lines: 0,
             cols: 0,
         }
+    }
+
+    pub fn is_zero(&self) -> bool {
+        return self.chars == 0 && self.lines == 0 && self.cols == 0;
     }
 
     pub fn increase(&self, chunk: &str) -> TextPosition {

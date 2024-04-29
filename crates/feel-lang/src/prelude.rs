@@ -26,7 +26,7 @@ fn to_feel_index(idx: usize) -> usize {
 
 pub fn range_check(pos: usize, low: usize, high: usize) -> Result<usize, EvalError> {
     if pos < low || pos > high {
-        Err(EvalError::IndexError)
+        Err(EvalError::index_error())
     } else {
         Ok(pos)
     }
@@ -107,27 +107,27 @@ impl Prelude {
     }
 
     pub fn load_preludes(&mut self) {
-        self.add_native_func("set", &["name", "value"], |eng, args| -> EvalResult {
-            let name_node = args.get(&"name".to_owned()).unwrap();
-            let var_name = match name_node {
-                StrV(value) => value.clone(),
-                _ => return Err(EvalError::runtime("argument name should be string")),
-            };
-            let value = args.get(&"value".to_owned()).unwrap();
-            eng.set_var(var_name, value.clone());
-            Ok(value.clone())
-        });
+        // self.add_native_func("set", &["name", "value"], |eng, args| -> EvalResult {
+        //     let name_node = args.get(&"name".to_owned()).unwrap();
+        //     let var_name = match name_node {
+        //         StrV(value) => value.clone(),
+        //         _ => return Err(EvalError::runtime("argument name should be string")),
+        //     };
+        //     let value = args.get(&"value".to_owned()).unwrap();
+        //     eng.set_var(var_name, value.clone());
+        //     Ok(value.clone())
+        // });
 
-        self.add_native_func("bind", &["name", "value"], |eng, args| -> EvalResult {
-            let name_node = args.get(&"name".to_owned()).unwrap();
-            let var_name = match name_node {
-                StrV(value) => value.clone(),
-                _ => return Err(EvalError::runtime("argument name should be string")),
-            };
-            let value = args.get(&"value".to_owned()).unwrap();
-            eng.bind_var(var_name, value.clone());
-            Ok(value.clone())
-        });
+        // self.add_native_func("bind", &["name", "value"], |eng, args| -> EvalResult {
+        //     let name_node = args.get(&"name".to_owned()).unwrap();
+        //     let var_name = match name_node {
+        //         StrV(value) => value.clone(),
+        //         _ => return Err(EvalError::runtime("argument name should be string")),
+        //     };
+        //     let value = args.get(&"value".to_owned()).unwrap();
+        //     eng.bind_var(var_name, value.clone());
+        //     Ok(value.clone())
+        // });
 
         // conversion functions
         // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-conversion/
@@ -370,10 +370,13 @@ impl Prelude {
                     duration: duration.clone(),
                     negative: true,
                 }),
-                _ => Err(EvalError::ValueError(format!(
-                    "argument[1] `n`, expect number|duration, but {} found",
-                    arg0.data_type(),
-                ))),
+                _ => Err(EvalError::value_error(
+                    format!(
+                        "argument[1] `n`, expect number|duration, but {} found",
+                        arg0.data_type(),
+                    )
+                    .as_str(),
+                )),
             }
         });
 
@@ -398,7 +401,7 @@ impl Prelude {
             if let Some(v) = n.sqrt() {
                 Ok(Value::NumberV(v))
             } else {
-                Err(EvalError::ValueError("sqrt() failed".to_owned()))
+                Err(EvalError::value_error("sqrt() failed"))
             }
         });
 
@@ -412,19 +415,17 @@ impl Prelude {
                 let n = arg0.expect_number("argument[1] `number`")?;
                 let ln = match n.ln() {
                     Some(v) => v,
-                    None => return Err(EvalError::ValueError("log() failed".to_owned())),
+                    None => return Err(EvalError::value_error("log() failed")),
                 };
 
                 if let Some(arg1) = args.get(&"base".to_owned()) {
                     let base = arg1.expect_number("argument[2] `base`")?;
                     if base <= Numeric::ONE {
-                        Err(EvalError::ValueError(
-                            "argument[2] `base`, negative base".to_owned(),
-                        ))
+                        Err(EvalError::value_error("argument[2] `base`, negative base"))
                     } else if let Some(base_ln) = base.ln() {
                         Ok(Value::NumberV(ln / base_ln))
                     } else {
-                        Err(EvalError::ValueError("log(base) failed".to_owned()))
+                        Err(EvalError::value_error("log(base) failed"))
                     }
                 } else {
                     Ok(Value::NumberV(ln))
@@ -892,10 +893,13 @@ impl Prelude {
                     keys
                 }
                 _ => {
-                    return Err(EvalError::TypeError(format!(
-                        "expect string or string list, by {} found",
-                        arg1.data_type()
-                    )))
+                    return Err(EvalError::type_error(
+                        format!(
+                            "expect string or string list, by {} found",
+                            arg1.data_type()
+                        )
+                        .as_str(),
+                    ))
                 }
             };
 
@@ -938,10 +942,13 @@ impl Prelude {
                         keys
                     }
                     _ => {
-                        return Err(EvalError::TypeError(format!(
-                            "expect string or string list, by {} found",
-                            arg1.data_type()
-                        )))
+                        return Err(EvalError::type_error(
+                            format!(
+                                "expect string or string list, by {} found",
+                                arg1.data_type()
+                            )
+                            .as_str(),
+                        ))
                     }
                 };
 

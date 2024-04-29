@@ -216,4 +216,8 @@ impl Node {
             start_pos,
         })
     }
+
+    pub fn start_position(&self) -> TextPosition {
+        self.start_pos.clone()
+    }
 }

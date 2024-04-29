@@ -1,6 +1,7 @@
 use super::value::Value;
 use super::value::ValueError;
-use crate::eval::{EvalError, EvalResult};
+use crate::eval::{EvalError, EvalErrorKind::*, EvalResult};
+
 use crate::prelude::Prelude;
 use chrono::Datelike;
 use lazy_static::lazy_static;
@@ -292,10 +293,10 @@ pub(crate) fn install_temporal_prelude(prelude: &mut Prelude) {
             Value::DateV(v) => Ok(Value::StrV(
                 day_of_week(date_to_datetime(v.clone())).to_owned(),
             )),
-            _ => Err(EvalError::TypeError(format!(
+            _ => Err(EvalError::new(TypeError(format!(
                 "argument[1] `date`, expect date|date and time, but {} found",
                 arg0.data_type(),
-            ))),
+            )))),
         }
     });
 }

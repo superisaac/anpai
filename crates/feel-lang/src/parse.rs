@@ -7,7 +7,7 @@ use std::fmt;
 /// parse FEEL refer to https://www.omg.org/spec/DMN/1.2/PDF
 
 // Parse error
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ParseError {
     Parse(String),
     Scan(ScanError),
@@ -157,24 +157,6 @@ impl Parser<'_> {
         }
         Ok(left)
     }
-
-    // binary operators
-    // fn parse_binop_keywords(
-    //     &mut self,
-    //     keywords: &[&str],
-    //     sub_func: fn(&mut Self) -> NodeResult,
-    // ) -> NodeResult {
-    //     let mut start_pos = self.scanner.current_token().position;
-    //     let mut left = sub_func(self)?;
-    //     while self.scanner.expect_keywords(keywords) {
-    //         let op = self.scanner.current_token().value;
-    //         goahead!(self);
-    //         let right = sub_func(self)?;
-    //         left = Node::new(BinOp { op, left, right }, start_pos.clone());
-    //         start_pos = self.scanner.current_token().position;
-    //     }
-    //     Ok(left)
-    // }
 
     fn parse_binop_kinds(
         &mut self,

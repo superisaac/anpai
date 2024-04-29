@@ -5,9 +5,13 @@ use std::fmt;
 
 use std::rc::Rc;
 
+use crate::scan::TextPosition;
+
+use self::EvalErrorKind::*;
+
 use super::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use super::helpers::unescape;
-use super::parse::ParseError;
+use super::parse::{parse, ParseError};
 use super::prelude::PRELUDE;
 use super::values::context::Context;
 use super::values::numeric::Numeric;
@@ -19,8 +23,8 @@ use super::values::range::RangeT;
 use super::values::value::Value::{self, *};
 
 // EvalError
-#[derive(Debug)]
-pub enum EvalError {
+#[derive(Debug, Clone)]
+pub enum EvalErrorKind {
     VarNotFound(String),
     KeyError,
     IndexError,
@@ -30,7 +34,7 @@ pub enum EvalError {
     ValueError(String),
 }
 
-impl fmt::Display for EvalError {
+impl fmt::Display for EvalErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::VarNotFound(name) => write!(f, "VarNotFound: `{}`", name),
@@ -39,8 +43,20 @@ impl fmt::Display for EvalError {
             Self::IndexError => write!(f, "{}", "IndexError"),
             Self::Runtime(message) => write!(f, "RuntimeError: {}", message),
             Self::ValueError(message) => write!(f, "ValueError: {}", message),
-            Self::Parse(err) => write!(f, "{}", err),
+            Self::Parse(parse_err) => write!(f, "{}", parse_err),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct EvalError {
+    pub kind: EvalErrorKind,
+    pub pos: TextPosition,
+}
+
+impl fmt::Display for EvalError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{} at {}", self.kind, self.pos)
     }
 }
 
@@ -48,31 +64,82 @@ impl error::Error for EvalError {}
 
 impl From<String> for EvalError {
     fn from(err: String) -> EvalError {
-        Self::Runtime(err)
+        Self::new(Runtime(err))
     }
 }
 
 impl From<ParseError> for EvalError {
     fn from(err: ParseError) -> EvalError {
-        Self::Parse(err)
+        Self::new(Parse(err))
+    }
+}
+
+impl From<(ParseError, TextPosition)> for EvalError {
+    fn from(err: (ParseError, TextPosition)) -> EvalError {
+        Self::new_with_pos(Parse(err.0), err.1)
     }
 }
 
 impl From<ValueError> for EvalError {
     fn from(err: ValueError) -> EvalError {
-        Self::ValueError(err.0)
+        Self::new(EvalErrorKind::ValueError(err.0))
     }
 }
 
 impl From<TypeError> for EvalError {
     fn from(err: TypeError) -> EvalError {
-        Self::TypeError(err.0)
+        Self::new(EvalErrorKind::TypeError(err.0))
     }
 }
 
 impl EvalError {
+    pub fn new(kind: EvalErrorKind) -> EvalError {
+        EvalError {
+            kind,
+            pos: TextPosition::zero(),
+        }
+    }
+
+    pub fn new_with_pos(kind: EvalErrorKind, pos: TextPosition) -> EvalError {
+        EvalError { kind, pos }
+    }
+
     pub fn runtime(message: &str) -> EvalError {
-        Self::Runtime(String::from(message))
+        Self::new(Runtime(String::from(message)))
+    }
+
+    pub fn value_error(message: &str) -> EvalError {
+        Self::new(EvalErrorKind::ValueError(String::from(message)))
+    }
+
+    pub fn type_error(message: &str) -> EvalError {
+        Self::new(EvalErrorKind::TypeError(String::from(message)))
+    }
+
+    pub fn index_error() -> EvalError {
+        Self::new(EvalErrorKind::IndexError)
+    }
+
+    // pub fn var_not_found(varname: &str) -> EvalError {
+    //     Self::new(VarNotFound(String::from(varname)))
+    // }
+
+    pub fn with_pos(&self, pos: TextPosition) -> EvalError {
+        EvalError {
+            kind: self.kind.clone(),
+            pos,
+        }
+    }
+
+    pub fn with_pos_if_zero(&self, pos: TextPosition) -> EvalError {
+        if pos.is_zero() {
+            EvalError {
+                kind: self.kind.clone(),
+                pos,
+            }
+        } else {
+            self.clone()
+        }
     }
 }
 
@@ -144,8 +211,27 @@ impl Engine {
             .insert(name, value);
     }
 
+    pub fn load_context(&mut self, ctx_input: &str) -> EvalResult {
+        let node = parse(ctx_input)?;
+        let ctx_value = self.eval(node)?;
+        return match ctx_value {
+            ContextV(m) => {
+                self.push_frame();
+                let ctx_entries = m.as_ref().borrow().entries();
+                for (k, v) in ctx_entries {
+                    self.set_var(k, v);
+                }
+                Ok(BoolV(true))
+            }
+            _ => Err(EvalError::new(EvalErrorKind::ValueError(
+                "context/map required".to_owned(),
+            ))),
+        };
+    }
+
     pub fn eval(&mut self, node: Box<Node>) -> EvalResult {
-        match *node.syntax {
+        let start_pos = node.start_pos;
+        let res = match *node.syntax {
             Null => Ok(NullV),
             Bool(value) => Ok(BoolV(value)),
             Number(value) => self.eval_number(value),
@@ -177,7 +263,7 @@ impl Engine {
                         body,
                         code: code.clone(),
                     },
-                    node.start_pos,
+                    start_pos.clone(),
                 ),
                 code,
             }),
@@ -204,7 +290,11 @@ impl Engine {
             } => self.eval_every_expr(var_name, list_expr, filter_expr),
             ExprList(exprs) => self.eval_expr_list(exprs),
             MultiTests(exprs) => self.eval_multi_tests(exprs),
-        }
+        };
+        return match res {
+            Ok(v) => Ok(v),
+            Err(err) => Err(err.with_pos_if_zero(start_pos)),
+        };
     }
 
     #[inline(always)]
@@ -224,9 +314,18 @@ impl Engine {
         self.push_frame();
         let r = match self.eval(value_node.clone()) {
             Ok(_) => Ok(BoolV(true)),
-            Err(EvalError::IndexError)
-            | Err(EvalError::KeyError)
-            | Err(EvalError::VarNotFound(_)) => Ok(BoolV(false)),
+            Err(EvalError {
+                kind: IndexError,
+                pos: _,
+            })
+            | Err(EvalError {
+                kind: KeyError,
+                pos: _,
+            })
+            | Err(EvalError {
+                kind: VarNotFound(_),
+                pos: _,
+            }) => Ok(BoolV(false)),
             Err(err) => Err(err),
         };
         self.pop_frame();
@@ -245,7 +344,7 @@ impl Engine {
         if let Some(value) = self.resolve(name.clone()) {
             Ok(value)
         } else {
-            Err(EvalError::VarNotFound(name))
+            Err(EvalError::new(VarNotFound(name)))
         }
     }
 
@@ -301,13 +400,16 @@ impl Engine {
         end_open: bool,
     ) -> EvalResult {
         let start_value = self.eval(start_node)?;
-        let end_value = self.eval(end_node)?;
+        let end_value = self.eval(end_node.clone())?;
         if start_value.data_type() != end_value.data_type() {
-            return Err(EvalError::ValueError(format!(
-                "range start type {} != end type {}",
-                start_value.data_type(),
-                end_value.data_type()
-            )));
+            return Err(EvalError::new_with_pos(
+                EvalErrorKind::ValueError(format!(
+                    "range start type {} != end type {}",
+                    start_value.data_type(),
+                    end_value.data_type()
+                )),
+                end_node.start_position(),
+            ));
         }
         Ok(RangeV(RangeT {
             start_open,
@@ -406,7 +508,7 @@ impl Engine {
     fn eval_expr_list_in(&mut self, exprs: Vec<Box<Node>>) -> EvalResult {
         let left_value = self
             .resolve("?".to_owned())
-            .ok_or(EvalError::VarNotFound("?".to_owned()))?;
+            .ok_or(EvalError::new(VarNotFound("?".to_owned())))?;
         for expr in exprs.iter() {
             let res = self.eval(expr.clone())?;
             if let BoolV(true) = res {
@@ -461,10 +563,9 @@ impl Engine {
                 require_args,
             } => self.call_macro(&macro_, require_args, call_args),
             _ => {
-                return Err(EvalError::Runtime(format!(
-                    "cannot call non function {}",
-                    fref.data_type()
-                )))
+                return Err(EvalError::runtime(
+                    format!("cannot call non function {}", fref.data_type()).as_str(),
+                ))
             }
         }
     }
@@ -479,17 +580,17 @@ impl Engine {
     ) -> EvalResult {
         let call_args_len = call_args.len();
         if require_args.len() > call_args_len {
-            return Err(EvalError::Runtime(format!(
+            return Err(EvalError::new(Runtime(format!(
                 "too few arguments, expect at least {} args, found {}",
                 require_args.len(),
                 call_args_len
-            )));
+            ))));
         } else if var_arg.is_none() && require_args.len() + optional_args.len() < call_args.len() {
-            return Err(EvalError::Runtime(format!(
+            return Err(EvalError::new(Runtime(format!(
                 "too many arguments, expect at most {} args, found {}",
                 require_args.len() + optional_args.len(),
                 call_args_len
-            )));
+            ))));
         }
 
         let mut named_args: HashMap<String, Value> = HashMap::new();
@@ -509,11 +610,11 @@ impl Engine {
                         use_var_arg = true;
                         var_arg_name.as_str()
                     } else {
-                        return Err(EvalError::Runtime(format!(
+                        return Err(EvalError::new(Runtime(format!(
                             "too many arguments, expect at most {} args, found {}",
                             require_args.len() + optional_args.len(),
                             call_args_len
-                        )));
+                        ))));
                     };
                     positional_arg_index += 1;
                     implicit_arg_name
@@ -521,10 +622,10 @@ impl Engine {
                 a => a,
             };
             if named_args.contains_key(arg_name) {
-                return Err(EvalError::ValueError(format!(
+                return Err(EvalError::new(EvalErrorKind::ValueError(format!(
                     "argument {} already set",
                     arg_name
-                )));
+                ))));
             }
             let arg_value = self.eval(call_arg.arg)?;
             if use_var_arg {
@@ -550,12 +651,12 @@ impl Engine {
         call_args: Vec<FuncCallArg>,
     ) -> EvalResult {
         if require_args.len() > call_args.len() {
-            return Err(EvalError::Runtime(format!(
+            return Err(EvalError::new(Runtime(format!(
                 "call macro {} expect {} args, found {}",
                 macro_obj.name,
                 require_args.len(),
                 call_args.len()
-            )));
+            ))));
         }
 
         let mut args: HashMap<String, Box<Node>> = HashMap::new();
@@ -579,7 +680,9 @@ impl Engine {
         } = *func_def.syntax
         {
             if arg_names.len() > arg_values.len() {
-                return Err(EvalError::runtime("func call with too few arguments"));
+                return Err(EvalError::new(Runtime(
+                    "func call with too few arguments".to_owned(),
+                )));
             }
             self.push_frame();
             for (i, arg_name) in arg_names.iter().enumerate() {
@@ -590,10 +693,10 @@ impl Engine {
             self.pop_frame();
             result
         } else {
-            Err(EvalError::Runtime(format!(
+            Err(EvalError::new(Runtime(format!(
                 "cannot call non funct {}",
                 func_def
-            )))
+            ))))
         }
     }
 
@@ -614,7 +717,10 @@ impl Engine {
                     return Ok(BoolV(right_value.bool_value()));
                 }
             }
-            _ => Err(EvalError::Runtime(format!("un expected logic op {}", op))),
+            _ => Err(EvalError::new(Runtime(format!(
+                "un expected logic op {}",
+                op
+            )))),
         }
     }
 
@@ -637,7 +743,7 @@ impl Engine {
             "=" => Ok(BoolV(left_value == right_value)),
             "[]" => self.eval_binop_index(left_value, right_value),
             //"in" => self.eval_binop_in(left_value, right_value),
-            _ => return Err(EvalError::Runtime(format!("unknown op {}", op))),
+            _ => return Err(EvalError::new(Runtime(format!("unknown op {}", op)))),
         }
     }
 
@@ -647,10 +753,10 @@ impl Engine {
             ContextV(a) => match right_value {
                 StrV(k) => {
                     let m = a.borrow();
-                    let v = m.get(k).ok_or(EvalError::KeyError)?;
+                    let v = m.get(k).ok_or(EvalError::new(KeyError))?;
                     Ok(v)
                 }
-                _ => Err(EvalError::runtime("map key not string")),
+                _ => Err(EvalError::new(Runtime("map key not string".to_owned()))),
             },
             ArrayV(a) => match right_value {
                 NumberV(idx) => {
@@ -660,18 +766,18 @@ impl Engine {
                         || idx < Numeric::ONE
                         || idx > Numeric::from_usize(arr.len())
                     {
-                        return Err(EvalError::IndexError);
+                        return Err(EvalError::new(IndexError));
                     }
                     let idx0 = idx.to_usize().unwrap();
-                    let v = arr.get(idx0 - 1).ok_or(EvalError::IndexError)?;
+                    let v = arr.get(idx0 - 1).ok_or(EvalError::new(IndexError))?;
                     Ok(v.clone())
                 }
                 _ => Err(EvalError::runtime("array index not integer")),
             },
-            _ => Err(EvalError::Runtime(format!(
+            _ => Err(EvalError::new(Runtime(format!(
                 "value {} is not indexable",
                 left_value.data_type()
-            ))),
+            )))),
         }
     }
 
@@ -719,7 +825,7 @@ impl Engine {
         match left_value {
             ContextV(a) => {
                 let m = a.borrow();
-                let v = m.get(attr).ok_or(EvalError::KeyError)?;
+                let v = m.get(attr).ok_or(EvalError::new(KeyError))?;
                 Ok(v)
             }
             _ => Err(EvalError::runtime("map is not indexable")),
@@ -741,214 +847,221 @@ mod test {
     #[test]
     fn test_parse_stateless() {
         let testcases = [
-            ("2+ 4", "6"),
-            ("2 -5", "-3"),
-            ("8 - 2", "6"),
-            ("7 / 2", "3.5"), // decimal display outputs normalized string
-            ("10 / 3", "3.333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333"), // precision is up to 28
-            ("4 * 9 + 1", "37"),
-            ("8 % 5", "3"),
-            ("8 / 5", "1.6"),
-            ("true and false", "false"),
-            ("false or 2", "true"),
-            ("not (false or 2)", "false"),
+            (None, "2+ 4", "6"),
+            (None, "2 -5", "-3"),
+            (None, "8 - 2", "6"),
+            (None, "7 / 2", "3.5"), // decimal display outputs normalized string
+            (None, "10 / 3", "3.333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333"), // precision is up to 28
+            (None, "4 * 9 + 1", "37"),
+            (None, "8 % 5", "3"),
+            (None, "8 / 5", "1.6"),
+            (None, "true and false", "false"),
+            (None, "false or 2", "true"),
+            (None, "not (false or 2)", "false"),
             (
+                None,
                 r#"@"2023-06-01T10:33:20+01:00" + @"P3Y11M""#,
                 r#"date and time("2027-05-01T10:33:20+01:00")"#,
             ),
             (
+                None,
                 r#"@"2023-06-01T10:33:20+01:00" - @"P1Y2M""#,
                 r#"date and time("2022-04-01T10:33:20+01:00")"#,
             ),
             (
+                None,
                 r#" @"2023-06-01T10:33:20+01:00" - @"2022-04-01T10:33:20+01:00" "#,
                 r#"duration("P426DT0.2446661632S")"#,
             ),
-            (r#"@"2023-09-17" < @"2023-10-02""#, "true"),
-            (r#""abc" + "de\\nf""#, r#""abcde\nf""#),
-            ("2 < 3 - 1", "false"),
-            (r#""abc" <= "abd""#, "true"),
-            ("[6, 1, 2, -3][4]", "-3"),
-            ("[2, 8,false,true]", "[2, 8, false, true]"),
-            ("{a: 1, b: 2}", r#"{"a":1, "b":2}"#),
+            (None, r#"@"2023-09-17" < @"2023-10-02""#, "true"),
+            (None, r#""abc" + "de\\nf""#, r#""abcde\nf""#),
+            (None, "2 < 3 - 1", "false"),
+            (None, r#""abc" <= "abd""#, "true"),
+            (None, "[6, 1, 2, -3][4]", "-3"),
+            (None, "[2, 8,false,true]", "[2, 8, false, true]"),
+            (None, "{a: 1, b: 2}", r#"{"a":1, "b":2}"#),
             // in operator over ranges and arrays
-            ("5 in (5..8]", "false"),
-            ("5 in [5..8)", "true"),
-            ("8 in [5..8)", "false"),
-            ("8 in [5..8]", "true"),
-            (r#" "c" in ["a".."z"]"#, "true"),
-            (r#" "f" in ["a".."f")"#, "false"),
-            ("7 in [2, 7, 8]", "true"),
-            ("7 in [3, 99, -1]", "false"),
+            (None, "5 in (5..8]", "false"),
+            (None, "5 in [5..8)", "true"),
+            (None, "8 in [5..8)", "false"),
+            (None, "8 in [5..8]", "true"),
+            (None, r#" "c" in ["a".."z"]"#, "true"),
+            (None, r#" "f" in ["a".."f")"#, "false"),
+            (None, "7 in [2, 7, 8]", "true"),
+            (None, "7 in [3, 99, -1]", "false"),
             // if expr
-            ("if 2 > 3 then 6 else 8", "8"),
-            ("for a in [2, 3, 4] return a * 2", "[4, 6, 8]"), // simple for loop
+            (None, "if 2 > 3 then 6 else 8", "8"),
+            (None, "for a in [2, 3, 4] return a * 2", "[4, 6, 8]"), // simple for loop
             (
+                None,
                 "for a in [2, 3, 4], b in [8, 1, 2] return a + b",
                 "[[10, 3, 4], [11, 4, 5], [12, 5, 6]]",
             ),
-            ("some a in [2, 8, 3, 6] satisfies a > 4", "8"),
-            ("every a in [2, 8, 3, 6] satisfies a > 4", "[8, 6]"),
+            (None, "some a in [2, 8, 3, 6] satisfies a > 4", "8"),
+            (None, "every a in [2, 8, 3, 6] satisfies a > 4", "[8, 6]"),
             //("2 * 8; true; null; 9 / 3", "3"),
-            ("2 in (>=5, <3)", "true"),
+            (None, "2 in (>=5, <3)", "true"),
 
-            (r#"set("a", 5); a + 10.3"#, "15.3"), // expression list
-            (r#"set("?", 5); >6, =8, < 3"#, "false"), // multi tests
-            (r#"set("?", 5); >6, <8, < 3"#, "true"),
-            (r#"is defined(a)"#, "false"),
-            (r#"is defined([1, 2][1])"#, "true"),
-            (r#"is defined([1, 2][-1])"#, "false"),
-            (r#"is defined([1, 2][6])"#, "false"),
+            (Some("{a: 5}"), r#"a + 10.3"#, "15.3"), // expression list
+            (Some(r#"{"?": 5}"#), r#">6, =8, < 3"#, "false"), // multi tests
+            (Some(r#"{"?": 5}"#), r#">6, <8, < 3"#, "true"),
+            (None, r#"is defined(a)"#, "false"),
+            (None, r#"is defined([1, 2][1])"#, "true"),
+            (None, r#"is defined([1, 2][-1])"#, "false"),
+            (None, r#"is defined([1, 2][6])"#, "false"),
             // test prelude functions
-            ("not(2>1)", "false"),
-            (r#"number("3000.888")"#, "3000.888"),
-            (r#"string length("hello world")"#, "11"),
-            (r#"string join(["hello", "world", "again"], ", ", ":")"#, r#"":hello, world, again""#),
+            (None, "not(2>1)", "false"),
+            (None, r#"number("3000.888")"#, "3000.888"),
+            (None, r#"string length("hello world")"#, "11"),
+            (None, r#"string join(["hello", "world", "again"], ", ", ":")"#, r#"":hello, world, again""#),
             // boolean functions
-            (r#"get or else("this", "default")"#, r#""this""#),
-            (r#"get or else(null, "default")"#, r#""default""#),
-            ("get or else(null, null)", "null"),
+            (None, r#"get or else("this", "default")"#, r#""this""#),
+            (None, r#"get or else(null, "default")"#, r#""default""#),
+            (None, "get or else(null, null)", "null"),
             // number functions
-            ("decimal(1/3, 2)", "0.33"),
-            ("decimal(1.5, 0)", "2"),
-            ("decimal(1.5)", "1.5"),
-            (r#"decimal("1.56", 9)"#, "1.560000000"),
+            (None, "decimal(1/3, 2)", "0.33"),
+            (None, "decimal(1.5, 0)", "2"),
+            (None, "decimal(1.5)", "1.5"),
+            (None, r#"decimal("1.56", 9)"#, "1.560000000"),
 
-            ("floor(1.5)", "1"),
-            ("floor(-1.5)", "-2"),
-            ("floor(-1.56, 1)", "-1.6"),
-            ("ceiling(1.5)", "2"),
-            ("ceiling(-1.5)", "-1"),
-            ("ceiling(-1.56, 1)", "-1.5"),
-            ("decimal(log(10), 12)", "2.302585092994"),
-            ("odd(5)", "true"),
-            ("odd(2)", "false"),
-            ("even(5)", "false"),
-            ("even(2)", "true"),
+            (None, "floor(1.5)", "1"),
+            (None, "floor(-1.5)", "-2"),
+            (None, "floor(-1.56, 1)", "-1.6"),
+            (None, "ceiling(1.5)", "2"),
+            (None, "ceiling(-1.5)", "-1"),
+            (None, "ceiling(-1.56, 1)", "-1.5"),
+            (None, "decimal(log(10), 12)", "2.302585092994"),
+            (None, "odd(5)", "true"),
+            (None, "odd(2)", "false"),
+            (None, "even(5)", "false"),
+            (None, "even(2)", "true"),
 
             // list functions
-            ("list contains([2, 8, -1], 8)", "true"),
-            (r#"list contains([2, 8, "hello"], "world")"#, "false"),
-            ("count(1, 2, 4, 9, -3)", "5"),
-            ("count()", "0"),
-            ("min(31, -1, 9, 8, -1, -99)", "-99"),
-            ("min(31, -1, 9, false, -1, -99)", "-99"),
-            ("max(31, -1, 9, 8, -1, -99)", "31"),
-            ("sum(31, -1, 9, false, -1, -99)", "-61"),  
-            ("sort([3, -1, 2])", "[-1, 2, 3]"),
-            ("sublist([1,2,3], 2)", "[2, 3]"),
-            ("sublist([1,2,3], 1, 2)", "[1, 2]"),
-            ("append([1], 2, 3)", "[1, 2, 3]"),
-            ("append([1, 2, 3])", "[1, 2, 3]"),
-            ("concatenate([1,2],[3])", "[1, 2, 3]"),
-            ("concatenate([1],[2],[3])", "[1, 2, 3]"),
-            ("insert before([1, 3], 1, 2)", "[2, 1, 3]"),
-            ("remove([1,2,3], 2)", "[1, 3]"),
-            ("reverse([1,2,3])", "[3, 2, 1]"),
-            ("index of([1,2,3,2], 2)", "[2, 4]"),
+            (None, "list contains([2, 8, -1], 8)", "true"),
+            (None, r#"list contains([2, 8, "hello"], "world")"#, "false"),
+            (None, "count(1, 2, 4, 9, -3)", "5"),
+            (None, "count()", "0"),
+            (None, "min(31, -1, 9, 8, -1, -99)", "-99"),
+            (None, "min(31, -1, 9, false, -1, -99)", "-99"),
+            (None, "max(31, -1, 9, 8, -1, -99)", "31"),
+            (None, "sum(31, -1, 9, false, -1, -99)", "-61"),  
+            (None, "sort([3, -1, 2])", "[-1, 2, 3]"),
+            (None, "sublist([1,2,3], 2)", "[2, 3]"),
+            (None, "sublist([1,2,3], 1, 2)", "[1, 2]"),
+            (None, "append([1], 2, 3)", "[1, 2, 3]"),
+            (None, "append([1, 2, 3])", "[1, 2, 3]"),
+            (None, "concatenate([1,2],[3])", "[1, 2, 3]"),
+            (None, "concatenate([1],[2],[3])", "[1, 2, 3]"),
+            (None, "insert before([1, 3], 1, 2)", "[2, 1, 3]"),
+            (None, "remove([1,2,3], 2)", "[1, 3]"),
+            (None, "reverse([1,2,3])", "[3, 2, 1]"),
+            (None, "index of([1,2,3,2], 2)", "[2, 4]"),
             // test context functions
-            (r#"get value({"a": 5, b: 9}, "b")"#, "9"),
-            (r#"get value({"a": 5, b: {"c k": {m: 5}}}, ["b", "c k", "m"])"#, "5"),
-            (r#"context put({"o":8}, ["a", "b", "c d"], 3)"#, r#"{"a":{"b":{"c d":3}}, "o":8}"#),
-            (r#"context put({a: {b: {"c d":3}}, o:8}, ["a", "b", "c d"], 6)"#, r#"{"a":{"b":{"c d":6}}, "o":8}"#),
-            ("context merge([{a:1}, {b:2}, {c:3}])", r#"{"a":1, "b":2, "c":3}"#),
-            ("get entries({a: 2, b: 8})", r#"[{"key":"a", "value":2}, {"key":"b", "value":8}]"#),
+            (None, r#"get value({"a": 5, b: 9}, "b")"#, "9"),
+            (None, r#"get value({"a": 5, b: {"c k": {m: 5}}}, ["b", "c k", "m"])"#, "5"),
+            (None, r#"context put({"o":8}, ["a", "b", "c d"], 3)"#, r#"{"a":{"b":{"c d":3}}, "o":8}"#),
+            (None, r#"context put({a: {b: {"c d":3}}, o:8}, ["a", "b", "c d"], 6)"#, r#"{"a":{"b":{"c d":6}}, "o":8}"#),
+            (None, "context merge([{a:1}, {b:2}, {c:3}])", r#"{"a":1, "b":2, "c":3}"#),
+            (None, "get entries({a: 2, b: 8})", r#"[{"key":"a", "value":2}, {"key":"b", "value":8}]"#),
 
             // test range functions
-            ("before(1, 10)", "true"),
-            ("before(10, 1)", "false"),
-            ("before([1..5], 10)", "true"),
-            ("before(1, [2..5])", "true"),
-            ("before(3, [2..5])", "false"),
+            (None, "before(1, 10)", "true"),
+            (None, "before(10, 1)", "false"),
+            (None, "before([1..5], 10)", "true"),
+            (None, "before(1, [2..5])", "true"),
+            (None, "before(3, [2..5])", "false"),
 
-            ("before([1..5),[5..10])", "true"),
-            ("before([1..5),(5..10])", "true"),
-            ("before([1..5],[5..10])", "false"),
-            ("before([1..5),(5..10])", "true"),
+            (None, "before([1..5),[5..10])", "true"),
+            (None, "before([1..5),(5..10])", "true"),
+            (None, "before([1..5],[5..10])", "false"),
+            (None, "before([1..5),(5..10])", "true"),
 
-            ("after([5..10], [1..5))", "true"),
-            ("after((5..10], [1..5))", "true"),
-            ("after([5..10], [1..5])", "false"),
-            ("after((5..10], [1..5))", "true"),
+            (None, "after([5..10], [1..5))", "true"),
+            (None, "after((5..10], [1..5))", "true"),
+            (None, "after([5..10], [1..5])", "false"),
+            (None, "after((5..10], [1..5))", "true"),
 
-            ("meets([1..5], [5..10])", "true"),
-            ("meets([1..3], [4..6])", "false"),
-            ("meets([1..3], [3..5])", "true"),
-            ("meets([1..5], (5..8])", "false"),
+            (None, "meets([1..5], [5..10])", "true"),
+            (None, "meets([1..3], [4..6])", "false"),
+            (None, "meets([1..3], [3..5])", "true"),
+            (None, "meets([1..5], (5..8])", "false"),
 
-            ("met by([5..10], [1..5])", "true"),
-            ("met by([3..4], [1..2])", "false"),
-            ("met by([3..5], [1..3])", "true"),
-            ("met by((5..8], [1..5))", "false"),
-            ("met by([5..10], [1..5))", "false"),
+            (None, "met by([5..10], [1..5])", "true"),
+            (None, "met by([3..4], [1..2])", "false"),
+            (None, "met by([3..5], [1..3])", "true"),
+            (None, "met by((5..8], [1..5))", "false"),
+            (None, "met by([5..10], [1..5))", "false"),
 
 
-            ("overlaps([5..10], [1..6])", "true"),
-            ("overlaps((3..7], [1..4])", "true"),
-            ("overlaps([1..3], (3..6])", "false"),
-            ("overlaps((5..8], [1..5))", "false"),
-            ("overlaps([4..10], [1..5))", "true"),
+            (None, "overlaps([5..10], [1..6])", "true"),
+            (None, "overlaps((3..7], [1..4])", "true"),
+            (None, "overlaps([1..3], (3..6])", "false"),
+            (None, "overlaps((5..8], [1..5))", "false"),
+            (None, "overlaps([4..10], [1..5))", "true"),
 
-            ("overlaps before([1..5], [4..10])", "true"),
-            ("overlaps before([3..4], [1..2])", "false"),
-            ("overlaps before([1..3], (3..5])", "false"),
-            ("overlaps before([1..5), (3..8])", "true"),
-            ("overlaps before([1..5), [5..10])", "false"),
+            (None, "overlaps before([1..5], [4..10])", "true"),
+            (None, "overlaps before([3..4], [1..2])", "false"),
+            (None, "overlaps before([1..3], (3..5])", "false"),
+            (None, "overlaps before([1..5), (3..8])", "true"),
+            (None, "overlaps before([1..5), [5..10])", "false"),
 
-            ("overlaps after([4..10], [1..5])", "true"),
-            ("overlaps after([3..4], [1..2])", "false"),
-            ("overlaps after([3..5], [1..3))", "false"),
-            ("overlaps after((5..8], [1..5))", "false"),
-            ("overlaps after([4..10], [1..5))", "true"),
+            (None, "overlaps after([4..10], [1..5])", "true"),
+            (None, "overlaps after([3..4], [1..2])", "false"),
+            (None, "overlaps after([3..5], [1..3))", "false"),
+            (None, "overlaps after((5..8], [1..5))", "false"),
+            (None, "overlaps after([4..10], [1..5))", "true"),
 
-            ("finishes(5, [1..5])", "true"),
-            ("finishes(10, [1..7])", "false"),
-            ("finishes([3..5], [1..5])", "true"),
-            ("finishes((1..5], [1..5))", "false"),
-            ("finishes([5..10], [1..10))", "false"),
+            (None, "finishes(5, [1..5])", "true"),
+            (None, "finishes(10, [1..7])", "false"),
+            (None, "finishes([3..5], [1..5])", "true"),
+            (None, "finishes((1..5], [1..5))", "false"),
+            (None, "finishes([5..10], [1..10))", "false"),
 
-            ("finished by([5..10], 10)", "true"),
-            ("finished by([3..4], 2)", "false"),
+            (None, "finished by([5..10], 10)", "true"),
+            (None, "finished by([3..4], 2)", "false"),
 
-            ("finished by([1..5], [3..5])", "true"),
-            ("finished by((5..8], [1..5))", "false"),
-            ("finished by([5..10], (1..10))", "false"),
+            (None, "finished by([1..5], [3..5])", "true"),
+            (None, "finished by((5..8], [1..5))", "false"),
+            (None, "finished by([5..10], (1..10))", "false"),
 
-            ("includes([5..10], 6)", "true"),
-            ("includes([3..4], 5)", "false"),
-            ("includes([1..10], [4..6])", "true"),
-            ("includes((5..8], [1..5))", "false"),
-            ("includes([1..10], [1..5))", "true"),
+            (None, "includes([5..10], 6)", "true"),
+            (None, "includes([3..4], 5)", "false"),
+            (None, "includes([1..10], [4..6])", "true"),
+            (None, "includes((5..8], [1..5))", "false"),
+            (None, "includes([1..10], [1..5))", "true"),
 
-            ("during(5, [1..10])", "true"),
-            ("during(12, [1..10])", "false"),
-            ("during(1, (1..10])", "false"),
-            ("during([4..6], [1..10))", "true"),
-            ("during((1..5], (1..10])", "true"),
+            (None, "during(5, [1..10])", "true"),
+            (None, "during(12, [1..10])", "false"),
+            (None, "during(1, (1..10])", "false"),
+            (None, "during([4..6], [1..10))", "true"),
+            (None, "during((1..5], (1..10])", "true"),
 
-            ("starts(1, [1..5])", "true"),
-            ("starts(1, (1..8])", "false"),
-            ("starts((1..5], [1..5])", "false"),
-            ("starts([1..10], [1..10])", "true"),
-            ("starts((1..10), (1..10))", "true"),
+            (None, "starts(1, [1..5])", "true"),
+            (None, "starts(1, (1..8])", "false"),
+            (None, "starts((1..5], [1..5])", "false"),
+            (None, "starts([1..10], [1..10])", "true"),
+            (None, "starts((1..10), (1..10))", "true"),
 
-            ("started by([1..10], 1)", "true"),
-            ("started by((1..10], 1)", "false"),
-            ("started by([1..10], [1..5])", "true"),
-            ("started by((1..10], [1..5))", "false"),
-            ("started by([1..10], [1..10))", "true"),
+            (None, "started by([1..10], 1)", "true"),
+            (None, "started by((1..10], 1)", "false"),
+            (None, "started by([1..10], [1..5])", "true"),
+            (None, "started by((1..10], [1..5))", "false"),
+            (None, "started by([1..10], [1..10))", "true"),
 
-            ("coincides([1..5], [1..5])", "true"),
-            ("coincides((1..5], [1..5))", "false"),
-            ("coincides([1..5], [2..6])", "false"),
+            (None, "coincides([1..5], [1..5])", "true"),
+            (None, "coincides((1..5], [1..5))", "false"),
+            (None, "coincides([1..5], [2..6])", "false"),
 
             // temporal functions
-            (r#"date and time("2018-04-29T09:30:00+07:00")"#, r#"date and time("2018-04-29T09:30:00+07:00")"# ),
+            (None, r#"date and time("2018-04-29T09:30:00+07:00")"#, r#"date and time("2018-04-29T09:30:00+07:00")"# ),
         ];
 
-        for (input, output) in testcases {
+        for (ctx, input, output) in testcases {
             let mut eng = super::Engine::new();
             //println!("parse input {input}");
+            if let Some(ctx_input) = ctx {
+                eng.load_context(ctx_input).unwrap();
+            }
             let node = parse(input).unwrap();
             let v = eng.eval(node).unwrap();
             assert_eq!(v.to_string(), output, "output mismatch input: '{}'", input);
@@ -971,9 +1084,7 @@ mod test {
     #[test]
     fn test_native_func_set() {
         let mut eng = super::Engine::new();
-        let input = r#"set("hi", 5)"#;
-        let node = parse(input).unwrap();
-        let _ = eng.eval(node).unwrap();
+        eng.load_context("{hi: 5}").unwrap();
 
         let input1 = r#"hi + 3"#;
         let node1 = parse(input1).unwrap();
@@ -984,9 +1095,7 @@ mod test {
     #[test]
     fn test_func_call() {
         let mut eng = super::Engine::new();
-        let input = r#"set("add2", function(a, b) a+b)"#;
-        let node = parse(input).unwrap();
-        let _ = eng.eval(node).unwrap();
+        eng.load_context(r#"{add2: (function(a, b) a+b)}"#).unwrap();
 
         let input1 = r#"add2(4.5, 9)"#;
         let node1 = parse(input1).unwrap();

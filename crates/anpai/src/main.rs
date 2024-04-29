@@ -1,7 +1,6 @@
 use clap::*;
 use feel_lang::eval;
 use feel_lang::parse;
-use feel_lang::scan::TextPosition;
 use fileinput::FileInput;
 use std::io::{BufRead, BufReader};
 
@@ -33,11 +32,8 @@ impl FEELCommands {
         code: &str,
         dump_ast: bool,
         json_format: bool,
-    ) -> Result<(), (eval::EvalError, TextPosition)> {
-        let n = match parse::parse(code) {
-            Ok(v) => v,
-            Err((err, pos)) => return Err((eval::EvalError::from(err), pos)),
-        };
+    ) -> Result<(), eval::EvalError> {
+        let n = parse::parse(code)?;
         if dump_ast {
             if json_format {
                 let serialized = serde_json::to_string_pretty(&n).unwrap();
@@ -47,10 +43,7 @@ impl FEELCommands {
             }
         } else {
             let mut eng = eval::Engine::new();
-            let res = match eng.eval(n.clone()) {
-                Ok(v) => v,
-                Err(err) => return Err((err, n.start_pos)),
-            };
+            let res = eng.eval(n.clone())?;
             println!("{}", res);
         }
         Ok(())
@@ -84,12 +77,12 @@ impl FEELCommands {
                 };
                 match self.parse_and_eval(input.as_str(), *ast, *json) {
                     Ok(_) => (),
-                    Err((err, pos)) => {
+                    Err(err) => {
                         eprintln!(
                             "{}\nPosition: {}\n\n{}",
-                            err,
-                            pos,
-                            pos.line_pointers(input.as_str())
+                            err.kind,
+                            err.pos,
+                            err.pos.line_pointers(input.as_str())
                         );
                     }
                 }
