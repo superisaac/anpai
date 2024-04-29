@@ -19,6 +19,9 @@ enum FEELCommands {
         #[arg(short, long, help = "output format is JSON")]
         json: bool,
 
+        #[arg(short, long, help = "context variables")]
+        vars: Option<String>,
+
         #[arg(short, long, help = "given input as string instead of from files")]
         code: Option<String>,
 
@@ -30,6 +33,7 @@ impl FEELCommands {
     fn parse_and_eval(
         &self,
         code: &str,
+        vars: Option<String>,
         dump_ast: bool,
         json_format: bool,
     ) -> Result<(), eval::EvalError> {
@@ -43,6 +47,9 @@ impl FEELCommands {
             }
         } else {
             let mut eng = eval::Engine::new();
+            if let Some(context_vars) = vars {
+                eng.load_context(&context_vars)?;
+            }
             let res = eng.eval(n.clone())?;
             println!("{}", res);
         }
@@ -54,6 +61,7 @@ impl FEELCommands {
             Self::Feel {
                 ast,
                 json,
+                vars,
                 code,
                 files,
             } => {
@@ -75,7 +83,7 @@ impl FEELCommands {
                     //self.parse_and_eval(buf.as_str())
                     buf
                 };
-                match self.parse_and_eval(input.as_str(), *ast, *json) {
+                match self.parse_and_eval(input.as_str(), vars.clone(), *ast, *json) {
                     Ok(_) => (),
                     Err(err) => {
                         eprintln!(

@@ -23,7 +23,7 @@ interpreter.
 13
 
 # dump AST tree instead of evaluating the script
-% ./target/debug/anpai feel -c 'bind("a", 5); if a > 3 then "larger" else "smaller"' --ast
+% ./target/debug/anpai feel -c 'if a > 3 then "larger" else "smaller"' -v '{a: 5}' --ast
 (expr-list (call bind ["a", 5]) (if (> a 3) "larger" "smaller"))
 
 % ./target/debug/anpai feel -c 'some x in [3, 4, 8, 9] satisfies x % 2 = 0'
