@@ -2,7 +2,9 @@ use clap::*;
 use feel_lang::eval;
 use feel_lang::parse;
 use fileinput::FileInput;
-use std::io::{BufRead, BufReader};
+use std::fs::File;
+use std::io::BufReader;
+use std::io::Read;
 
 #[derive(Parser, Debug)]
 #[clap(
@@ -19,7 +21,10 @@ enum FEELCommands {
         #[arg(short, long, help = "output format is JSON")]
         json: bool,
 
-        #[arg(short, long, help = "context variables")]
+        #[arg(long, help = "context variables")]
+        varsfile: Option<String>,
+
+        #[arg(long, help = "context variables")]
         vars: Option<String>,
 
         #[arg(short, long, help = "given input as string instead of from files")]
@@ -33,6 +38,7 @@ impl FEELCommands {
     fn parse_and_eval(
         &self,
         code: &str,
+        varsfile: Option<String>,
         vars: Option<String>,
         dump_ast: bool,
         json_format: bool,
@@ -47,6 +53,14 @@ impl FEELCommands {
             }
         } else {
             let mut eng = eval::Engine::new();
+
+            // read context vars
+            if let Some(context_varsfile) = varsfile {
+                let mut data_file = File::open(context_varsfile.as_str()).unwrap();
+                let mut content = String::new();
+                data_file.read_to_string(&mut content).unwrap();
+                eng.load_context(&content)?;
+            }
             if let Some(context_vars) = vars {
                 eng.load_context(&context_vars)?;
             }
@@ -61,6 +75,7 @@ impl FEELCommands {
             Self::Feel {
                 ast,
                 json,
+                varsfile,
                 vars,
                 code,
                 files,
@@ -71,19 +86,20 @@ impl FEELCommands {
                 } else {
                     let filenames: Vec<&str> = files.iter().map(|s| s.as_str()).collect();
                     let fileinput = FileInput::new(&filenames);
-                    let reader = BufReader::new(fileinput);
+                    let mut reader = BufReader::new(fileinput);
 
                     // read all contents from either files or stdin
                     let mut buf: String = String::new();
-                    for res in reader.lines() {
-                        let line = res.unwrap();
-                        buf.push_str(line.as_str());
-                        buf.push_str("\n");
-                    }
-                    //self.parse_and_eval(buf.as_str())
+                    reader.read_to_string(&mut buf).unwrap();
                     buf
                 };
-                match self.parse_and_eval(input.as_str(), vars.clone(), *ast, *json) {
+                match self.parse_and_eval(
+                    input.as_str(),
+                    varsfile.clone(),
+                    vars.clone(),
+                    *ast,
+                    *json,
+                ) {
                     Ok(_) => (),
                     Err(err) => {
                         eprintln!(
