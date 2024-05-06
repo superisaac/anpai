@@ -13,7 +13,7 @@ use std::io::Read;
     rename_all = "kebab-case"
 )]
 enum FEELCommands {
-    #[clap(name = "feel", about = "run feel language intepreter")]
+    #[clap(name = "feel", about = "run feel language intepretor")]
     Feel {
         #[arg(short, long, help = "dump AST node instead of evaluating")]
         ast: bool,
