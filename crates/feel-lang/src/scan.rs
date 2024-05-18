@@ -237,7 +237,7 @@ lazy_static! {
             token: "name",
             //reg: Some(Regex::new(r"^[a-zA-Z_][a-zA-Z_0-9]*( +[a-zA-Z_][a-zA-Z_0-9]*)*").unwrap()),
             reg: Some(Regex::new(r"(?x)
-            ^[a-zA-Z_\$\\?\%\p{Han}\p{Greek}\p{Bopomofo}\p{Hangul}][a-zA-Z_\$\\?\%0-9\p{Han}\p{Greek}}\p{Bopomofo}\p{Hangul}]*
+            ^[a-zA-Z_\$\?\%\p{Han}\p{Greek}\p{Bopomofo}\p{Hangul}][a-zA-Z_\$\?\%0-9\p{Han}\p{Greek}\p{Bopomofo}\p{Hangul}]*
             ").unwrap()),
         });
 

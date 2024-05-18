@@ -730,7 +730,6 @@ impl Parser<'_> {
         let exp = self.parse_expression()?;
         let end_pos = self.scanner.current_token().position;
         let func_code = self.scanner.text_range(start_pos.chars, end_pos.chars);
-
         Ok(Node::new(
             FuncDef {
                 arg_names,
