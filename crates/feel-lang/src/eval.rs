@@ -905,6 +905,8 @@ mod test {
             (Some("{a: 5}"), r#"a + 10.3"#, "15.3"), // expression list
             (Some(r#"{"?": 5}"#), r#">6, =8, < 3"#, "false"), // multi tests
             (Some(r#"{"?": 5}"#), r#">6, <8, < 3"#, "true"),
+            (Some(r#"{"???": 5}"#), r#"??? + 6"#, "11"),
+            //(Some(r#"{"?": 5}"#), r#"?>6, ?<8, < 3"#, "true"),
             (None, r#"is defined(a)"#, "false"),
             (None, r#"is defined([1, 2][1])"#, "true"),
             (None, r#"is defined([1, 2][-1])"#, "false"),

@@ -318,10 +318,6 @@ impl Parser<'_> {
             "{" => self.parse_map(),
             "(" => self.parse_bracket_or_range(),
             "[" => self.parse_range_or_array(),
-            "?" => Ok(Node::new(
-                Var("?".to_owned()),
-                self.scanner.current_token().position,
-            )),
             "keyword" => match self.scanner.current_token().value.as_str() {
                 "true" | "false" => self.parse_bool(),
                 "null" => self.parse_null(),
