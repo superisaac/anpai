@@ -54,6 +54,14 @@ impl Prelude {
             None => None,
         }
     }
+
+    pub fn has_name(&self, name: String) -> bool {
+        match self.vars.get(&name) {
+            Some(_v) => true,
+            None => false,
+        }
+    }
+
     pub fn add_macro(&mut self, name: &str, require_args: &[&str], body: MacroBody) {
         let require_args_vec = require_args.into_iter().map(|s| String::from(*s)).collect();
         let macro_ = MacroT {

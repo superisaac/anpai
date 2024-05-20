@@ -1,6 +1,9 @@
 use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
+use crate::eval::Engine;
 use crate::helpers::find_duplicate;
-use crate::scan::{ScanError, Scanner, TextPosition};
+use crate::scan::{ScanError, Scanner, TextPosition, Token};
+
+use std::backtrace::Backtrace;
 use std::error::Error;
 use std::fmt;
 
@@ -47,31 +50,49 @@ type NodeResult = Result<Box<Node>, ParseError>;
 
 pub struct Parser<'a> {
     scanner: Box<Scanner<'a>>,
+    engine: Box<Engine>,
 }
 
 // shortcuts to go ahead one token
 macro_rules! goahead {
     ($parser:ident) => {
         let _ = $parser.scanner.next_token()?;
-        // if let Err(err) = $parser.scanner.next_token() {
-        //     return Err(err);
-        // }
     };
 }
 
 impl Parser<'_> {
-    pub fn new(input: &str) -> Parser {
+    pub fn new<'a>(input: &str, engine: Box<Engine>) -> Parser {
         let scanner = Scanner::new(input);
         Parser {
             scanner: Box::new(scanner),
+            engine,
         }
     }
 
     fn unexpect(&self, expects: &str) -> ParseError {
+        // let mut stack_str = String::new();
+        // for (i, name) in self.call_stack.iter().enumerate() {
+        //     if i > 0 {
+        //         stack_str.push_str(", ");
+        //     }
+        //     stack_str.push_str(name);
+        // }
+
+        let bt = Backtrace::force_capture();
+        let mut stack_str = String::new();
+        for (i, frame) in bt.frames().iter().enumerate() {
+            if i > 0 {
+                stack_str.push_str("\n");
+            }
+            stack_str.push_str(format!("{:?}", frame).as_str());
+        }
+        //let stack_str = format!("{:?}", bt);
+
         ParseError::new(format!(
-            "unexpected token {}, expect {}",
+            "unexpected token {}, expect {}, stack {}",
             self.scanner.current_token().kind,
-            expects
+            expects,
+            stack_str,
         ))
     }
 
@@ -84,6 +105,7 @@ impl Parser<'_> {
     }
 
     pub fn parse(&mut self) -> NodeResult {
+        //calltrace!(self, "parse", {
         let mut exprs: Vec<Box<Node>> = Vec::new();
         goahead!(self);
         let start_pos = self.scanner.current_token().position;
@@ -99,6 +121,7 @@ impl Parser<'_> {
         } else {
             return Ok(Node::new(ExprList(exprs), start_pos));
         }
+        //})
     }
 
     // fn parse_multi_tests_element(&mut self) -> NodeResult {
@@ -334,9 +357,12 @@ impl Parser<'_> {
     }
 
     fn parse_name(&mut self, stop_keywords: Option<&[&str]>) -> Result<String, ParseError> {
-        let mut names: Vec<String> = Vec::new();
+        let mut token_stack: Vec<Token> = Vec::new();
 
-        while self.scanner.expect_kinds(&["name", "keyword"]) {
+        while self
+            .scanner
+            .expect_kinds(&["name", "keyword", "+", "-", "*", "/"])
+        {
             let token = self.scanner.current_token();
             if let ("keyword", Some(stop_keywords)) = (token.kind, stop_keywords) {
                 let token_keyword = token.value.as_str();
@@ -344,21 +370,67 @@ impl Parser<'_> {
                     break;
                 }
             }
-            names.push(token.value);
+            token_stack.push(token);
             goahead!(self);
         }
-        if names.len() > 0 {
+        while token_stack.len() > 0 {
             let mut name_buffer = String::new();
-            for (i, name) in names.iter().enumerate() {
-                if i > 0 {
+            let mut found_op = false;
+            for (i, t) in token_stack.iter().enumerate() {
+                if t.kind != "keyword" && t.kind != "name" {
+                    found_op = true;
+                }
+                if i > 0
+                    && (token_stack[i - 1].position.chars + token_stack[i - 1].value.len()
+                        < t.position.chars)
+                {
                     name_buffer.push_str(" ");
                 }
-                name_buffer.push_str(name.as_str());
+                name_buffer.push_str(t.value.as_str());
             }
-            Ok(name_buffer)
-        } else {
-            Err(self.unexpect("names"))
+            if !found_op || self.engine.has_name(name_buffer.clone()) {
+                return Ok(name_buffer);
+            }
+            if let Some(token) = token_stack.pop() {
+                self.scanner.rewind(token);
+            }
         }
+
+        Err(self.unexpect("names"))
+    }
+
+    fn parse_var_name(&mut self, stop_keywords: Option<&[&str]>) -> Result<String, ParseError> {
+        let mut token_stack: Vec<Token> = Vec::new();
+
+        while self
+            .scanner
+            .expect_kinds(&["name", "keyword", "+", "-", "*", "/"])
+        {
+            let token = self.scanner.current_token();
+            if let ("keyword", Some(stop_keywords)) = (token.kind, stop_keywords) {
+                let token_keyword = token.value.as_str();
+                if stop_keywords.into_iter().any(|x| *x == token_keyword) {
+                    break;
+                }
+            }
+            token_stack.push(token);
+            goahead!(self);
+        }
+        if token_stack.len() > 0 {
+            let mut name_buffer = String::new();
+            for (i, t) in token_stack.iter().enumerate() {
+                if i > 0
+                    && (token_stack[i - 1].position.chars + token_stack[i - 1].value.len()
+                        < t.position.chars)
+                {
+                    name_buffer.push_str(" ");
+                }
+                name_buffer.push_str(t.value.as_str());
+            }
+            return Ok(name_buffer);
+        }
+
+        Err(self.unexpect("names"))
     }
 
     fn parse_var(&mut self) -> NodeResult {
@@ -461,7 +533,7 @@ impl Parser<'_> {
     fn parse_map_key(&mut self) -> NodeResult {
         if self.scanner.expect("name") {
             let start_pos = self.scanner.current_token().position;
-            match self.parse_name(None) {
+            match self.parse_var_name(None) {
                 Ok(name) => Ok(Node::new(Ident(name), start_pos)),
                 Err(err) => Err(err),
             }
@@ -621,7 +693,7 @@ impl Parser<'_> {
     fn parse_for_expression(&mut self) -> NodeResult {
         let start_pos = self.scanner.current_token().position;
         goahead!(self); // skip 'for'
-        let var_name = self.parse_name(Some(&["in", "for"]))?;
+        let var_name = self.parse_var_name(Some(&["in", "for"]))?;
         if !self.scanner.expect_keyword("in") {
             return Err(self.unexpect_keyword("in"));
         }
@@ -661,7 +733,7 @@ impl Parser<'_> {
         let start_pos = self.scanner.current_token().position;
         let cmd = self.scanner.current_token().value;
         goahead!(self); // skip 'some'|'every'
-        let var_name = self.parse_name(Some(&["in"]))?;
+        let var_name = self.parse_var_name(Some(&["in"]))?;
 
         if !self.scanner.expect_keyword("in") {
             return Err(self.unexpect_keyword("in"));
@@ -741,8 +813,8 @@ impl Parser<'_> {
     }
 }
 
-pub fn parse(input: &str) -> Result<Box<Node>, (ParseError, TextPosition)> {
-    let mut parser = Parser::new(input);
+pub fn parse(input: &str, engine: Box<Engine>) -> Result<Box<Node>, (ParseError, TextPosition)> {
+    let mut parser = Parser::new(input, engine);
     match parser.parse() {
         Ok(n) => Ok(n),
         Err(err) => Err((err, parser.scanner.current_token().position)),
@@ -751,6 +823,7 @@ pub fn parse(input: &str) -> Result<Box<Node>, (ParseError, TextPosition)> {
 
 #[cfg(test)]
 mod test {
+    use crate::eval::Engine;
     use core::assert_matches::assert_matches;
     #[test]
     fn test_parse_results() {
@@ -763,15 +836,23 @@ mod test {
         ];
 
         for (input, output) in testcases {
-            let node = super::parse(input).unwrap();
-            assert_eq!(format!("{}", *node), output);
+            let engine = Box::new(Engine::new());
+            let node = super::parse(input, engine).unwrap();
+            assert_eq!(
+                format!("{}", *node),
+                output,
+                "output {} mismatch input {}",
+                output,
+                input
+            );
         }
     }
 
     #[test]
     fn test_parse_func_def() {
         let input = "function(a, b) a + b   ";
-        let node = super::parse(input).unwrap();
+        let engine = Box::new(Engine::new());
+        let node = super::parse(input, engine).unwrap();
         assert_matches!(
             *(node.syntax),
             crate::ast::NodeSyntax::FuncDef {
@@ -792,7 +873,8 @@ mod test {
 
     #[test]
     fn test_parse_dup_arg_name() {
-        let res = super::parse("function(a, b, a) a+ b");
+        let engine = Box::new(Engine::new());
+        let res = super::parse("function(a, b, a) a+ b", engine);
         assert_matches!(res, Err((super::ParseError::Parse(x), _)) if x == "function has duplication arg name `a`".to_owned());
     }
 }

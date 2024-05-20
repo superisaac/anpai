@@ -86,7 +86,7 @@ impl TextPosition {
 }
 
 // Token struct
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Token {
     pub kind: &'static str,
     pub value: String,
@@ -365,6 +365,11 @@ impl Scanner<'_> {
             }
         }
         Err(ScanError::from_str("fail to find token"))
+    }
+
+    pub fn rewind(&mut self, token: Token) {
+        self.cursor = token.position.increase(&token.value);
+        self.current = Some(token.clone());
     }
 
     // pub fn find_tokens(&mut self) -> Result<Vec<Token>, ScanError> {

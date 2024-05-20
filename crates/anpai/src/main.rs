@@ -43,7 +43,20 @@ impl FEELCommands {
         dump_ast: bool,
         json_format: bool,
     ) -> Result<(), eval::EvalError> {
-        let n = parse::parse(code)?;
+        let mut eng = Box::new(eval::Engine::new());
+        // read context vars
+        if let Some(context_varsfile) = varsfile {
+            let mut data_file = File::open(context_varsfile.as_str()).unwrap();
+            let mut content = String::new();
+            data_file.read_to_string(&mut content).unwrap();
+            eng.load_context(&content)?;
+        }
+
+        if let Some(context_vars) = vars {
+            eng.load_context(&context_vars)?;
+        }
+        let n = parse::parse(code, eng.clone())?;
+
         if dump_ast {
             if json_format {
                 let serialized = serde_json::to_string_pretty(&n).unwrap();
@@ -52,18 +65,6 @@ impl FEELCommands {
                 println!("{}", n);
             }
         } else {
-            let mut eng = eval::Engine::new();
-
-            // read context vars
-            if let Some(context_varsfile) = varsfile {
-                let mut data_file = File::open(context_varsfile.as_str()).unwrap();
-                let mut content = String::new();
-                data_file.read_to_string(&mut content).unwrap();
-                eng.load_context(&content)?;
-            }
-            if let Some(context_vars) = vars {
-                eng.load_context(&context_vars)?;
-            }
             let res = eng.eval(n.clone())?;
             println!("{}", res);
         }

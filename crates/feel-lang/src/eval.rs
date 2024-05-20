@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::error;
@@ -145,10 +146,12 @@ impl EvalError {
 
 pub type EvalResult = Result<Value, EvalError>;
 
+#[derive(Clone)]
 pub struct ScopeFrame {
     vars: HashMap<String, Value>,
 }
 
+#[derive(Clone)]
 pub struct Engine {
     scopes: Vec<RefCell<ScopeFrame>>,
 }
@@ -178,6 +181,15 @@ impl Engine {
             }
         }
         PRELUDE.resolve(name)
+    }
+
+    pub fn has_name(&self, name: String) -> bool {
+        for scope in self.scopes.iter().rev() {
+            if let Some(_v) = scope.borrow().vars.get(&name) {
+                return true;
+            }
+        }
+        PRELUDE.has_name(name)
     }
 
     /// set the value of a variable by look up the stack
@@ -211,8 +223,12 @@ impl Engine {
             .insert(name, value);
     }
 
+    pub fn as_box(&self) -> Box<Engine> {
+        return Box::new(self.clone());
+    }
+
     pub fn load_context(&mut self, ctx_input: &str) -> EvalResult {
-        let node = parse(ctx_input)?;
+        let node = parse(ctx_input, Box::new(self.clone()))?;
         let ctx_value = self.eval(node)?;
         return match ctx_value {
             ContextV(m) => {
@@ -429,7 +445,8 @@ impl Engine {
         match list_value {
             ArrayV(items) => {
                 let mut results: Vec<Value> = vec![];
-                for item in items.borrow().iter() {
+                let refarr: &RefCell<Vec<Value>> = items.borrow();
+                for item in refarr.borrow().iter() {
                     self.push_frame();
                     self.set_var(var_name.clone(), item.clone());
                     let result = self.eval(return_expr.clone());
@@ -454,7 +471,8 @@ impl Engine {
         let list_value = self.eval(list_expr)?;
         match list_value {
             ArrayV(items) => {
-                for item in items.borrow().iter() {
+                let refarr: &RefCell<Vec<Value>> = items.borrow();
+                for item in refarr.borrow().iter() {
                     self.push_frame();
                     self.set_var(var_name.clone(), item.clone());
                     let result = self.eval(filter_expr.clone());
@@ -484,7 +502,8 @@ impl Engine {
         match list_value {
             ArrayV(items) => {
                 let mut results: Vec<Value> = vec![];
-                for item in items.borrow().iter() {
+                let refarr: &RefCell<Vec<Value>> = items.borrow();
+                for item in refarr.borrow().iter() {
                     self.push_frame();
                     self.set_var(var_name.clone(), item.clone());
                     let result = self.eval(filter_expr.clone());
@@ -752,8 +771,9 @@ impl Engine {
         match left_value {
             ContextV(a) => match right_value {
                 StrV(k) => {
-                    let m = a.borrow();
-                    let v = m.get(k).ok_or(EvalError::new(KeyError))?;
+                    let refctx: &RefCell<Context> = a.borrow();
+                    //let m = a.borrow();
+                    let v = refctx.borrow().get(k).ok_or(EvalError::new(KeyError))?;
                     Ok(v)
                 }
                 _ => Err(EvalError::new(Runtime("map key not string".to_owned()))),
@@ -761,7 +781,8 @@ impl Engine {
             ArrayV(a) => match right_value {
                 NumberV(idx) => {
                     // in FEEL language index starts from 1
-                    let arr = a.borrow();
+                    let refarr: &RefCell<Vec<Value>> = a.borrow();
+                    let arr = refarr.borrow();
                     if !idx.is_integer()
                         || idx < Numeric::ONE
                         || idx > Numeric::from_usize(arr.len())
@@ -769,6 +790,7 @@ impl Engine {
                         return Err(EvalError::new(IndexError));
                     }
                     let idx0 = idx.to_usize().unwrap();
+
                     let v = arr.get(idx0 - 1).ok_or(EvalError::new(IndexError))?;
                     Ok(v.clone())
                 }
@@ -804,8 +826,8 @@ impl Engine {
                 Ok(BoolV(contains))
             }
             ArrayV(a) => {
-                let arr = a.borrow();
-                for v in arr.iter() {
+                let refarr: &RefCell<Vec<Value>> = a.borrow();
+                for v in refarr.borrow().iter() {
                     if *v == left_value {
                         return Ok(BoolV(true));
                     }
@@ -824,8 +846,9 @@ impl Engine {
         let left_value = self.eval(left)?;
         match left_value {
             ContextV(a) => {
-                let m = a.borrow();
-                let v = m.get(attr).ok_or(EvalError::new(KeyError))?;
+                let refctx: &RefCell<Context> = a.borrow();
+                //let m = a.borrow();
+                let v = refctx.borrow().get(attr).ok_or(EvalError::new(KeyError))?;
                 Ok(v)
             }
             _ => Err(EvalError::runtime("map is not indexable")),
@@ -906,7 +929,9 @@ mod test {
             (Some(r#"{"?": 5}"#), r#">6, =8, < 3"#, "false"), // multi tests
             (Some(r#"{"?": 5}"#), r#">6, <8, < 3"#, "true"),
             (Some(r#"{"???": 5}"#), r#"??? + 6"#, "11"),
+            (Some(r#"{a+b: 9}"#), "a+b*2", "18"),
             (None, r#"{a: function(x,y) x+y}["a"](3, 5)"#, "8"),
+
             //(Some(r#"{"?": 5}"#), r#"?>6, ?<8, < 3"#, "true"),
             (None, r#"is defined(a)"#, "false"),
             (None, r#"is defined([1, 2][1])"#, "true"),
@@ -1065,7 +1090,7 @@ mod test {
             if let Some(ctx_input) = ctx {
                 eng.load_context(ctx_input).unwrap();
             }
-            let node = parse(input).unwrap();
+            let node = parse(input, Box::new(eng.clone())).unwrap();
             let v = eng.eval(node).unwrap();
             assert_eq!(v.to_string(), output, "output mismatch input: '{}'", input);
         }
@@ -1079,7 +1104,7 @@ mod test {
             super::NumberV(Numeric::from_str("2.3").unwrap()),
         );
         let input = "v1 + 3";
-        let node = parse(input).unwrap();
+        let node = parse(input, Box::new(eng.clone())).unwrap();
         let v = eng.eval(node).unwrap();
         assert_eq!(v.to_string(), "5.3");
     }
@@ -1090,7 +1115,7 @@ mod test {
         eng.load_context("{hi: 5}").unwrap();
 
         let input1 = r#"hi + 3"#;
-        let node1 = parse(input1).unwrap();
+        let node1 = parse(input1, Box::new(eng.clone())).unwrap();
         let v = eng.eval(node1).unwrap();
         assert_eq!(v.to_string(), "8");
     }
@@ -1101,7 +1126,7 @@ mod test {
         eng.load_context(r#"{add2: (function(a, b) a+b)}"#).unwrap();
 
         let input1 = r#"add2(4.5, 9)"#;
-        let node1 = parse(input1).unwrap();
+        let node1 = parse(input1, Box::new(eng.clone())).unwrap();
         let v = eng.eval(node1).unwrap();
         assert_eq!(v.to_string(), "13.5");
     }
