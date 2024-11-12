@@ -6,6 +6,7 @@ use std::fmt;
 
 use std::rc::Rc;
 
+use crate::ast::VarValue;
 use crate::scan::TextPosition;
 
 use self::EvalErrorKind::*;
@@ -254,7 +255,7 @@ impl Engine {
             Str(value) => self.eval_string(value),
             Temporal(value) => Ok(parse_temporal(value.as_str())?),
             Ident(value) => Ok(StrV(value)),
-            Var(name) => self.eval_var(name),
+            Var(v) => self.eval_var(v),
             Neg(value) => self.eval_neg_op(value),
             BinOp { op, left, right } => self.eval_binop(op, left, right),
             InOp { left, right } => self.eval_in_op(left, right),
@@ -322,7 +323,7 @@ impl Engine {
 
     pub fn is_defined(&mut self, value_node: &Box<Node>) -> EvalResult {
         if let Var(v) = *value_node.syntax.clone() {
-            return match self.resolve(v) {
+            return match self.resolve(v.value()) {
                 Some(_) => Ok(BoolV(true)),
                 None => Ok(BoolV(false)),
             };
@@ -356,11 +357,11 @@ impl Engine {
     }
 
     #[inline(always)]
-    fn eval_var(&mut self, name: String) -> EvalResult {
-        if let Some(value) = self.resolve(name.clone()) {
-            Ok(value)
+    fn eval_var(&mut self, v: VarValue) -> EvalResult {
+        if let Some(r) = self.resolve(v.value()) {
+            Ok(r)
         } else {
-            Err(EvalError::new(VarNotFound(name)))
+            Err(EvalError::new(VarNotFound(v.value())))
         }
     }
 

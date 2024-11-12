@@ -1,4 +1,4 @@
-use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
+use crate::ast::{FuncCallArg, MapNodeItem, VarValue, Node, NodeSyntax::*};
 use crate::eval::Engine;
 use crate::helpers::find_duplicate;
 use crate::scan::{ScanError, Scanner, TextPosition, Token};
@@ -284,11 +284,11 @@ impl Parser<'_> {
         let arg = self.parse_expression()?;
         if self.scanner.expect(":") {
             goahead!(self);
-            if let Var(name) = *arg.syntax {
+            if let Var(v) = *arg.syntax {
                 goahead!(self); // skip ":"
                 let arg_value = self.parse_expression()?;
                 return Ok(FuncCallArg {
-                    arg_name: name,
+                    arg_name: v.value(),
                     arg: arg_value,
                 });
             } else {
@@ -443,13 +443,13 @@ impl Parser<'_> {
         let var_name = self.parse_name(None)?;
         // let token = self.scanner.current_token();
         // goahead!(self);
-        Ok(Node::new(Var(var_name), start_pos))
+        Ok(Node::new(Var(VarValue::Name(var_name)), start_pos))
     }
 
     fn parse_backtick(&mut self) -> NodeResult {
         let token = self.scanner.current_token();
         goahead!(self);
-        Ok(Node::new(Var(token.value), token.position))
+        Ok(Node::new(Var(VarValue::Backtick(token.value)), token.position))
         //Ok(Node::new(Str(token.value), token.position))
     }
 
@@ -470,7 +470,7 @@ impl Parser<'_> {
         goahead!(self); // skip op
         let start_pos = self.scanner.current_token().position;
         let right = self.parse_expression()?;
-        let left = Node::new(Var("?".to_owned()), start_pos.clone());
+        let left = Node::new(Var(VarValue::Name("?".to_owned())), start_pos.clone());
         Ok(Node::new(
             BinOp {
                 op: op.to_string(),

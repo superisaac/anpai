@@ -32,6 +32,32 @@ impl fmt::Display for MapNodeItem {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub enum VarValue {
+    Name(String),
+    Str(String),
+    Backtick(String),
+}
+
+impl VarValue {
+    pub fn value(&self) -> String {
+        match self {
+            Self::Name(v) => v.to_string(),
+            Self::Str(v) => v.to_string(),
+            Self::Backtick(v) => v.to_string()
+        }
+    }
+}
+impl fmt::Display for VarValue {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Name(v) => write!(f, "{}", v),
+            Self::Str(v) => write!(f, "\"{}\"", v),
+            Self::Backtick(v) => write!(f, r#"`{}`"#, v),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub enum NodeSyntax {
     BinOp {
         op: String,
@@ -69,7 +95,7 @@ pub enum NodeSyntax {
     },
 
     // variable
-    Var(String),
+    Var(VarValue),
 
     // ident, used in map key
     Ident(String),
@@ -143,7 +169,7 @@ impl fmt::Display for NodeSyntax {
             } => write!(f, "(function ")
                 .and_then(|_| fmt_vec(f, arg_names.iter(), "[", "]"))
                 .and_then(|_| write!(f, " {})", body)),
-            Self::Var(name) => write!(f, "{}", name),
+            Self::Var(v) => write!(f, "{}", v),
             Self::Ident(name) => write!(f, "{}", name),
             Self::Number(value) => write!(f, "{}", value),
             Self::Bool(value) => write!(f, "{}", value),
