@@ -332,6 +332,7 @@ impl Parser<'_> {
         match self.scanner.current_token().kind {
             "number" => self.parse_number(),
             "name" => self.parse_var(),
+            "backtick" => self.parse_backtick(),
             "string" => self.parse_string(),
             "temporal" => self.parse_temporal(),
             "-" => self.parse_neg(),
@@ -401,7 +402,11 @@ impl Parser<'_> {
 
     fn parse_var_name(&mut self, stop_keywords: Option<&[&str]>) -> Result<String, ParseError> {
         let mut token_stack: Vec<Token> = Vec::new();
-
+        if self.scanner.expect("backtick") {
+            let t = self.scanner.current_token();
+            goahead!(self);
+            return Ok(t.value);
+        }
         while self
             .scanner
             .expect_kinds(&["name", "keyword", "+", "-", "*", "/"])
@@ -441,6 +446,13 @@ impl Parser<'_> {
         Ok(Node::new(Var(var_name), start_pos))
     }
 
+    fn parse_backtick(&mut self) -> NodeResult {
+        let token = self.scanner.current_token();
+        goahead!(self);
+        Ok(Node::new(Var(token.value), token.position))
+        //Ok(Node::new(Str(token.value), token.position))
+    }
+
     fn parse_number(&mut self) -> NodeResult {
         let token = self.scanner.current_token();
         goahead!(self);
@@ -474,6 +486,8 @@ impl Parser<'_> {
         goahead!(self);
         Ok(Node::new(Str(token.value), token.position))
     }
+
+    
 
     fn parse_temporal(&mut self) -> NodeResult {
         let token = self.scanner.current_token();
@@ -531,7 +545,7 @@ impl Parser<'_> {
     }
 
     fn parse_map_key(&mut self) -> NodeResult {
-        if self.scanner.expect("name") {
+        if self.scanner.expect_kinds(&["name", "backtick"]) {
             let start_pos = self.scanner.current_token().position;
             match self.parse_var_name(None) {
                 Ok(name) => Ok(Node::new(Ident(name), start_pos)),

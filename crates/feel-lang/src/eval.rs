@@ -915,6 +915,7 @@ mod test {
             // if expr
             (None, "if 2 > 3 then 6 else 8", "8"),
             (None, "for a in [2, 3, 4] return a * 2", "[4, 6, 8]"), // simple for loop
+            (None, r#"for `a&b-c` in [2, 3, 4] return `a&b-c` * 2"#, "[4, 6, 8]"), // simple for loop
             (
                 None,
                 "for a in [2, 3, 4], b in [8, 1, 2] return a + b",

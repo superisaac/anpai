@@ -27,6 +27,7 @@ impl Context {
     pub fn new() -> Context {
         Context(BTreeMap::new())
     }
+
     pub fn len(&self) -> usize {
         self.0.len()
     }

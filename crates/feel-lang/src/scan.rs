@@ -153,6 +153,7 @@ fn test_token_expect_keywords() {
     assert!(token.expect_keywords(&["xyz", "kkk"]));
 }
 
+
 #[test]
 fn test_value_ahead_01() {
     let text = r#"
@@ -164,6 +165,7 @@ fn test_value_ahead_01() {
     assert_eq!(cursor.lines, 3);
     assert_eq!(cursor.cols, 6); // "    ok".len()
 }
+
 
 #[test]
 fn test_value_ahead_02() {
@@ -200,21 +202,31 @@ lazy_static! {
             token: "comment_singleline",
             reg: Some(Regex::new(r"^//.*\n").unwrap()),
         });
+    
         patterns.push(TokenPattern {
             token: "comment_multiline",
             reg: Some(Regex::new(r"^/\*(.|\n)*\*/").unwrap()),
         });
+
         patterns.push(TokenPattern{
             token: "keyword",
             reg: Some(Regex::new(r"^\b(true|false|and|or|null|function|if|then|else|loop|for|some|every|in|return|satisfies)\b").unwrap()),
         });
+
         patterns.push(TokenPattern {
             token: "temporal",
             reg: Some(Regex::new(r#"^@"(\\.|[^"])*""#).unwrap()),
         });
+
         patterns.push(TokenPattern {
             token: "string",
             reg: Some(Regex::new(r#"^"(\\.|[^"])*""#).unwrap()),
+        });
+
+        patterns.push(TokenPattern {
+            token: "backtick",
+            reg: Some(Regex::new(r#"^`[^`]*`"#).unwrap()),
+            // backtick string is in camunda dialets
         });
 
         let ops = [
