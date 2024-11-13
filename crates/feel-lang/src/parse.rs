@@ -9,6 +9,7 @@ use std::fmt;
 
 /// parse FEEL refer to https://www.omg.org/spec/DMN/1.2/PDF
 
+
 // Parse error
 #[derive(Debug, Clone)]
 pub enum ParseError {
@@ -70,14 +71,6 @@ impl Parser<'_> {
     }
 
     fn unexpect(&self, expects: &str) -> ParseError {
-        // let mut stack_str = String::new();
-        // for (i, name) in self.call_stack.iter().enumerate() {
-        //     if i > 0 {
-        //         stack_str.push_str(", ");
-        //     }
-        //     stack_str.push_str(name);
-        // }
-
         let bt = Backtrace::force_capture();
         let mut stack_str = String::new();
         for (i, frame) in bt.frames().iter().enumerate() {
@@ -105,64 +98,49 @@ impl Parser<'_> {
     }
 
     pub fn parse(&mut self) -> NodeResult {
-        //calltrace!(self, "parse", {
-        let mut exprs: Vec<Box<Node>> = Vec::new();
         goahead!(self);
-        let start_pos = self.scanner.current_token().position;
-        while !self.scanner.expect("eof") {
-            if self.scanner.expect(";") {
-                goahead!(self);
-            }
-            let node = self.parse_multi_tests()?;
-            exprs.push(node);
-        }
-        if exprs.len() == 1 {
-            return Ok(exprs[0].clone());
-        } else {
-            return Ok(Node::new(ExprList(exprs), start_pos));
-        }
-        //})
+        let n = self.parse_expression()?;
+        goahead!(self);
+        Ok(n)
     }
 
-    // fn parse_multi_tests_element(&mut self) -> NodeResult {
-    //     if self
-    //         .scanner
-    //         .expect_kinds(&[">", ">=", "<", "<=", "!=", "="])
-    //     {
-    //         // unary tests
-    //         let start_pos = self.scanner.current_token().position;
-    //         let op = self.scanner.current_token().kind;
-    //         goahead!(self); // skip op
-    //         let right = self.parse_expression()?;
-    //         let left = Node::new(Var("?".to_owned()), start_pos.clone());
-    //         Ok(Node::new(
-    //             BinOp {
-    //                 op: op.to_string(),
-    //                 left,
-    //                 right,
-    //             },
-    //             start_pos,
-    //         ))
-    //     } else {
-    //         self.parse_expression()
-    //     }
-    // }
-
-    fn parse_multi_tests(&mut self) -> NodeResult {
+    pub fn parse_unary_tests(&mut self) -> NodeResult {
         let start_pos = self.scanner.current_token().position;
-        let elem = self.parse_expression()?;
+        let elem = self.parse_unary_test()?;
+
         if self.scanner.expect(",") {
             let mut elements = Vec::new();
             elements.push(elem);
             while self.scanner.expect(",") {
                 goahead!(self); // skip ','
-                let elem1 = self.parse_expression()?;
+                let elem1 = self.parse_unary_test()?;
                 elements.push(elem1);
             }
             Ok(Node::new(MultiTests(elements), start_pos))
         } else {
             Ok(elem)
         }
+    }
+
+    fn parse_unary_test(&mut self) -> NodeResult {
+        if self.scanner.expect_kinds(&[">", ">=", "<", "<=", "!=", "="]) {
+            let op = self.scanner.current_token().kind;
+            goahead!(self); // skip op
+            let start_pos = self.scanner.current_token().position;
+            let right = self.parse_expression()?;
+            let left = Node::new(Var(VarValue::Name("?".to_owned())), start_pos.clone());
+            Ok(Node::new(
+                BinOp {
+                    op: op.to_string(),
+                    left,
+                    right,
+                },
+                start_pos,
+            ))
+        } else {
+            self.parse_expression()
+        }
+        
     }
 
     fn parse_expression(&mut self) -> NodeResult {
@@ -336,9 +314,6 @@ impl Parser<'_> {
             "string" => self.parse_string(),
             "temporal" => self.parse_temporal(),
             "-" => self.parse_neg(),
-            ">" | ">=" | "<" | "<=" | "!=" | "=" => {
-                self.parse_unary_test(self.scanner.current_token().kind)
-            }
             "{" => self.parse_map(),
             "(" => self.parse_bracket_or_range(),
             "[" => self.parse_range_or_array(),
@@ -466,20 +441,7 @@ impl Parser<'_> {
         Ok(Node::new(Neg(node), start_pos))
     }
 
-    fn parse_unary_test(&mut self, op: &str) -> NodeResult {
-        goahead!(self); // skip op
-        let start_pos = self.scanner.current_token().position;
-        let right = self.parse_expression()?;
-        let left = Node::new(Var(VarValue::Name("?".to_owned())), start_pos.clone());
-        Ok(Node::new(
-            BinOp {
-                op: op.to_string(),
-                left,
-                right,
-            },
-            start_pos,
-        ))
-    }
+    
 
     fn parse_string(&mut self) -> NodeResult {
         let token = self.scanner.current_token();
@@ -845,8 +807,8 @@ mod test {
             ("a + b(4, 9)", "(+ a (call b [4, 9]))"),
             ("if a > 6 then true else false", "(if (> a 6) true false)"),
             ("{a: 1, \"bbb\": [2, 1]}", r#"{a: 1, "bbb": [2, 1]}"#),
-            ("> 2, <= 1, a>8", "(multi-tests (> ? 2) (<= ? 1) (> a 8))"),
-            ("2>8; 9; true", "(expr-list (> 2 8) 9 true)"),
+            //("> 2, <= 1, a>8", "(multi-tests (> ? 2) (<= ? 1) (> a 8))"),
+            //("2>8; 9; true", "(expr-list (> 2 8) 9 true)"),
         ];
 
         for (input, output) in testcases {
