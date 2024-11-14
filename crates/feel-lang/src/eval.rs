@@ -875,7 +875,7 @@ mod test {
             (None, "2 -5", "-3"),
             (None, "8 - 2", "6"),
             (None, "7 / 2", "3.5"), // decimal display outputs normalized string
-            (None, "10 / 3", "3.333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333333"), // precision is up to 28
+            (None, "10 / 3", "3.3333333333333333333333333333333333"), // precision is up to 34
             (None, "4 * 9 + 1", "37"),
             (None, "8 % 5", "3"),
             (None, "8 / 5", "1.6"),
@@ -1108,6 +1108,7 @@ mod test {
         let input = "v1 + 3";
         let node = parse(input, Box::new(eng.clone()), Default::default()).unwrap();
         let v = eng.eval(node).unwrap();
+        //let s = fmt::format(format_args!("{:.3}", v));
         assert_eq!(v.to_string(), "5.3");
     }
 

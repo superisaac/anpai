@@ -12,11 +12,33 @@ pub enum Numeric {
     Decimal(BigDecimal),
 }
 
+// fn remove_trailing_zeros(s: String) -> String {
+//     if s.contains(".") {
+//         let re = Regex::new(r"\.?0*$").unwrap();
+//         let r = re.replace(s.as_str(), "");
+//         return r.to_string();
+//     } else {
+//         return s;
+//     }
+// }
+
 impl fmt::Display for Numeric {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Integer(v) => write!(f, "{}", v),
-            Self::Decimal(v) => write!(f, "{}", v),
+            Self::Decimal(v) => {
+                // refer to https://www.omg.org/spec/DMN/1.2/PDF
+                // 10.3.2.3.1 number
+                // FEEL Numbers are based on IEEE 754-2008 Decimal128 format, with 34 decimal digits of precision and rounding 
+                // toward the nearest neighbor with ties favoring the even neighbor */
+                let scale = v.fractional_digit_count() as usize;
+                if scale > 34  {
+                    //write!(fa, "{:.*}", v.with_scale_round(34, RoundingMode::Floor))
+                    write!(f, "{:.34}", v)
+                } else {
+                    write!(f, "{:.*}", scale, v)
+                }
+            }
         }
     }
 }
@@ -57,8 +79,7 @@ impl Numeric {
                 return Self::Integer(v);
             }
         }
-
-        Self::Decimal(bign)
+        Self::Decimal(bign) //.with_scale(34))
     }
 
     pub fn from_value(value: &Value) -> Option<Numeric> {
@@ -84,6 +105,8 @@ impl Numeric {
     pub fn from_f64(v: f64) -> Numeric {
         Self::Decimal(BigDecimal::from_f64(v).unwrap())
     }
+
+    
 
     pub fn to_decimal(&self) -> BigDecimal {
         match self {
@@ -356,5 +379,20 @@ impl cmp::Ord for Numeric {
             }
         }
         self.to_decimal().cmp(&other.to_decimal())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_num_format() {
+        let v = super::Numeric::from_str("0.77890000").unwrap();
+        assert_eq!(v.to_string(), "0.77890000");
+    }
+
+    #[test]
+    fn test_zero_num_format() {
+        let v = super::Numeric::from_str("0.00000").unwrap();
+        assert_eq!(v.to_string(), "0");
     }
 }
