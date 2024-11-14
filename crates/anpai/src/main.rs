@@ -55,7 +55,7 @@ impl FEELCommands {
         if let Some(context_vars) = vars {
             eng.load_context(&context_vars)?;
         }
-        let n = parse::parse(code, eng.clone())?;
+        let n = parse::parse(code, eng.clone(), Default::default())?;
 
         if dump_ast {
             if json_format {

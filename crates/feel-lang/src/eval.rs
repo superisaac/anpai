@@ -229,7 +229,7 @@ impl Engine {
     }
 
     pub fn load_context(&mut self, ctx_input: &str) -> EvalResult {
-        let node = parse(ctx_input, Box::new(self.clone()))?;
+        let node = parse(ctx_input, Box::new(self.clone()), Default::default())?;
         let ctx_value = self.eval(node)?;
         return match ctx_value {
             ContextV(m) => {
@@ -1092,7 +1092,7 @@ mod test {
             if let Some(ctx_input) = ctx {
                 eng.load_context(ctx_input).unwrap();
             }
-            let node = parse(input, Box::new(eng.clone())).unwrap();
+            let node = parse(input, Box::new(eng.clone()), Default::default()).unwrap();
             let v = eng.eval(node).unwrap();
             assert_eq!(v.to_string(), output, "output mismatch input: '{}'", input);
         }
@@ -1106,7 +1106,7 @@ mod test {
             super::NumberV(Numeric::from_str("2.3").unwrap()),
         );
         let input = "v1 + 3";
-        let node = parse(input, Box::new(eng.clone())).unwrap();
+        let node = parse(input, Box::new(eng.clone()), Default::default()).unwrap();
         let v = eng.eval(node).unwrap();
         assert_eq!(v.to_string(), "5.3");
     }
@@ -1117,7 +1117,7 @@ mod test {
         eng.load_context("{hi: 5}").unwrap();
 
         let input1 = r#"hi + 3"#;
-        let node1 = parse(input1, Box::new(eng.clone())).unwrap();
+        let node1 = parse(input1, Box::new(eng.clone()), Default::default()).unwrap();
         let v = eng.eval(node1).unwrap();
         assert_eq!(v.to_string(), "8");
     }
@@ -1128,7 +1128,7 @@ mod test {
         eng.load_context(r#"{add2: (function(a, b) a+b)}"#).unwrap();
 
         let input1 = r#"add2(4.5, 9)"#;
-        let node1 = parse(input1, Box::new(eng.clone())).unwrap();
+        let node1 = parse(input1, Box::new(eng.clone()), Default::default()).unwrap();
         let v = eng.eval(node1).unwrap();
         assert_eq!(v.to_string(), "13.5");
     }

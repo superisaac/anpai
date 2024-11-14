@@ -10,6 +10,13 @@ use std::fmt;
 /// parse FEEL refer to https://www.omg.org/spec/DMN/1.2/PDF
 
 
+#[derive(Default)]
+pub enum ParseTop {
+    #[default]
+    Expression,
+    UnaryTests,
+}
+
 // Parse error
 #[derive(Debug, Clone)]
 pub enum ParseError {
@@ -97,14 +104,15 @@ impl Parser<'_> {
         ))
     }
 
-    pub fn parse(&mut self) -> NodeResult {
+    pub fn parse(&mut self, top: ParseTop) -> NodeResult {
         goahead!(self);
-        let n = self.parse_expression()?;
-        goahead!(self);
-        Ok(n)
+        match top {
+            ParseTop::Expression => self.parse_expression(),
+            ParseTop::UnaryTests => self.parse_unary_tests()
+        }
     }
 
-    pub fn parse_unary_tests(&mut self) -> NodeResult {
+    fn parse_unary_tests(&mut self) -> NodeResult {
         let start_pos = self.scanner.current_token().position;
         let elem = self.parse_unary_test()?;
 
@@ -789,9 +797,9 @@ impl Parser<'_> {
     }
 }
 
-pub fn parse(input: &str, engine: Box<Engine>) -> Result<Box<Node>, (ParseError, TextPosition)> {
+pub fn parse(input: &str, engine: Box<Engine>, top: ParseTop) -> Result<Box<Node>, (ParseError, TextPosition)> {
     let mut parser = Parser::new(input, engine);
-    match parser.parse() {
+    match parser.parse(top) {
         Ok(n) => Ok(n),
         Err(err) => Err((err, parser.scanner.current_token().position)),
     }
@@ -813,7 +821,7 @@ mod test {
 
         for (input, output) in testcases {
             let engine = Box::new(Engine::new());
-            let node = super::parse(input, engine).unwrap();
+            let node = super::parse(input, engine, Default::default()).unwrap();
             assert_eq!(
                 format!("{}", *node),
                 output,
@@ -828,7 +836,7 @@ mod test {
     fn test_parse_func_def() {
         let input = "function(a, b) a + b   ";
         let engine = Box::new(Engine::new());
-        let node = super::parse(input, engine).unwrap();
+        let node = super::parse(input, engine, Default::default()).unwrap();
         assert_matches!(
             *(node.syntax),
             crate::ast::NodeSyntax::FuncDef {
@@ -850,7 +858,7 @@ mod test {
     #[test]
     fn test_parse_dup_arg_name() {
         let engine = Box::new(Engine::new());
-        let res = super::parse("function(a, b, a) a+ b", engine);
+        let res = super::parse("function(a, b, a) a+ b", engine, Default::default());
         assert_matches!(res, Err((super::ParseError::Parse(x), _)) if x == "function has duplication arg name `a`".to_owned());
     }
 }
