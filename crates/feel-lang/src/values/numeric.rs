@@ -1,7 +1,9 @@
 use super::value::Value;
 use bigdecimal::*;
+// use lazy_static::lazy_static;
 use num_bigint::Sign;
 use std::cmp;
+// use std::num::NonZeroU64;
 use std::fmt;
 use std::ops;
 use std::str::FromStr;
@@ -22,21 +24,33 @@ pub enum Numeric {
 //     }
 // }
 
+// lazy_static! {
+//     static ref BIG_CONTEXT: Context = {
+//         let prec = NonZeroU64::new(34).unwrap();
+//         Context::new(prec, Default::default())
+//     };
+// }
+
 impl fmt::Display for Numeric {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Integer(v) => write!(f, "{}", v),
             Self::Decimal(v) => {
-                // refer to https://www.omg.org/spec/DMN/1.2/PDF
-                // 10.3.2.3.1 number
-                // FEEL Numbers are based on IEEE 754-2008 Decimal128 format, with 34 decimal digits of precision and rounding 
-                // toward the nearest neighbor with ties favoring the even neighbor */
-                let scale = v.fractional_digit_count() as usize;
-                if scale > 34  {
-                    //write!(fa, "{:.*}", v.with_scale_round(34, RoundingMode::Floor))
-                    write!(f, "{:.34}", v)
+                if let Some(prec) = f.precision() {
+                    let scaledv = v.with_scale_round(prec as i64, RoundingMode::Floor);
+                    write!(f, "{:.*}", prec, scaledv)
                 } else {
-                    write!(f, "{:.*}", scale, v)
+                    // refer to https://www.omg.org/spec/DMN/1.2/PDF
+                    // 10.3.2.3.1 number
+                    // FEEL Numbers are based on IEEE 754-2008 Decimal128 format, with 34 decimal digits of precision and rounding
+                    // toward the nearest neighbor with ties favoring the even neighbor */
+                    let scale = v.fractional_digit_count() as usize;
+                    if scale > 34 {
+                        //write!(fa, "{:.*}", v.with_scale_round(34, RoundingMode::Floor))
+                        write!(f, "{:.34}", v)
+                    } else {
+                        write!(f, "{:.*}", scale, v)
+                    }
                 }
             }
         }
@@ -105,8 +119,6 @@ impl Numeric {
     pub fn from_f64(v: f64) -> Numeric {
         Self::Decimal(BigDecimal::from_f64(v).unwrap())
     }
-
-    
 
     pub fn to_decimal(&self) -> BigDecimal {
         match self {
@@ -384,10 +396,15 @@ impl cmp::Ord for Numeric {
 
 #[cfg(test)]
 mod test {
+
     #[test]
     fn test_num_format() {
-        let v = super::Numeric::from_str("0.77890000").unwrap();
-        assert_eq!(v.to_string(), "0.77890000");
+        let a1 = super::Numeric::from_str("0.77890000").unwrap();
+        assert_eq!(a1.to_string(), "0.77890000");
+
+        let a2 = super::Numeric::from_str("3.7788400202").unwrap();
+        let s2 = format!("{:.3}", a2);
+        assert_eq!(s2, "3.778");
     }
 
     #[test]

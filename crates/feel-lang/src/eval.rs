@@ -916,7 +916,11 @@ mod test {
             // if expr
             (None, "if 2 > 3 then 6 else 8", "8"),
             (None, "for a in [2, 3, 4] return a * 2", "[4, 6, 8]"), // simple for loop
-            (None, r#"for `a&b-c` in [2, 3, 4] return `a&b-c` * 2"#, "[4, 6, 8]"), // simple for loop
+            (
+                None,
+                r#"for `a&b-c` in [2, 3, 4] return `a&b-c` * 2"#,
+                "[4, 6, 8]",
+            ), // simple for loop
             (
                 None,
                 "for a in [2, 3, 4], b in [8, 1, 2] return a + b",
@@ -926,14 +930,12 @@ mod test {
             (None, "every a in [2, 8, 3, 6] satisfies a > 4", "[8, 6]"),
             //("2 * 8; true; null; 9 / 3", "3"),
             //(None, "2 in (>=5, <3)", "true"),
-
             (Some("{a: 5}"), r#"a + 10.3"#, "15.3"), // expression list
             // (Some(r#"{"?": 5}"#), r#">6, =8, < 3"#, "false"), // multi tests
             // (Some(r#"{"?": 5}"#), r#">6, <8, < 3"#, "true"),
             (Some(r#"{"???": 5}"#), r#"??? + 6"#, "11"),
             (Some(r#"{a+b: 9}"#), "a+b*2", "18"),
             (None, r#"{a: function(x,y) x+y}["a"](3, 5)"#, "8"),
-
             //(Some(r#"{"?": 5}"#), r#"?>6, ?<8, < 3"#, "true"),
             (None, r#"is defined(a)"#, "false"),
             (None, r#"is defined([1, 2][1])"#, "true"),
@@ -943,7 +945,11 @@ mod test {
             (None, "not(2>1)", "false"),
             (None, r#"number("3000.888")"#, "3000.888"),
             (None, r#"string length("hello world")"#, "11"),
-            (None, r#"string join(["hello", "world", "again"], ", ", ":")"#, r#"":hello, world, again""#),
+            (
+                None,
+                r#"string join(["hello", "world", "again"], ", ", ":")"#,
+                r#"":hello, world, again""#,
+            ),
             // boolean functions
             (None, r#"get or else("this", "default")"#, r#""this""#),
             (None, r#"get or else(null, "default")"#, r#""default""#),
@@ -953,7 +959,6 @@ mod test {
             (None, "decimal(1.5, 0)", "2"),
             (None, "decimal(1.5)", "1.5"),
             (None, r#"decimal("1.56", 9)"#, "1.560000000"),
-
             (None, "floor(1.5)", "1"),
             (None, "floor(-1.5)", "-2"),
             (None, "floor(-1.56, 1)", "-1.6"),
@@ -965,7 +970,6 @@ mod test {
             (None, "odd(2)", "false"),
             (None, "even(5)", "false"),
             (None, "even(2)", "true"),
-
             // list functions
             (None, "list contains([2, 8, -1], 8)", "true"),
             (None, r#"list contains([2, 8, "hello"], "world")"#, "false"),
@@ -974,7 +978,7 @@ mod test {
             (None, "min(31, -1, 9, 8, -1, -99)", "-99"),
             (None, "min(31, -1, 9, false, -1, -99)", "-99"),
             (None, "max(31, -1, 9, 8, -1, -99)", "31"),
-            (None, "sum(31, -1, 9, false, -1, -99)", "-61"),  
+            (None, "sum(31, -1, 9, false, -1, -99)", "-61"),
             (None, "sort([3, -1, 2])", "[-1, 2, 3]"),
             (None, "sublist([1,2,3], 2)", "[2, 3]"),
             (None, "sublist([1,2,3], 1, 2)", "[1, 2]"),
@@ -988,102 +992,108 @@ mod test {
             (None, "index of([1,2,3,2], 2)", "[2, 4]"),
             // test context functions
             (None, r#"get value({"a": 5, b: 9}, "b")"#, "9"),
-            (None, r#"get value({"a": 5, b: {"c k": {m: 5}}}, ["b", "c k", "m"])"#, "5"),
-            (None, r#"context put({"o":8}, ["a", "b", "c d"], 3)"#, r#"{"a":{"b":{"c d":3}}, "o":8}"#),
-            (None, r#"context put({a: {b: {"c d":3}}, o:8}, ["a", "b", "c d"], 6)"#, r#"{"a":{"b":{"c d":6}}, "o":8}"#),
-            (None, "context merge([{a:1}, {b:2}, {c:3}])", r#"{"a":1, "b":2, "c":3}"#),
-            (None, "get entries({a: 2, b: 8})", r#"[{"key":"a", "value":2}, {"key":"b", "value":8}]"#),
-
+            (
+                None,
+                r#"get value({"a": 5, b: {"c k": {m: 5}}}, ["b", "c k", "m"])"#,
+                "5",
+            ),
+            (
+                None,
+                r#"context put({"o":8}, ["a", "b", "c d"], 3)"#,
+                r#"{"a":{"b":{"c d":3}}, "o":8}"#,
+            ),
+            (
+                None,
+                r#"context put({a: {b: {"c d":3}}, o:8}, ["a", "b", "c d"], 6)"#,
+                r#"{"a":{"b":{"c d":6}}, "o":8}"#,
+            ),
+            (
+                None,
+                "context merge([{a:1}, {b:2}, {c:3}])",
+                r#"{"a":1, "b":2, "c":3}"#,
+            ),
+            (
+                None,
+                "get entries({a: 2, b: 8})",
+                r#"[{"key":"a", "value":2}, {"key":"b", "value":8}]"#,
+            ),
             // test range functions
             (None, "before(1, 10)", "true"),
             (None, "before(10, 1)", "false"),
             (None, "before([1..5], 10)", "true"),
             (None, "before(1, [2..5])", "true"),
             (None, "before(3, [2..5])", "false"),
-
             (None, "before([1..5),[5..10])", "true"),
             (None, "before([1..5),(5..10])", "true"),
             (None, "before([1..5],[5..10])", "false"),
             (None, "before([1..5),(5..10])", "true"),
-
             (None, "after([5..10], [1..5))", "true"),
             (None, "after((5..10], [1..5))", "true"),
             (None, "after([5..10], [1..5])", "false"),
             (None, "after((5..10], [1..5))", "true"),
-
             (None, "meets([1..5], [5..10])", "true"),
             (None, "meets([1..3], [4..6])", "false"),
             (None, "meets([1..3], [3..5])", "true"),
             (None, "meets([1..5], (5..8])", "false"),
-
             (None, "met by([5..10], [1..5])", "true"),
             (None, "met by([3..4], [1..2])", "false"),
             (None, "met by([3..5], [1..3])", "true"),
             (None, "met by((5..8], [1..5))", "false"),
             (None, "met by([5..10], [1..5))", "false"),
-
-
             (None, "overlaps([5..10], [1..6])", "true"),
             (None, "overlaps((3..7], [1..4])", "true"),
             (None, "overlaps([1..3], (3..6])", "false"),
             (None, "overlaps((5..8], [1..5))", "false"),
             (None, "overlaps([4..10], [1..5))", "true"),
-
             (None, "overlaps before([1..5], [4..10])", "true"),
             (None, "overlaps before([3..4], [1..2])", "false"),
             (None, "overlaps before([1..3], (3..5])", "false"),
             (None, "overlaps before([1..5), (3..8])", "true"),
             (None, "overlaps before([1..5), [5..10])", "false"),
-
             (None, "overlaps after([4..10], [1..5])", "true"),
             (None, "overlaps after([3..4], [1..2])", "false"),
             (None, "overlaps after([3..5], [1..3))", "false"),
             (None, "overlaps after((5..8], [1..5))", "false"),
             (None, "overlaps after([4..10], [1..5))", "true"),
-
             (None, "finishes(5, [1..5])", "true"),
             (None, "finishes(10, [1..7])", "false"),
             (None, "finishes([3..5], [1..5])", "true"),
             (None, "finishes((1..5], [1..5))", "false"),
             (None, "finishes([5..10], [1..10))", "false"),
-
             (None, "finished by([5..10], 10)", "true"),
             (None, "finished by([3..4], 2)", "false"),
-
             (None, "finished by([1..5], [3..5])", "true"),
             (None, "finished by((5..8], [1..5))", "false"),
             (None, "finished by([5..10], (1..10))", "false"),
-
             (None, "includes([5..10], 6)", "true"),
             (None, "includes([3..4], 5)", "false"),
             (None, "includes([1..10], [4..6])", "true"),
             (None, "includes((5..8], [1..5))", "false"),
             (None, "includes([1..10], [1..5))", "true"),
-
             (None, "during(5, [1..10])", "true"),
             (None, "during(12, [1..10])", "false"),
             (None, "during(1, (1..10])", "false"),
             (None, "during([4..6], [1..10))", "true"),
             (None, "during((1..5], (1..10])", "true"),
-
             (None, "starts(1, [1..5])", "true"),
             (None, "starts(1, (1..8])", "false"),
             (None, "starts((1..5], [1..5])", "false"),
             (None, "starts([1..10], [1..10])", "true"),
             (None, "starts((1..10), (1..10))", "true"),
-
             (None, "started by([1..10], 1)", "true"),
             (None, "started by((1..10], 1)", "false"),
             (None, "started by([1..10], [1..5])", "true"),
             (None, "started by((1..10], [1..5))", "false"),
             (None, "started by([1..10], [1..10))", "true"),
-
             (None, "coincides([1..5], [1..5])", "true"),
             (None, "coincides((1..5], [1..5))", "false"),
             (None, "coincides([1..5], [2..6])", "false"),
-
             // temporal functions
-            (None, r#"date and time("2018-04-29T09:30:00+07:00")"#, r#"date and time("2018-04-29T09:30:00+07:00")"# ),
+            (
+                None,
+                r#"date and time("2018-04-29T09:30:00+07:00")"#,
+                r#"date and time("2018-04-29T09:30:00+07:00")"#,
+            ),
         ];
 
         for (ctx, input, output) in testcases {

@@ -1,4 +1,4 @@
-use crate::ast::{FuncCallArg, MapNodeItem, VarValue, Node, NodeSyntax::*};
+use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*, VarValue};
 use crate::eval::Engine;
 use crate::helpers::find_duplicate;
 use crate::scan::{ScanError, Scanner, TextPosition, Token};
@@ -8,7 +8,6 @@ use std::error::Error;
 use std::fmt;
 
 /// parse FEEL refer to https://www.omg.org/spec/DMN/1.2/PDF
-
 
 #[derive(Default)]
 pub enum ParseTop {
@@ -108,7 +107,7 @@ impl Parser<'_> {
         goahead!(self);
         match top {
             ParseTop::Expression => self.parse_expression(),
-            ParseTop::UnaryTests => self.parse_unary_tests()
+            ParseTop::UnaryTests => self.parse_unary_tests(),
         }
     }
 
@@ -131,7 +130,10 @@ impl Parser<'_> {
     }
 
     fn parse_unary_test(&mut self) -> NodeResult {
-        if self.scanner.expect_kinds(&[">", ">=", "<", "<=", "!=", "="]) {
+        if self
+            .scanner
+            .expect_kinds(&[">", ">=", "<", "<=", "!=", "="])
+        {
             let op = self.scanner.current_token().kind;
             goahead!(self); // skip op
             let start_pos = self.scanner.current_token().position;
@@ -148,7 +150,6 @@ impl Parser<'_> {
         } else {
             self.parse_expression()
         }
-        
     }
 
     fn parse_expression(&mut self) -> NodeResult {
@@ -432,7 +433,10 @@ impl Parser<'_> {
     fn parse_backtick(&mut self) -> NodeResult {
         let token = self.scanner.current_token();
         goahead!(self);
-        Ok(Node::new(Var(VarValue::Backtick(token.value)), token.position))
+        Ok(Node::new(
+            Var(VarValue::Backtick(token.value)),
+            token.position,
+        ))
         //Ok(Node::new(Str(token.value), token.position))
     }
 
@@ -449,15 +453,11 @@ impl Parser<'_> {
         Ok(Node::new(Neg(node), start_pos))
     }
 
-    
-
     fn parse_string(&mut self) -> NodeResult {
         let token = self.scanner.current_token();
         goahead!(self);
         Ok(Node::new(Str(token.value), token.position))
     }
-
-    
 
     fn parse_temporal(&mut self) -> NodeResult {
         let token = self.scanner.current_token();
@@ -797,7 +797,11 @@ impl Parser<'_> {
     }
 }
 
-pub fn parse(input: &str, engine: Box<Engine>, top: ParseTop) -> Result<Box<Node>, (ParseError, TextPosition)> {
+pub fn parse(
+    input: &str,
+    engine: Box<Engine>,
+    top: ParseTop,
+) -> Result<Box<Node>, (ParseError, TextPosition)> {
     let mut parser = Parser::new(input, engine);
     match parser.parse(top) {
         Ok(n) => Ok(n),

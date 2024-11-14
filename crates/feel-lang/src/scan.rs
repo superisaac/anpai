@@ -153,7 +153,6 @@ fn test_token_expect_keywords() {
     assert!(token.expect_keywords(&["xyz", "kkk"]));
 }
 
-
 #[test]
 fn test_value_ahead_01() {
     let text = r#"
@@ -165,7 +164,6 @@ fn test_value_ahead_01() {
     assert_eq!(cursor.lines, 3);
     assert_eq!(cursor.cols, 6); // "    ok".len()
 }
-
 
 #[test]
 fn test_value_ahead_02() {
@@ -202,7 +200,7 @@ lazy_static! {
             token: "comment_singleline",
             reg: Some(Regex::new(r"^//.*\n").unwrap()),
         });
-    
+
         patterns.push(TokenPattern {
             token: "comment_multiline",
             reg: Some(Regex::new(r"^/\*(.|\n)*\*/").unwrap()),

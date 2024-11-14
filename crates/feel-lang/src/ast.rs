@@ -43,7 +43,7 @@ impl VarValue {
         match self {
             Self::Name(v) => v.to_string(),
             Self::Str(v) => v.to_string(),
-            Self::Backtick(v) => v.to_string()
+            Self::Backtick(v) => v.to_string(),
         }
     }
 }
