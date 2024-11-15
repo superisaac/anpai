@@ -814,7 +814,7 @@ mod test {
     use crate::eval::Engine;
     use core::assert_matches::assert_matches;
     #[test]
-    fn test_parse_results() {
+    fn test_parse_expressions() {
         let testcases = [
             ("a + b(4, 9)", "(+ a (call b [4, 9]))"),
             ("if a > 6 then true else false", "(if (> a 6) true false)"),

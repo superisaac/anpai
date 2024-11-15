@@ -891,7 +891,7 @@ mod test {
     }
 
     #[test]
-    fn test_parse_stateless() {
+    fn test_parse_expression_stateless() {
         let testcases = [
             (None, "2+ 4", "6"),
             (None, "2 -5", "-3"),
@@ -951,7 +951,7 @@ mod test {
             (None, "some a in [2, 8, 3, 6] satisfies a > 4", "8"),
             (None, "every a in [2, 8, 3, 6] satisfies a > 4", "[8, 6]"),
             //("2 * 8; true; null; 9 / 3", "3"),
-            //(None, "2 in (>=5, <3)", "true"),
+            (None, "2 in (>=5, <3)", "true"),
             (Some("{a: 5}"), r#"a + 10.3"#, "15.3"), // expression list
             // (Some(r#"{"?": 5}"#), r#">6, =8, < 3"#, "false"), // multi tests
             // (Some(r#"{"?": 5}"#), r#">6, <8, < 3"#, "true"),
@@ -965,7 +965,7 @@ mod test {
             (None, r#"is defined([1, 2][6])"#, "false"),
             // test prelude functions
             (None, "not(2>1)", "false"),
-            (None, r#"number("3000.888")"#, "3000.888"),
+            (None, r#"number("3000.88800")"#, "3000.88800"),
             (None, r#"string length("hello world")"#, "11"),
             (
                 None,
@@ -1125,6 +1125,31 @@ mod test {
                 eng.load_context(ctx_input).unwrap();
             }
             let node = parse(input, Box::new(eng.clone()), Default::default()).unwrap();
+            let v = eng.eval(node).unwrap();
+            assert_eq!(v.to_string(), output, "output mismatch input: '{}'", input);
+        }
+    }
+
+    #[test]
+    fn test_parse_unary_tests_stateless() {
+        let testcases = [
+            (Some(r#"{"?": 5}"#), r#">6, =8, < 3"#, "false"), // unary tests
+            (Some(r#"{"?": 5}"#), r#">6, <8, < 3"#, "true"),
+            (Some(r#"{"?": 5}"#), r#"?>6, ?<8, < 3"#, "true"),
+        ];
+
+        for (ctx, input, output) in testcases {
+            let mut eng = super::Engine::new();
+            //println!("parse input {input}");
+            if let Some(ctx_input) = ctx {
+                eng.load_context(ctx_input).unwrap();
+            }
+            let node = parse(
+                input,
+                Box::new(eng.clone()),
+                crate::parse::ParseTop::UnaryTests,
+            )
+            .unwrap();
             let v = eng.eval(node).unwrap();
             assert_eq!(v.to_string(), output, "output mismatch input: '{}'", input);
         }
