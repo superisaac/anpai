@@ -65,6 +65,11 @@ pub enum NodeSyntax {
         right: Box<Node>,
     },
 
+    UnaryTest {
+        op: String,
+        right: Box<Node>,
+    },
+
     InOp {
         left: Box<Node>,
         right: Box<Node>,
@@ -149,13 +154,14 @@ pub enum NodeSyntax {
 
     ExprList(Vec<Box<Node>>),
 
-    MultiTests(Vec<Box<Node>>),
+    UnaryTests(Vec<Box<Node>>),
 }
 
 impl fmt::Display for NodeSyntax {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::BinOp { op, left, right } => write!(f, "({} {} {})", op, left, right),
+            Self::UnaryTest { op, right } => write!(f, "({} {})", op, right),
             Self::InOp { left, right } => write!(f, "(in {} {})", left, right),
             Self::LogicOp { op, left, right } => write!(f, "({} {} {})", op, left, right),
             Self::DotOp { left, attr } => write!(f, "(. {} {})", left, attr),
@@ -218,7 +224,7 @@ impl fmt::Display for NodeSyntax {
                 var_name, list_expr, filter_expr
             ),
             Self::ExprList(elements) => fmt_iter(f, elements.iter(), " ", "(expr-list ", ")"),
-            Self::MultiTests(elements) => fmt_iter(f, elements.iter(), " ", "(multi-tests ", ")"),
+            Self::UnaryTests(elements) => fmt_iter(f, elements.iter(), " ", "(unary-tests ", ")"),
         }
     }
 }

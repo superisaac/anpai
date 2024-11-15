@@ -123,7 +123,7 @@ impl Parser<'_> {
                 let elem1 = self.parse_unary_test()?;
                 elements.push(elem1);
             }
-            Ok(Node::new(MultiTests(elements), start_pos))
+            Ok(Node::new(UnaryTests(elements), start_pos))
         } else {
             Ok(elem)
         }
@@ -138,11 +138,10 @@ impl Parser<'_> {
             goahead!(self); // skip op
             let start_pos = self.scanner.current_token().position;
             let right = self.parse_expression()?;
-            let left = Node::new(Var(VarValue::Name("?".to_owned())), start_pos.clone());
+            //let left = Node::new(Var(VarValue::Name("?".to_owned())), start_pos.clone());
             Ok(Node::new(
-                BinOp {
+                UnaryTest {
                     op: op.to_string(),
-                    left,
                     right,
                 },
                 start_pos,
@@ -326,6 +325,7 @@ impl Parser<'_> {
             "{" => self.parse_map(),
             "(" => self.parse_bracket_or_range(),
             "[" => self.parse_range_or_array(),
+            ">" | ">=" | "<" | "<=" | "!=" | "=" => self.parse_unary_test(),
             "keyword" => match self.scanner.current_token().value.as_str() {
                 "true" | "false" => self.parse_bool(),
                 "null" => self.parse_null(),
@@ -819,13 +819,33 @@ mod test {
             ("a + b(4, 9)", "(+ a (call b [4, 9]))"),
             ("if a > 6 then true else false", "(if (> a 6) true false)"),
             ("{a: 1, \"bbb\": [2, 1]}", r#"{a: 1, "bbb": [2, 1]}"#),
-            //("> 2, <= 1, a>8", "(multi-tests (> ? 2) (<= ? 1) (> a 8))"),
+            //("> 2, <= 1, a>8", "(unary-tests (> ? 2) (<= ? 1) (> a 8))"),
             //("2>8; 9; true", "(expr-list (> 2 8) 9 true)"),
         ];
 
         for (input, output) in testcases {
             let engine = Box::new(Engine::new());
             let node = super::parse(input, engine, Default::default()).unwrap();
+            assert_eq!(
+                format!("{}", *node),
+                output,
+                "output {} mismatch input {}",
+                output,
+                input
+            );
+        }
+    }
+
+    #[test]
+    fn test_parse_unary_tests() {
+        let testcases = [
+            ("> 2, <= 1, a>8", "(unary-tests (> 2) (<= 1) (> a 8))"),
+            //("2>8; 9; true", "(expr-list (> 2 8) 9 true)"),
+        ];
+
+        for (input, output) in testcases {
+            let engine = Box::new(Engine::new());
+            let node = super::parse(input, engine, super::ParseTop::UnaryTests).unwrap();
             assert_eq!(
                 format!("{}", *node),
                 output,

@@ -258,6 +258,7 @@ impl Engine {
             Var(v) => self.eval_var(v),
             Neg(value) => self.eval_neg_op(value),
             BinOp { op, left, right } => self.eval_binop(op, left, right),
+            UnaryTest { op, right } => self.eval_unary_test(op, right),
             InOp { left, right } => self.eval_in_op(left, right),
             LogicOp { op, left, right } => self.eval_logicop(op, left, right),
             DotOp { left, attr } => self.eval_dotop(left, attr),
@@ -306,7 +307,7 @@ impl Engine {
                 filter_expr,
             } => self.eval_every_expr(var_name, list_expr, filter_expr),
             ExprList(exprs) => self.eval_expr_list(exprs),
-            MultiTests(exprs) => self.eval_multi_tests(exprs),
+            UnaryTests(exprs) => self.eval_unary_tests(exprs),
         };
         return match res {
             Ok(v) => Ok(v),
@@ -555,7 +556,7 @@ impl Engine {
     }
 
     #[inline(always)]
-    fn eval_multi_tests(&mut self, exprs: Vec<Box<Node>>) -> EvalResult {
+    fn eval_unary_tests(&mut self, exprs: Vec<Box<Node>>) -> EvalResult {
         self.eval_expr_list_in(exprs)
         // //let input_value = self.resolve("?".to_owned()).ok_or(EvalError::VarNotFound)?;
         // for expr in exprs.iter() {
@@ -764,6 +765,27 @@ impl Engine {
             "[]" => self.eval_binop_index(left_value, right_value),
             //"in" => self.eval_binop_in(left_value, right_value),
             _ => return Err(EvalError::new(Runtime(format!("unknown op {}", op)))),
+        }
+    }
+
+    #[inline(always)]
+    fn eval_unary_test(&mut self, op: String, right: Box<Node>) -> EvalResult {
+        let left_value = self.eval_var(VarValue::Name("?".to_owned()))?;
+        let right_value = self.eval(right)?;
+        match op.as_str() {
+            ">" => Ok(BoolV(left_value > right_value)),
+            ">=" => Ok(BoolV(left_value >= right_value)),
+            "<" => Ok(BoolV(left_value < right_value)),
+            "<=" => Ok(BoolV(left_value <= right_value)),
+            "!=" => Ok(BoolV(left_value != right_value)),
+            "=" => Ok(BoolV(left_value == right_value)),
+            //"in" => self.eval_binop_in(left_value, right_value),
+            _ => {
+                return Err(EvalError::new(Runtime(format!(
+                    "unknown unary test op {}",
+                    op
+                ))))
+            }
         }
     }
 
