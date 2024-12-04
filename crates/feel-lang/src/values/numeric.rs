@@ -14,23 +14,6 @@ pub enum Numeric {
     Decimal(BigDecimal),
 }
 
-// fn remove_trailing_zeros(s: String) -> String {
-//     if s.contains(".") {
-//         let re = Regex::new(r"\.?0*$").unwrap();
-//         let r = re.replace(s.as_str(), "");
-//         return r.to_string();
-//     } else {
-//         return s;
-//     }
-// }
-
-// lazy_static! {
-//     static ref BIG_CONTEXT: Context = {
-//         let prec = NonZeroU64::new(34).unwrap();
-//         Context::new(prec, Default::default())
-//     };
-// }
-
 impl fmt::Display for Numeric {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -93,7 +76,12 @@ impl Numeric {
                 return Self::Integer(v);
             }
         }
-        Self::Decimal(bign) //.with_scale(34))
+        if bign.fractional_digit_count() > 34 {
+            let round_bign = bign.with_scale_round(34, RoundingMode::Floor);
+            Self::Decimal(round_bign)
+        } else {
+            Self::Decimal(bign)
+        }
     }
 
     pub fn from_value(value: &Value) -> Option<Numeric> {
@@ -411,5 +399,12 @@ mod test {
     fn test_zero_num_format() {
         let v = super::Numeric::from_str("0.00000").unwrap();
         assert_eq!(v.to_string(), "0");
+    }
+    #[test]
+    fn test_max_scale() {
+        let a = super::Numeric::from_str("1.00000000000000000000000000000000005").unwrap();
+        let b = super::Numeric::from_str("1.00000000000000000000000000000000008").unwrap();
+        let s = a + b;
+        assert_eq!(s.to_string(), "2.0000000000000000000000000000000000"); // the last 13 was stripped
     }
 }
