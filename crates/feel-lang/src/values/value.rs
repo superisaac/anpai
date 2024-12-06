@@ -77,13 +77,13 @@ pub enum Value {
     ContextV(ContextRef),
     NativeFuncV {
         func: NativeFunc,
-        require_args: Vec<String>,
+        required_args: Vec<String>,
         optional_args: Vec<String>,
         var_arg: Option<String>,
     },
     MacroV {
         macro_: MacroT,
-        require_args: Vec<String>,
+        required_args: Vec<String>,
     },
     FuncV {
         func_def: Box<Node>,
@@ -115,13 +115,13 @@ impl fmt::Display for Value {
             Self::ArrayV(arr) => fmt_vec(f, arr.borrow().iter(), "[", "]"),
             Self::ContextV(map) => write!(f, "{}", map.borrow()),
             Self::NativeFuncV {
-                require_args: _,
+                required_args: _,
                 optional_args: _,
                 var_arg: _,
                 func: _,
             } => write!(f, "{}", "function"),
             Self::MacroV {
-                require_args: _,
+                required_args: _,
                 macro_: _,
             } => write!(f, "{}", "function"),
             Self::FuncV { func_def: _, code } => write!(f, "{}", code),
@@ -155,13 +155,13 @@ impl Value {
             Self::ArrayV(_) => "array".to_owned(),
             Self::ContextV(_) => "map".to_owned(),
             Self::NativeFuncV {
-                require_args: _,
+                required_args: _,
                 optional_args: _,
                 var_arg: _,
                 func: _,
             } => "nativefunc".to_owned(),
             Self::MacroV {
-                require_args: _,
+                required_args: _,
                 macro_: _,
             } => "macro".to_owned(),
             Self::FuncV {

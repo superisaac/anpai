@@ -574,15 +574,15 @@ impl Engine {
         match fref {
             NativeFuncV {
                 func,
-                require_args,
+                required_args,
                 optional_args,
                 var_arg,
-            } => self.call_native_func(&func, require_args, optional_args, var_arg, call_args),
+            } => self.call_native_func(&func, required_args, optional_args, var_arg, call_args),
             FuncV { func_def, code: _ } => self.call_func(func_def, call_args),
             MacroV {
                 macro_,
-                require_args,
-            } => self.call_macro(&macro_, require_args, call_args),
+                required_args,
+            } => self.call_macro(&macro_, required_args, call_args),
             _ => {
                 return Err(EvalError::runtime(
                     format!("cannot call non function {}", fref.data_type()).as_str(),
@@ -594,22 +594,22 @@ impl Engine {
     fn call_native_func(
         &mut self,
         func: &NativeFunc,
-        require_args: Vec<String>,
+        required_args: Vec<String>,
         optional_args: Vec<String>,
         var_arg: Option<String>,
         call_args: Vec<FuncCallArg>,
     ) -> EvalResult {
         let call_args_len = call_args.len();
-        if require_args.len() > call_args_len {
+        if required_args.len() > call_args_len {
             return Err(EvalError::new(Runtime(format!(
                 "too few arguments, expect at least {} args, found {}",
-                require_args.len(),
+                required_args.len(),
                 call_args_len
             ))));
-        } else if var_arg.is_none() && require_args.len() + optional_args.len() < call_args.len() {
+        } else if var_arg.is_none() && required_args.len() + optional_args.len() < call_args.len() {
             return Err(EvalError::new(Runtime(format!(
                 "too many arguments, expect at most {} args, found {}",
-                require_args.len() + optional_args.len(),
+                required_args.len() + optional_args.len(),
                 call_args_len
             ))));
         }
@@ -623,17 +623,17 @@ impl Engine {
             // resolve argument name
             let arg_name = match call_arg.arg_name.as_str() {
                 "" => {
-                    let implicit_arg_name = if positional_arg_index < require_args.len() {
-                        require_args[positional_arg_index].as_str()
-                    } else if positional_arg_index < require_args.len() + optional_args.len() {
-                        optional_args[positional_arg_index - require_args.len()].as_str()
+                    let implicit_arg_name = if positional_arg_index < required_args.len() {
+                        required_args[positional_arg_index].as_str()
+                    } else if positional_arg_index < required_args.len() + optional_args.len() {
+                        optional_args[positional_arg_index - required_args.len()].as_str()
                     } else if let Some(ref var_arg_name) = var_arg {
                         use_var_arg = true;
                         var_arg_name.as_str()
                     } else {
                         return Err(EvalError::new(Runtime(format!(
                             "too many arguments, expect at most {} args, found {}",
-                            require_args.len() + optional_args.len(),
+                            required_args.len() + optional_args.len(),
                             call_args_len
                         ))));
                     };

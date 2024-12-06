@@ -62,28 +62,34 @@ impl Prelude {
         }
     }
 
-    pub fn add_macro(&mut self, name: &str, require_args: &[&str], body: MacroBody) {
-        let require_args_vec = require_args.into_iter().map(|s| String::from(*s)).collect();
+    pub fn add_macro(&mut self, name: &str, required_args: &[&str], body: MacroBody) {
+        let required_args_vec = required_args
+            .into_iter()
+            .map(|s| String::from(*s))
+            .collect();
         let macro_ = MacroT {
             name: name.to_owned(),
             body,
         };
         let macro_value = MacroV {
             macro_,
-            require_args: require_args_vec,
+            required_args: required_args_vec,
         };
         self.set_var(name.to_owned(), macro_value);
     }
 
-    pub fn add_native_func(&mut self, name: &str, require_args: &[&str], func: NativeFuncBody) {
-        let require_arg_vec = require_args.into_iter().map(|&s| String::from(s)).collect();
+    pub fn add_native_func(&mut self, name: &str, required_args: &[&str], func: NativeFuncBody) {
+        let required_arg_vec = required_args
+            .into_iter()
+            .map(|&s| String::from(s))
+            .collect();
         let func_t = NativeFunc {
             name: name.to_owned(),
             body: func,
         };
         let func_value = NativeFuncV {
             func: func_t,
-            require_args: require_arg_vec,
+            required_args: required_arg_vec,
             optional_args: Vec::new(),
             var_arg: None,
         };
@@ -93,7 +99,7 @@ impl Prelude {
     pub fn add_native_func_with_optional_args(
         &mut self,
         name: &str,
-        require_args: &[&str],
+        required_args: &[&str],
         optional_args: &[&str],
         var_arg: Option<&str>,
         func: NativeFuncBody,
@@ -104,7 +110,10 @@ impl Prelude {
         };
         let func_value = NativeFuncV {
             func: func_t,
-            require_args: require_args.into_iter().map(|&s| String::from(s)).collect(),
+            required_args: required_args
+                .into_iter()
+                .map(|&s| String::from(s))
+                .collect(),
             optional_args: optional_args
                 .into_iter()
                 .map(|&s| String::from(s))
