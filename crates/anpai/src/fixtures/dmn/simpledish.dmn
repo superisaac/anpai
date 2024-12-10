@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:modeler="http://camunda.org/schema/modeler/1.0" xmlns:biodi="http://bpmn.io/schema/dmn/biodi/2.0" id="Definitions_0bseb8u" name="DRD" namespace="http://camunda.org/schema/1.0/dmn" exporter="Camunda Modeler" exporterVersion="5.11.0" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.2.0">
+  <decision id="Decision_0rwi1k0" name="Decision 1">
+    <decisionTable id="DecisionTable_1g6j563">
+      <input id="Input_1" label="Season">
+        <inputExpression id="InputExpression_1" typeRef="string">
+          <text></text>
+        </inputExpression>
+      </input>
+      <output id="Output_1" name="Dish" typeRef="string" biodi:width="239" />
+      <rule id="DecisionRule_0m0wqkb">
+        <description>https://camunda.com/dmn/</description>
+        <inputEntry id="UnaryTests_0crgj13">
+          <text>"Fall"</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_0eq24zz">
+          <text>"Sparelibs"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_0xktny2">
+        <inputEntry id="UnaryTests_1ai59tg">
+          <text>"Winter"</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_1a54mi2">
+          <text>"Roastbeef"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_05m8gwl">
+        <inputEntry id="UnaryTests_18ch6xj">
+          <text>"Spring"</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_10fxj23">
+          <text>"Steak"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_1qc7vsf">
+        <inputEntry id="UnaryTests_1p12szs">
+          <text>"Summer"</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_0u0rwhl">
+          <text>"Light Salad and a nice Steak"</text>
+        </outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram>
+      <dmndi:DMNShape dmnElementRef="Decision_0rwi1k0">
+        <dc:Bounds height="80" width="180" x="160" y="100" />
+      </dmndi:DMNShape>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</definitions>
