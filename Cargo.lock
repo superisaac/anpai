@@ -205,6 +205,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "930c7171c8df9fb1782bdf9b918ed9ed2d33d1d22300abb754f9085bc48bf8e8"
 
 [[package]]
+name = "dmn"
+version = "0.1.0"
+
+[[package]]
 name = "feel"
 version = "0.1.0"
 dependencies = [
