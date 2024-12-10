@@ -1,6 +1,6 @@
 use clap::*;
-use feel_lang::eval;
-use feel_lang::parse;
+use feel::eval;
+use feel::parse;
 use fileinput::FileInput;
 use std::fs::File;
 use std::io::BufReader;

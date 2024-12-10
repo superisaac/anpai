@@ -1,5 +1,5 @@
 [package]
-name = "feel-lang"
+name = "feel"
 version = "0.1.0"
 edition = "2021"
 
