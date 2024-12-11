@@ -1,6 +1,7 @@
 use clap::*;
 use feel::eval;
-use feel::parse;
+use feel::parse as feel_parse;
+use dmn::parse as dmn_parse;
 use fileinput::FileInput;
 use std::fs::File;
 use std::io::BufReader;
@@ -12,8 +13,8 @@ use std::io::Read;
     about = "workflow kits and tools",
     rename_all = "kebab-case"
 )]
-enum FEELCommands {
-    #[clap(name = "feel", about = "run feel language intepretor")]
+enum AnpaiCommands {
+    #[clap(name = "feel", about = "run FEEL language intepretor")]
     Feel {
         #[arg(short, long, help = "dump AST node instead of evaluating")]
         ast: bool,
@@ -32,10 +33,15 @@ enum FEELCommands {
 
         files: Vec<String>,
     },
+
+    #[clap(name = "dmn", about = "DMN parser and evaluator")]
+    Dmn {
+        file: String,
+    }
 }
 
-impl FEELCommands {
-    fn parse_and_eval(
+impl AnpaiCommands {
+    fn parse_and_eval_feel(
         &self,
         code: &str,
         varsfile: Option<String>,
@@ -55,7 +61,7 @@ impl FEELCommands {
         if let Some(context_vars) = vars {
             eng.load_context(&context_vars)?;
         }
-        let n = parse::parse(code, eng.clone(), Default::default())?;
+        let n = feel_parse::parse(code, eng.clone(), Default::default())?;
 
         if dump_ast {
             if json_format {
@@ -94,7 +100,7 @@ impl FEELCommands {
                     reader.read_to_string(&mut buf).unwrap();
                     buf
                 };
-                match self.parse_and_eval(
+                match self.parse_and_eval_feel(
                     input.as_str(),
                     varsfile.clone(),
                     vars.clone(),
@@ -112,6 +118,9 @@ impl FEELCommands {
                     }
                 }
             }
+            Self::Dmn { file } => {
+                dmn_parse::parse_file(file.as_str());
+            }
         }
 
         ()
@@ -119,7 +128,6 @@ impl FEELCommands {
 }
 
 fn main() {
-    //let cmd = commands::FEELCommands::parse();
-    let args = FEELCommands::parse();
+    let args = AnpaiCommands::parse();
     args.execute()
 }
