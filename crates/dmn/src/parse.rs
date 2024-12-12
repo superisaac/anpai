@@ -2,10 +2,34 @@ extern crate sxd_document;
 extern crate sxd_xpath;
 
 use std::fs;
+use std::fmt;
+use std::error;
+
 use sxd_document::parser;
 use sxd_xpath::{Factory, Context, Value};
 //use sxd_document::dom::Element;
 use sxd_xpath::nodeset::Node;
+
+// errors
+#[derive(Debug, Clone)]
+pub enum DmnError {
+    NoAttribute(String),
+    InvalidElement(String),
+    IOError(String),
+    XMLError(String),
+}
+impl error::Error for DmnError {}
+
+impl fmt::Display for DmnError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::NoAttribute(name) =>  write!(f, "attribute {} not found", name),
+            Self::InvalidElement(elem_name) => write!(f, "invalid element {}", elem_name),
+            Self::IOError(error_message) => write!(f, "io error {}", error_message),
+            Self::XMLError(error_message) => write!(f, "parse XML error {}", error_message),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct InputExpression {
@@ -66,11 +90,11 @@ impl Parser<'_> {
         }
     }
 
-    fn get_attribute(&self, node: Node, attr_name: &str) -> String {
+    fn get_attribute(&self, node: Node, attr_name: &str) -> Result<String, DmnError> {
         if let Node::Element(e) = node {
-            return e.attribute(attr_name).unwrap().value().to_owned();
+            return Ok(e.attribute(attr_name).unwrap().value().to_owned());
         }
-        return "".to_owned();
+        return Err(DmnError::NoAttribute(attr_name.to_owned()));
     }
 
     // fn evaluate_xpath<'a>(&'a self, node: Node<'a>, xpath: &str) -> Value<'_> {
@@ -113,8 +137,6 @@ impl Parser<'_> {
         let b = self.factory.build(xpath).unwrap().unwrap();
         let mut nodes: Vec<Node> = vec![];
         let value = b.evaluate(&self.context, node).unwrap();
-        println!("node html {} {:?}", xpath, node);
-        println!("element nodes {:?}", value);
         match value {
             Value::Nodeset(nodeset ) => {
                 for n in nodeset.iter() {
@@ -144,60 +166,60 @@ impl Parser<'_> {
     //     elements
     // }
 
-    fn parse_input(&self, n: Node) -> Input {
+    fn parse_input(&self, n: Node) -> Result<Input, DmnError> {
         if let Node::Element(_) = n {
-            let id = self.get_attribute(n, "id");
-            let label = self.get_attribute(n, "label");
+            let id = self.get_attribute(n, "id")?;
+            let label = self.get_attribute(n, "label").unwrap_or_default();
 
             let expr_node = self.get_first_element_node(n, "ns:inputExpression").unwrap();
             let input_expr = InputExpression {
-                id: self.get_attribute(expr_node, "id"),
-                type_ref: self.get_attribute(expr_node, "typeRef"),
+                id: self.get_attribute(expr_node, "id")?,
+                type_ref: self.get_attribute(expr_node, "typeRef").unwrap_or("".to_owned()),
                 text: self.get_text(expr_node, "ns:text"),
             };
 
-            Input {
+            Ok(Input {
                 id, label, expression: input_expr
-            }
+            })
         } else {
-            panic!("not input");
+            Err(DmnError::InvalidElement("input".to_owned()))
         }
     }
 
-    fn parse_output(&self, n: Node) -> Output {
-        let id = self.get_attribute(n, "id");
-        let type_ref = self.get_attribute(n, "typeRef");
-        let name = self.get_attribute(n, "name");
-        Output {
+    fn parse_output(&self, n: Node) -> Result<Output, DmnError> {
+        let id = self.get_attribute(n, "id")?;
+        let type_ref = self.get_attribute(n, "typeRef").unwrap_or_default();
+        let name = self.get_attribute(n, "name").unwrap_or_default();
+        Ok(Output {
             id, type_ref, name,
-        }
+        })
     }
 
-    fn parse_decision_table(&self, node: Node) -> DicisionTable {
+    fn parse_decision_table(&self, node: Node) -> Result<DicisionTable, DmnError> {
         if let Node::Element(_) = node  {
-            let id = self.get_attribute(node, "id");
+            let id = self.get_attribute(node, "id")?;
 
             let mut inputs: Vec<Input> = vec![];
             for input_node in self.get_element_nodes(node, "ns:input") {
-                let input = self.parse_input(input_node);
+                let input = self.parse_input(input_node)?;
                 inputs.push(input);
             }
 
             let mut outputs: Vec<Output> = vec![];
             for output_node in self.get_element_nodes(node, "ns:output") {
-                let output = self.parse_output(output_node);
+                let output = self.parse_output(output_node)?;
                 outputs.push(output);
             }
 
-            DicisionTable{id: id.to_owned(), inputs, outputs}
+            Ok(DicisionTable{id: id.to_owned(), inputs, outputs})
         } else {
-            panic!("bad element");
+            Err(DmnError::InvalidElement("decisionTable".to_owned()))
         }
     }
 
-    fn parse_file(&self, path: &str) -> DicisionTable {
-        let contents = fs::read_to_string(path).unwrap();
-        let package = parser::parse(contents.as_str()).unwrap();
+    fn parse_file(&self, path: &str) -> Result<DicisionTable, DmnError> {
+        let contents = fs::read_to_string(path).or_else(|e| Err(DmnError::IOError(e.to_string())))?;
+        let package = parser::parse(contents.as_str()).or_else(|e| Err(DmnError::XMLError(e.to_string())))?;
         let doc = package.as_document();
         let dicision_table_node = self.get_first_element_node(
             doc.root().into(),
@@ -208,7 +230,7 @@ impl Parser<'_> {
 
 pub fn parse_file(path: &str) {
     let parser = Parser::new();
-    let table = parser.parse_file(path);
+    let table = parser.parse_file(path).unwrap();
     println!("{:?}", table);
 } 
 
