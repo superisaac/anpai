@@ -4,7 +4,12 @@
     <decisionTable id="DecisionTable_1g6j563">
       <input id="Input_1" label="Season">
         <inputExpression id="InputExpression_1" typeRef="string">
-          <text></text>
+          <text>season</text>
+        </inputExpression>
+      </input>
+      <input id="InputClause_00tkqf4" label="Vegetarian Guests">
+        <inputExpression id="LiteralExpression_03s8exq" typeRef="boolean">
+          <text>hasVegetarianGuests</text>
         </inputExpression>
       </input>
       <output id="Output_1" name="Dish" typeRef="string" biodi:width="239" />
@@ -12,6 +17,9 @@
         <description>https://camunda.com/dmn/</description>
         <inputEntry id="UnaryTests_0crgj13">
           <text>"Fall"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_01dfw1l">
+          <text>false</text>
         </inputEntry>
         <outputEntry id="LiteralExpression_0eq24zz">
           <text>"Sparelibs"</text>
@@ -21,6 +29,9 @@
         <inputEntry id="UnaryTests_1ai59tg">
           <text>"Winter"</text>
         </inputEntry>
+        <inputEntry id="UnaryTests_1ufw8kb">
+          <text>false</text>
+        </inputEntry>
         <outputEntry id="LiteralExpression_1a54mi2">
           <text>"Roastbeef"</text>
         </outputEntry>
@@ -28,6 +39,9 @@
       <rule id="DecisionRule_05m8gwl">
         <inputEntry id="UnaryTests_18ch6xj">
           <text>"Spring"</text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0jytapu">
+          <text>false</text>
         </inputEntry>
         <outputEntry id="LiteralExpression_10fxj23">
           <text>"Steak"</text>
@@ -37,8 +51,22 @@
         <inputEntry id="UnaryTests_1p12szs">
           <text>"Summer"</text>
         </inputEntry>
+        <inputEntry id="UnaryTests_0v7u2k5">
+          <text>false</text>
+        </inputEntry>
         <outputEntry id="LiteralExpression_0u0rwhl">
           <text>"Light Salad and a nice Steak"</text>
+        </outputEntry>
+      </rule>
+      <rule id="DecisionRule_0wnb6a7">
+        <inputEntry id="UnaryTests_0u02eob">
+          <text></text>
+        </inputEntry>
+        <inputEntry id="UnaryTests_0im8c7r">
+          <text>true</text>
+        </inputEntry>
+        <outputEntry id="LiteralExpression_1phbi8p">
+          <text>"Pasta"</text>
         </outputEntry>
       </rule>
     </decisionTable>
