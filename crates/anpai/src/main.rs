@@ -1,7 +1,7 @@
 use clap::*;
+use dmn::parse as dmn_parse;
 use feel::eval;
 use feel::parse as feel_parse;
-use dmn::parse as dmn_parse;
 use fileinput::FileInput;
 use std::fs::File;
 use std::io::BufReader;
@@ -35,9 +35,7 @@ enum AnpaiCommands {
     },
 
     #[clap(name = "dmn", about = "DMN parser and evaluator")]
-    Dmn {
-        file: String,
-    }
+    Dmn { file: String },
 }
 
 impl AnpaiCommands {
