@@ -71,11 +71,32 @@ pub struct Output {
 }
 
 #[derive(Clone, Debug)]
+pub struct RuleInputEntry {
+    pub id: String,
+    pub text: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct RuleOutputEntry {
+    pub id: String,
+    pub text: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct Rule {
+    pub id: String,
+    pub description: String,
+    pub input_entries: Vec<RuleInputEntry>,
+    pub output_entries: Vec<RuleOutputEntry>,
+}
+
+#[derive(Clone, Debug)]
 pub struct DicisionTable {
     pub id: String,
     pub hit_policy: String,
     pub inputs: Vec<Input>,
     pub outputs: Vec<Output>,
+    pub rules: Vec<Rule>,
 }
 
 pub struct Parser<'a> {
@@ -190,6 +211,38 @@ impl Parser<'_> {
         }
     }
 
+    fn parse_rule(&self, n: Node) -> Result<Rule, DmnError> {
+        let id: String = self.get_attribute(n, "id")?;
+        let description = self.get_text(n, "ns:description").unwrap_or("".to_owned());
+
+        let mut input_entries: Vec<RuleInputEntry> = vec![];
+        for input_node in self.get_element_nodes(n, "ns:inputEntry")? {
+            let input_entry_id = self.get_attribute(input_node, "id")?;
+            let text = self.get_text(input_node, "text").unwrap_or("".to_owned());
+            input_entries.push(RuleInputEntry {
+                id: input_entry_id,
+                text,
+            });
+        }
+
+        let mut output_entries: Vec<RuleOutputEntry> = vec![];
+        for output_node in self.get_element_nodes(n, "ns:outputEntry")? {
+            let output_entry_id = self.get_attribute(output_node, "id")?;
+            let text = self.get_text(output_node, "text").unwrap_or("".to_owned());
+            output_entries.push(RuleOutputEntry {
+                id: output_entry_id,
+                text,
+            });
+        }
+
+        Ok(Rule {
+            id,
+            description,
+            input_entries,
+            output_entries,
+        })
+    }
+
     fn parse_output(&self, n: Node) -> Result<Output, DmnError> {
         let id = self.get_attribute(n, "id")?;
         let type_ref = self.get_attribute(n, "typeRef").unwrap_or_default();
@@ -216,11 +269,17 @@ impl Parser<'_> {
                 outputs.push(output);
             }
 
+            let mut rules: Vec<Rule> = vec![];
+            for rule_node in self.get_element_nodes(node, "ns:rule")? {
+                let rule = self.parse_rule(rule_node)?;
+                rules.push(rule);
+            }
             Ok(DicisionTable {
                 id,
                 hit_policy,
                 inputs,
                 outputs,
+                rules,
             })
         } else {
             Err(DmnError::InvalidElement("decisionTable".to_owned()))
