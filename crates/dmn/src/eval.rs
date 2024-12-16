@@ -35,7 +35,7 @@ pub fn eval_file(engine: &mut Box<Engine>, dmn_path: &str) -> Result<Value, DmnE
         let path = format!("input/{}[@id={}]", input_idx, input.id);
         let input_value = match engine.parse_and_eval(input_text.as_str()) {
             Ok(v) => v,
-            Err(err) => return Err(DmnError::FEELEvelError(err, path)),
+            Err(err) => return Err(DmnError::FEELEvalError(err, path, input_text)),
         };
         input_values.push(input_value);
     }
@@ -46,13 +46,17 @@ pub fn eval_file(engine: &mut Box<Engine>, dmn_path: &str) -> Result<Value, DmnE
             let mut output_context = Context::new();
             for (i, output) in table.outputs.iter().enumerate() {
                 let output_entry = rule.output_entries[i].clone();
+                let output_text = output_entry.text;
+                if output_text == "" {
+                    continue;
+                }
                 let path = format!(
                     "rule/{}/outputEntry/{}[@id={}]",
                     rule_idx, i, output_entry.id
                 );
-                let output_value = match engine.parse_and_eval(output_entry.text.as_str()) {
+                let output_value = match engine.parse_and_eval(output_text.as_str()) {
                     Ok(v) => v,
-                    Err(err) => return Err(DmnError::FEELEvelError(err, path)),
+                    Err(err) => return Err(DmnError::FEELEvalError(err, path, output_text)),
                 };
                 output_context.insert(output.name.clone(), output_value);
             }

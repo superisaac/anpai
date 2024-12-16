@@ -101,7 +101,13 @@ impl AnpaiCommands {
             data_file.read_to_string(&mut content).unwrap();
             match eng.load_context(&content) {
                 Ok(_) => (),
-                Err(err) => return Err(DmnError::FEELEvelError(err, "context-file".to_owned())),
+                Err(err) => {
+                    return Err(DmnError::FEELEvalError(
+                        err,
+                        "context-file".to_owned(),
+                        content,
+                    ))
+                }
             }
         }
 
@@ -109,7 +115,13 @@ impl AnpaiCommands {
             //eng.load_context(&context_vars)?;
             match eng.load_context(&context_vars) {
                 Ok(_) => (),
-                Err(err) => return Err(DmnError::FEELEvelError(err, "context-vars".to_owned())),
+                Err(err) => {
+                    return Err(DmnError::FEELEvalError(
+                        err,
+                        "context-vars".to_owned(),
+                        context_vars,
+                    ))
+                }
             }
         }
 
@@ -167,13 +179,13 @@ impl AnpaiCommands {
                 file,
             } => match self.parse_and_eval_dmn(varsfile.clone(), vars.clone(), file.clone()) {
                 Ok(_) => (),
-                Err(DmnError::FEELEvelError(err, path)) => {
+                Err(DmnError::FEELEvalError(err, path, code)) => {
                     eprintln!(
-                        "Path: {}\n{}\nPosition: {}",
+                        "Path: {}\n{}\nPosition: {}\n\n{}",
                         path,
                         err.kind,
                         err.pos,
-                        //err.pos.line_pointers(input.as_str())
+                        err.pos.line_pointers(code.as_str()),
                     );
                 }
                 Err(err) => {

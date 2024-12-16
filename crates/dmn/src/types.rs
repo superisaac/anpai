@@ -14,7 +14,7 @@ pub enum DmnError {
     XMLError(String),
     XPathParserError(ParserError),
     XPathExecutionError(ExecutionError),
-    FEELEvelError(FEELEvelError, String),
+    FEELEvalError(FEELEvelError, String, String),
 }
 impl error::Error for DmnError {}
 
@@ -46,7 +46,7 @@ impl fmt::Display for DmnError {
             Self::XMLError(error_message) => write!(f, "parse XML error {}", error_message),
             Self::XPathParserError(err) => write!(f, "parse xpath error {}", err),
             Self::XPathExecutionError(err) => write!(f, "execute xpath error {}", err),
-            Self::FEELEvelError(err, path) => write!(f, "eval FEEL error at {}, {}", path, err),
+            Self::FEELEvalError(err, path, _) => write!(f, "eval FEEL error at {}, {}", path, err),
         }
     }
 }
