@@ -14,11 +14,13 @@ pub struct Parser<'a> {
     context: Context<'a>,
 }
 
+static DEFAULT_NAMESPACE: &str = "https://www.omg.org/spec/DMN/20191111/MODEL/";
+
 impl Parser<'_> {
     pub fn new<'a>() -> Parser<'a> {
         let factory = Factory::new();
         let mut context = Context::new();
-        context.set_namespace("ns", "https://www.omg.org/spec/DMN/20191111/MODEL/");
+        context.set_namespace("ns", DEFAULT_NAMESPACE);
         Parser { factory, context }
     }
 

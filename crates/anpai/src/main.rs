@@ -99,11 +99,18 @@ impl AnpaiCommands {
             let mut data_file = File::open(context_varsfile.as_str()).unwrap();
             let mut content = String::new();
             data_file.read_to_string(&mut content).unwrap();
-            eng.load_context(&content)?;
+            match eng.load_context(&content) {
+                Ok(_) => (),
+                Err(err) => return Err(DmnError::FEELEvelError(err, "context-file".to_owned())),
+            }
         }
 
         if let Some(context_vars) = vars {
-            eng.load_context(&context_vars)?;
+            //eng.load_context(&context_vars)?;
+            match eng.load_context(&context_vars) {
+                Ok(_) => (),
+                Err(err) => return Err(DmnError::FEELEvelError(err, "context-vars".to_owned())),
+            }
         }
 
         //dmn_parse::parse_file(file.as_str());
@@ -143,6 +150,7 @@ impl AnpaiCommands {
                     *json,
                 ) {
                     Ok(_) => (),
+
                     Err(err) => {
                         eprintln!(
                             "{}\nPosition: {}\n\n{}",
@@ -159,6 +167,15 @@ impl AnpaiCommands {
                 file,
             } => match self.parse_and_eval_dmn(varsfile.clone(), vars.clone(), file.clone()) {
                 Ok(_) => (),
+                Err(DmnError::FEELEvelError(err, path)) => {
+                    eprintln!(
+                        "Path: {}\n{}\nPosition: {}",
+                        path,
+                        err.kind,
+                        err.pos,
+                        //err.pos.line_pointers(input.as_str())
+                    );
+                }
                 Err(err) => {
                     eprintln!("Error {}", err);
                 }

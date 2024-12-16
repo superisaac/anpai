@@ -30,20 +30,31 @@ pub fn eval_file(engine: &mut Box<Engine>, dmn_path: &str) -> Result<Value, DmnE
     let parser = Parser::new();
     let table = parser.parse_file(dmn_path)?;
     let mut input_values: Vec<Value> = vec![];
-    for input in table.inputs {
-        let input_text = input.expression.text;
-        let v = engine.parse_and_eval(input_text.as_str())?;
-        input_values.push(v);
+    for (input_idx, input) in table.inputs.iter().enumerate() {
+        let input_text = input.expression.text.clone();
+        let path = format!("input/{}[@id={}]", input_idx, input.id);
+        let input_value = match engine.parse_and_eval(input_text.as_str()) {
+            Ok(v) => v,
+            Err(err) => return Err(DmnError::FEELEvelError(err, path)),
+        };
+        input_values.push(input_value);
     }
 
-    for rule in table.rules.iter() {
+    for (rule_idx, rule) in table.rules.iter().enumerate() {
         if rule_matched(&rule, engine, &input_values) {
             // render the result
             let mut output_context = Context::new();
             for (i, output) in table.outputs.iter().enumerate() {
                 let output_entry = rule.output_entries[i].clone();
-                let v = engine.parse_and_eval(output_entry.text.as_str())?;
-                output_context.insert(output.name.clone(), v);
+                let path = format!(
+                    "rule/{}/outputEntry/{}[@id={}]",
+                    rule_idx, i, output_entry.id
+                );
+                let output_value = match engine.parse_and_eval(output_entry.text.as_str()) {
+                    Ok(v) => v,
+                    Err(err) => return Err(DmnError::FEELEvelError(err, path)),
+                };
+                output_context.insert(output.name.clone(), output_value);
             }
             return Ok(Value::ContextV(Rc::new(RefCell::new(output_context))));
         }

@@ -63,10 +63,10 @@
           <text></text>
         </inputEntry>
         <inputEntry id="UnaryTests_0zq86l1">
-          <text>true</text>
+          <text>waht</text>
         </inputEntry>
         <outputEntry id="LiteralExpression_1dv73ex">
-          <text>"Pasta"</text>
+          <text>W</text>
         </outputEntry>
       </rule>
     </decisionTable>

@@ -14,7 +14,7 @@ pub enum DmnError {
     XMLError(String),
     XPathParserError(ParserError),
     XPathExecutionError(ExecutionError),
-    FEELEvelError(FEELEvelError),
+    FEELEvelError(FEELEvelError, String),
 }
 impl error::Error for DmnError {}
 
@@ -30,11 +30,11 @@ impl From<ExecutionError> for DmnError {
     }
 }
 
-impl From<FEELEvelError> for DmnError {
-    fn from(err: FEELEvelError) -> DmnError {
-        Self::FEELEvelError(err)
-    }
-}
+// impl From<FEELEvelError> for DmnError {
+//     fn from(err: FEELEvelError) -> DmnError {
+//         Self::FEELEvelError(err)
+//     }
+// }
 
 impl fmt::Display for DmnError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -46,7 +46,7 @@ impl fmt::Display for DmnError {
             Self::XMLError(error_message) => write!(f, "parse XML error {}", error_message),
             Self::XPathParserError(err) => write!(f, "parse xpath error {}", err),
             Self::XPathExecutionError(err) => write!(f, "execute xpath error {}", err),
-            Self::FEELEvelError(err) => write!(f, "eval FEEL error {}", err),
+            Self::FEELEvelError(err, path) => write!(f, "eval FEEL error at {}, {}", path, err),
         }
     }
 }
