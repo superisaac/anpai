@@ -8,6 +8,9 @@ use std::rc::Rc;
 
 fn rule_matched(rule: &Rule, engine: &mut Box<Engine>, input_values: &Vec<Value>) -> bool {
     for (i, input_entry) in rule.input_entries.iter().enumerate() {
+        if input_entry.text == "" {
+            continue;
+        }
         let v = input_values[i].clone();
         engine.push_frame();
         engine.set_var("?".to_owned(), v);
@@ -35,6 +38,7 @@ pub fn eval_file(engine: &mut Box<Engine>, dmn_path: &str) -> Result<Value, DmnE
 
     for rule in table.rules.iter() {
         if rule_matched(&rule, engine, &input_values) {
+            // render the result
             let mut output_context = Context::new();
             for (i, output) in table.outputs.iter().enumerate() {
                 let output_entry = rule.output_entries[i].clone();

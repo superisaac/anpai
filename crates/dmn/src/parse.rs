@@ -26,13 +26,13 @@ impl Parser<'_> {
         let b = self.factory.build(xpath)?;
         if let Some(xpath) = b {
             match xpath.evaluate(&self.context, node)? {
-                Value::String(s) => Ok(s),
+                Value::String(s) => Ok(s.trim().to_owned()),
                 Value::Nodeset(nodeset) => {
                     let mut buf: String = String::new();
                     for n in nodeset.iter() {
                         buf.push_str(n.string_value().as_str());
                     }
-                    return Ok(buf);
+                    return Ok(buf.trim().to_owned());
                 }
                 Value::Boolean(b) => Ok(b.to_string()),
                 Value::Number(n) => Ok(n.to_string()),
@@ -141,7 +141,6 @@ impl Parser<'_> {
         //for input_entry_node in self.get_element_nodes(n, "ns:inputEntry")? {
         for input_entry_node in self.get_child_element_nodes(n, "inputEntry") {
             let input_entry_id = self.get_attribute(input_entry_node, "id")?;
-            println!("input entry id {}", input_entry_id);
             let text = self
                 .get_text(input_entry_node, "ns:text")
                 .unwrap_or("".to_owned());
