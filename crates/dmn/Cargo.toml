@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+feel.workspace = true
 sxd-document = "0.3.2"
 sxd-xpath = "0.4.2"

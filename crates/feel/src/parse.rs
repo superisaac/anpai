@@ -114,19 +114,18 @@ impl Parser<'_> {
     fn parse_unary_tests(&mut self) -> NodeResult {
         let start_pos = self.scanner.current_token().position;
         let elem = self.parse_unary_test()?;
+        let mut elements = Vec::new();
+        elements.push(elem);
 
         if self.scanner.expect(",") {
-            let mut elements = Vec::new();
-            elements.push(elem);
             while self.scanner.expect(",") {
                 goahead!(self); // skip ','
                 let elem1 = self.parse_unary_test()?;
                 elements.push(elem1);
             }
-            Ok(Node::new(UnaryTests(elements), start_pos))
-        } else {
-            Ok(elem)
+            //Ok(Node::new(UnaryTests(elements), start_pos))
         }
+        Ok(Node::new(UnaryTests(elements), start_pos))
     }
 
     fn parse_unary_test(&mut self) -> NodeResult {
@@ -147,7 +146,20 @@ impl Parser<'_> {
                 start_pos,
             ))
         } else {
-            self.parse_expression()
+            let start_pos = self.scanner.current_token().position;
+            let right = self.parse_expression()?;
+            match *right.syntax {
+                Var(_) | Number(_) | Str(_) | Ident(_) | Null | Bool(_) | Temporal(_) | Neg(_) => {
+                    Ok(Node::new(
+                        UnaryTest {
+                            op: "=".to_string(),
+                            right,
+                        },
+                        start_pos,
+                    ))
+                }
+                _ => Ok(right),
+            }
         }
     }
 

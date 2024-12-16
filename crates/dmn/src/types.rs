@@ -1,6 +1,8 @@
-use sxd_xpath::{ExecutionError, ParserError};
 use std::error;
 use std::fmt;
+use sxd_xpath::{ExecutionError, ParserError};
+
+use feel::eval::EvalError as FEELEvelError;
 
 // errors
 #[derive(Debug, Clone)]
@@ -12,6 +14,7 @@ pub enum DmnError {
     XMLError(String),
     XPathParserError(ParserError),
     XPathExecutionError(ExecutionError),
+    FEELEvelError(FEELEvelError),
 }
 impl error::Error for DmnError {}
 
@@ -27,6 +30,12 @@ impl From<ExecutionError> for DmnError {
     }
 }
 
+impl From<FEELEvelError> for DmnError {
+    fn from(err: FEELEvelError) -> DmnError {
+        Self::FEELEvelError(err)
+    }
+}
+
 impl fmt::Display for DmnError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -37,10 +46,10 @@ impl fmt::Display for DmnError {
             Self::XMLError(error_message) => write!(f, "parse XML error {}", error_message),
             Self::XPathParserError(err) => write!(f, "parse xpath error {}", err),
             Self::XPathExecutionError(err) => write!(f, "execute xpath error {}", err),
+            Self::FEELEvelError(err) => write!(f, "eval FEEL error {}", err),
         }
     }
 }
-
 
 #[derive(Clone, Debug)]
 pub struct InputExpression {
@@ -75,7 +84,6 @@ pub struct RuleOutputEntry {
     pub text: String,
 }
 
-
 #[derive(Clone, Debug)]
 pub struct Rule {
     pub id: String,
@@ -92,5 +100,3 @@ pub struct DicisionTable {
     pub outputs: Vec<Output>,
     pub rules: Vec<Rule>,
 }
-
-

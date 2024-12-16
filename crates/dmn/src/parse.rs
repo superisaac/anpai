@@ -1,12 +1,11 @@
 extern crate sxd_document;
 extern crate sxd_xpath;
 
-
 use std::fs;
 
 use sxd_document::parser;
-use sxd_xpath::{Context, Factory, Value};
 use sxd_xpath::nodeset::Node;
+use sxd_xpath::{Context, Factory, Value};
 
 use crate::types::*;
 
@@ -75,27 +74,39 @@ impl Parser<'_> {
         }
     }
 
-    fn get_element_nodes<'a>(
-        &'a self,
-        node: Node<'a>,
-        xpath: &str,
-    ) -> Result<Vec<Node<'a>>, DmnError> {
-        let b = self.factory.build(xpath)?;
+    // fn get_element_nodes<'a>(
+    //     &'a self,
+    //     node: Node<'a>,
+    //     xpath: &str,
+    // ) -> Result<Vec<Node<'a>>, DmnError> {
+    //     let b = self.factory.build(xpath)?;
+    //     let mut nodes: Vec<Node> = vec![];
+    //     if let Some(xpath) = b {
+    //         let value = xpath.evaluate(&self.context, node)?;
+    //         match value {
+    //             Value::Nodeset(nodeset) => {
+    //                 for n in nodeset.iter() {
+    //                     if let Node::Element(_) = n {
+    //                         nodes.push(n.clone());
+    //                     }
+    //                 }
+    //             }
+    //             _ => (),
+    //         }
+    //     }
+    //     Ok(nodes)
+    // }
+
+    fn get_child_element_nodes<'a>(&'a self, node: Node<'a>, local_name: &str) -> Vec<Node<'a>> {
         let mut nodes: Vec<Node> = vec![];
-        if let Some(xpath) = b {
-            let value = xpath.evaluate(&self.context, node)?;
-            match value {
-                Value::Nodeset(nodeset) => {
-                    for n in nodeset.iter() {
-                        if let Node::Element(_) = n {
-                            nodes.push(n.clone());
-                        }
-                    }
+        for child_node in node.children() {
+            if let Node::Element(elem) = child_node {
+                if elem.name().local_part() == local_name {
+                    nodes.push(child_node);
                 }
-                _ => (),
             }
         }
-        Ok(nodes)
+        nodes
     }
 
     fn parse_input(&self, n: Node) -> Result<Input, DmnError> {
@@ -127,9 +138,13 @@ impl Parser<'_> {
         let description = self.get_text(n, "ns:description").unwrap_or("".to_owned());
 
         let mut input_entries: Vec<RuleInputEntry> = vec![];
-        for input_node in self.get_element_nodes(n, "ns:inputEntry")? {
-            let input_entry_id = self.get_attribute(input_node, "id")?;
-            let text = self.get_text(input_node, "text").unwrap_or("".to_owned());
+        //for input_entry_node in self.get_element_nodes(n, "ns:inputEntry")? {
+        for input_entry_node in self.get_child_element_nodes(n, "inputEntry") {
+            let input_entry_id = self.get_attribute(input_entry_node, "id")?;
+            println!("input entry id {}", input_entry_id);
+            let text = self
+                .get_text(input_entry_node, "ns:text")
+                .unwrap_or("".to_owned());
             input_entries.push(RuleInputEntry {
                 id: input_entry_id,
                 text,
@@ -137,9 +152,11 @@ impl Parser<'_> {
         }
 
         let mut output_entries: Vec<RuleOutputEntry> = vec![];
-        for output_node in self.get_element_nodes(n, "ns:outputEntry")? {
+        for output_node in self.get_child_element_nodes(n, "outputEntry") {
             let output_entry_id = self.get_attribute(output_node, "id")?;
-            let text = self.get_text(output_node, "text").unwrap_or("".to_owned());
+            let text = self
+                .get_text(output_node, "ns:text")
+                .unwrap_or("".to_owned());
             output_entries.push(RuleOutputEntry {
                 id: output_entry_id,
                 text,
@@ -169,20 +186,34 @@ impl Parser<'_> {
                 .unwrap_or("UNIQUE".to_owned());
 
             let mut inputs: Vec<Input> = vec![];
-            for input_node in self.get_element_nodes(node, "ns:input")? {
+            //for input_node in self.get_element_nodes(node, "ns:input")? {
+            for input_node in self.get_child_element_nodes(node, "input") {
                 let input = self.parse_input(input_node)?;
                 inputs.push(input);
             }
 
             let mut outputs: Vec<Output> = vec![];
-            for output_node in self.get_element_nodes(node, "ns:output")? {
+            //for output_node in self.get_element_nodes(node, "ns:output")? {
+            for output_node in self.get_child_element_nodes(node, "output") {
                 let output = self.parse_output(output_node)?;
                 outputs.push(output);
             }
 
             let mut rules: Vec<Rule> = vec![];
-            for rule_node in self.get_element_nodes(node, "ns:rule")? {
-                let rule = self.parse_rule(rule_node)?;
+            for (i, rule_node) in self
+                .get_child_element_nodes(node, "rule")
+                .iter()
+                .enumerate()
+            {
+                let rule = self.parse_rule(*rule_node)?;
+                if rule.input_entries.len() != inputs.len() {
+                    return Err(DmnError::InvalidElement(format!(
+                        "rule({}).inputEntries.len({}) != inputs.len({})",
+                        i,
+                        rule.input_entries.len(),
+                        inputs.len()
+                    )));
+                }
                 rules.push(rule);
             }
             Ok(DicisionTable {
@@ -197,7 +228,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_file(&self, path: &str) -> Result<DicisionTable, DmnError> {
+    pub fn parse_file(&self, path: &str) -> Result<DicisionTable, DmnError> {
         let contents =
             fs::read_to_string(path).or_else(|e| Err(DmnError::IOError(e.to_string())))?;
         let package =
@@ -207,6 +238,7 @@ impl Parser<'_> {
             doc.root().into(),
             "/ns:definitions/ns:decision/ns:decisionTable",
         )?;
+
         self.parse_decision_table(dicision_table_node)
     }
 }

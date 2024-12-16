@@ -58,17 +58,6 @@
           <text>"Light Salad and a nice Steak"</text>
         </outputEntry>
       </rule>
-      <rule id="DecisionRule_0wnb6a7">
-        <inputEntry id="UnaryTests_0u02eob">
-          <text></text>
-        </inputEntry>
-        <inputEntry id="UnaryTests_0im8c7r">
-          <text>true</text>
-        </inputEntry>
-        <outputEntry id="LiteralExpression_1phbi8p">
-          <text>"Pasta"</text>
-        </outputEntry>
-      </rule>
     </decisionTable>
   </decision>
   <dmndi:DMNDI>

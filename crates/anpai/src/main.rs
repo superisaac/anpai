@@ -1,7 +1,11 @@
 use clap::*;
-use dmn::parse as dmn_parse;
+
 use feel::eval;
 use feel::parse as feel_parse;
+
+use dmn::eval as dmn_eval;
+use dmn::types::DmnError;
+
 use fileinput::FileInput;
 use std::fs::File;
 use std::io::BufReader;
@@ -22,7 +26,7 @@ enum AnpaiCommands {
         #[arg(short, long, help = "output format is JSON")]
         json: bool,
 
-        #[arg(long, help = "context variables")]
+        #[arg(long, help = "context variable file")]
         varsfile: Option<String>,
 
         #[arg(long, help = "context variables")]
@@ -35,7 +39,15 @@ enum AnpaiCommands {
     },
 
     #[clap(name = "dmn", about = "DMN parser and evaluator")]
-    Dmn { file: String },
+    Dmn {
+        #[arg(long, help = "context variable file")]
+        varsfile: Option<String>,
+
+        #[arg(long, help = "context variables")]
+        vars: Option<String>,
+
+        file: String,
+    },
 }
 
 impl AnpaiCommands {
@@ -72,6 +84,31 @@ impl AnpaiCommands {
             let res = eng.eval(n.clone())?;
             println!("{}", res);
         }
+        Ok(())
+    }
+
+    fn parse_and_eval_dmn(
+        &self,
+        varsfile: Option<String>,
+        vars: Option<String>,
+        file: String,
+    ) -> Result<(), DmnError> {
+        let mut eng = Box::new(eval::Engine::new());
+        // read context vars
+        if let Some(context_varsfile) = varsfile {
+            let mut data_file = File::open(context_varsfile.as_str()).unwrap();
+            let mut content = String::new();
+            data_file.read_to_string(&mut content).unwrap();
+            eng.load_context(&content)?;
+        }
+
+        if let Some(context_vars) = vars {
+            eng.load_context(&context_vars)?;
+        }
+
+        //dmn_parse::parse_file(file.as_str());
+        let v = dmn_eval::eval_file(&mut eng, file.as_str())?;
+        println!("{}", v);
         Ok(())
     }
 
@@ -116,9 +153,16 @@ impl AnpaiCommands {
                     }
                 }
             }
-            Self::Dmn { file } => {
-                dmn_parse::parse_file(file.as_str());
-            }
+            Self::Dmn {
+                varsfile,
+                vars,
+                file,
+            } => match self.parse_and_eval_dmn(varsfile.clone(), vars.clone(), file.clone()) {
+                Ok(_) => (),
+                Err(err) => {
+                    eprintln!("Error {}", err);
+                }
+            },
         }
 
         ()

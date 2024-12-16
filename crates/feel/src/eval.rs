@@ -13,7 +13,7 @@ use self::EvalErrorKind::*;
 
 use super::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*};
 use super::helpers::unescape;
-use super::parse::{parse, ParseError};
+use super::parse::{parse, ParseError, ParseTop};
 use super::prelude::PRELUDE;
 use super::values::context::Context;
 use super::values::numeric::Numeric;
@@ -164,14 +164,14 @@ impl Engine {
         eng
     }
 
-    fn push_frame(&mut self) {
+    pub fn push_frame(&mut self) {
         let frame = ScopeFrame {
             vars: HashMap::new(),
         };
         self.scopes.push(RefCell::new(frame));
     }
 
-    fn pop_frame(&mut self) {
+    pub fn pop_frame(&mut self) {
         self.scopes.pop();
     }
 
@@ -244,6 +244,26 @@ impl Engine {
                 "context/map required".to_owned(),
             ))),
         };
+    }
+
+    pub fn parse_and_eval(&mut self, input: &str) -> EvalResult {
+        match parse(input, Box::new(self.clone()), Default::default()) {
+            Ok(n) => self.eval(n),
+            Err((parse_err, pos)) => Err(EvalError {
+                kind: EvalErrorKind::Parse(parse_err),
+                pos,
+            }),
+        }
+    }
+
+    pub fn parse_and_eval_unary_tests(&mut self, input: &str) -> EvalResult {
+        match parse(input, Box::new(self.clone()), ParseTop::UnaryTests) {
+            Ok(n) => self.eval(n),
+            Err((parse_err, pos)) => Err(EvalError {
+                kind: EvalErrorKind::Parse(parse_err),
+                pos,
+            }),
+        }
     }
 
     pub fn eval(&mut self, node: Box<Node>) -> EvalResult {
