@@ -76,28 +76,41 @@ impl Parser<'_> {
         }
     }
 
-    // fn get_element_nodes<'a>(
-    //     &'a self,
-    //     node: Node<'a>,
-    //     xpath: &str,
-    // ) -> Result<Vec<Node<'a>>, DmnError> {
-    //     let b = self.factory.build(xpath)?;
-    //     let mut nodes: Vec<Node> = vec![];
-    //     if let Some(xpath) = b {
-    //         let value = xpath.evaluate(&self.context, node)?;
-    //         match value {
-    //             Value::Nodeset(nodeset) => {
-    //                 for n in nodeset.iter() {
-    //                     if let Node::Element(_) = n {
-    //                         nodes.push(n.clone());
-    //                     }
-    //                 }
-    //             }
-    //             _ => (),
-    //         }
-    //     }
-    //     Ok(nodes)
-    // }
+    fn parse_child_elements<ElemType>(
+        &self,
+        node: Node,
+        local_name: &str,
+        child_fn: fn(&Self, node: Node) -> Result<ElemType, DmnError>,
+    ) -> Result<Vec<ElemType>, DmnError> {
+        let mut elements: Vec<ElemType> = vec![];
+        for child_node in self.get_child_element_nodes(node, local_name) {
+            elements.push(child_fn(self, child_node)?);
+        }
+        Ok(elements)
+    }
+
+    fn get_element_nodes<'a>(
+        &'a self,
+        node: Node<'a>,
+        xpath: &str,
+    ) -> Result<Vec<Node<'a>>, DmnError> {
+        let b = self.factory.build(xpath)?;
+        let mut nodes: Vec<Node> = vec![];
+        if let Some(xpath) = b {
+            let value = xpath.evaluate(&self.context, node)?;
+            match value {
+                Value::Nodeset(nodeset) => {
+                    for n in nodeset.iter() {
+                        if let Node::Element(_) = n {
+                            nodes.push(n.clone());
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+        Ok(nodes)
+    }
 
     fn get_child_element_nodes<'a>(&'a self, node: Node<'a>, local_name: &str) -> Vec<Node<'a>> {
         let mut nodes: Vec<Node> = vec![];
@@ -134,35 +147,41 @@ impl Parser<'_> {
             Err(DmnError::InvalidElement("input".to_owned()))
         }
     }
+    fn parse_rule_input_entry(&self, node: Node) -> Result<RuleInputEntry, DmnError> {
+        let id = self.get_attribute(node, "id")?;
+        let text = self
+                .get_text(node, "ns:text")
+                .unwrap_or("".to_owned());
+        Ok(RuleInputEntry {
+            id,
+            text,
+        })
+    }
+
+    fn parse_rule_output_entry(&self, node: Node) -> Result<RuleOutputEntry, DmnError> {
+        let id = self.get_attribute(node, "id")?;
+        let text = self
+                .get_text(node, "ns:text")
+                .unwrap_or("".to_owned());
+        Ok(RuleOutputEntry {
+            id,
+            text,
+        })
+    }
 
     fn parse_rule(&self, n: Node) -> Result<Rule, DmnError> {
         let id: String = self.get_attribute(n, "id")?;
         let description = self.get_text(n, "ns:description").unwrap_or("".to_owned());
 
-        let mut input_entries: Vec<RuleInputEntry> = vec![];
-        //for input_entry_node in self.get_element_nodes(n, "ns:inputEntry")? {
-        for input_entry_node in self.get_child_element_nodes(n, "inputEntry") {
-            let input_entry_id = self.get_attribute(input_entry_node, "id")?;
-            let text = self
-                .get_text(input_entry_node, "ns:text")
-                .unwrap_or("".to_owned());
-            input_entries.push(RuleInputEntry {
-                id: input_entry_id,
-                text,
-            });
-        }
+        let input_entries = self.parse_child_elements(
+            n, 
+            "inputEntry", 
+            Parser::parse_rule_input_entry)?;
 
-        let mut output_entries: Vec<RuleOutputEntry> = vec![];
-        for output_node in self.get_child_element_nodes(n, "outputEntry") {
-            let output_entry_id = self.get_attribute(output_node, "id")?;
-            let text = self
-                .get_text(output_node, "ns:text")
-                .unwrap_or("".to_owned());
-            output_entries.push(RuleOutputEntry {
-                id: output_entry_id,
-                text,
-            });
-        }
+        let output_entries = self.parse_child_elements(
+            n, 
+            "outputEntry", 
+            Parser::parse_rule_output_entry)?;
 
         Ok(Rule {
             id,
@@ -186,19 +205,8 @@ impl Parser<'_> {
                 .get_attribute(node, "hitPolicy")
                 .unwrap_or("UNIQUE".to_owned());
 
-            let mut inputs: Vec<Input> = vec![];
-            //for input_node in self.get_element_nodes(node, "ns:input")? {
-            for input_node in self.get_child_element_nodes(node, "input") {
-                let input = self.parse_input(input_node)?;
-                inputs.push(input);
-            }
-
-            let mut outputs: Vec<Output> = vec![];
-            //for output_node in self.get_element_nodes(node, "ns:output")? {
-            for output_node in self.get_child_element_nodes(node, "output") {
-                let output = self.parse_output(output_node)?;
-                outputs.push(output);
-            }
+            let inputs = self.parse_child_elements(node, "input", Parser::parse_input)?;
+            let outputs = self.parse_child_elements(node, "output", Parser::parse_output)?;
 
             let mut rules: Vec<Rule> = vec![];
             for (i, rule_node) in self
@@ -230,11 +238,25 @@ impl Parser<'_> {
     }
 
     fn parse_requirements(&self, parent_node: Node) -> Result<Requirements, DmnError> {
-        Ok(Requirements {
+        let mut requirements = Requirements {
             required_inputs: vec![],
             required_authorities: vec![],
             required_dicisions: vec![],
-        })
+        };
+
+        for node in self.get_element_nodes(parent_node, "ns:informationRequirement/ns:requiredDecision")? {
+            requirements.required_dicisions.push(self.get_attribute(node, "href")?);
+        }
+
+        for node in self.get_element_nodes(parent_node, "ns:informationRequirement/ns:requiredInput")? {
+            requirements.required_inputs.push(self.get_attribute(node, "href")?);
+        }
+
+        for node in self.get_element_nodes(parent_node, "ns:authorityRequirement/ns:requiredAuthority")? {
+            requirements.required_authorities.push(self.get_attribute(node, "href")?);
+        }
+        
+        Ok(requirements)
     }
 
     fn parse_dicision(&self, node: Node) -> Result<Dicision, DmnError> {
@@ -306,20 +328,7 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_child_elements<ElemType>(
-        &self,
-        node: Node,
-        local_name: &str,
-        child_fn: fn(&Self, node: Node) -> Result<ElemType, DmnError>,
-    ) -> Result<Vec<ElemType>, DmnError> {
-        let mut elements: Vec<ElemType> = vec![];
-        for child_node in self.get_child_element_nodes(node, local_name) {
-            elements.push(child_fn(self, child_node)?);
-        }
-        Ok(elements)
-    }
-
-    fn parse_diagram(&self, node: Node) -> Result<Diagram, DmnError> {
+    pub fn parse_diagram(&self, node: Node) -> Result<Diagram, DmnError> {
         if let Node::Element(_) = node {
             let id = self.get_attribute(node, "id")?;
 
