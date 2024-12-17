@@ -229,6 +229,122 @@ impl Parser<'_> {
         }
     }
 
+    fn parse_requirements(&self, parent_node: Node) -> Result<Requirements, DmnError> {
+        Ok(Requirements {
+            required_inputs: vec![],
+            required_authorities: vec![],
+            required_dicisions: vec![],
+        })
+    }
+
+    fn parse_dicision(&self, node: Node) -> Result<Dicision, DmnError> {
+        if let Node::Element(_) = node {
+            let id = self.get_attribute(node, "id")?;
+
+            let dicision_table = match self.get_first_element_node(node, "ns:decisionTable") {
+                Ok(n) => Some(self.parse_decision_table(n)?),
+                Err(DmnError::NoElement) => None,
+                Err(err) => return Err(err),
+            };
+
+            let requirements = self.parse_requirements(node)?;
+            Ok(Dicision {
+                id,
+                dicision_table,
+                requirements,
+            })
+        } else {
+            Err(DmnError::NoElement)
+        }
+    }
+
+    fn parse_input_data(&self, node: Node) -> Result<InputData, DmnError> {
+        if let Node::Element(_) = node {
+            let id = self.get_attribute(node, "id")?;
+            let name = self.get_attribute(node, "name")?;
+            let requirements = self.parse_requirements(node)?;
+            Ok(InputData {
+                id,
+                name,
+                requirements,
+            })
+        } else {
+            Err(DmnError::NoElement)
+        }
+    }
+
+    fn parse_business_knowledge_model(
+        &self,
+        node: Node,
+    ) -> Result<BusinessKnowledgeModel, DmnError> {
+        if let Node::Element(_) = node {
+            let id = self.get_attribute(node, "id")?;
+            let name = self.get_attribute(node, "name")?;
+            let requirements = self.parse_requirements(node)?;
+            Ok(BusinessKnowledgeModel {
+                id,
+                name,
+                requirements,
+            })
+        } else {
+            Err(DmnError::NoElement)
+        }
+    }
+
+    fn parse_knowledge_source(&self, node: Node) -> Result<KnowledgeSource, DmnError> {
+        if let Node::Element(_) = node {
+            let id = self.get_attribute(node, "id")?;
+            let name = self.get_attribute(node, "name")?;
+            let requirements = self.parse_requirements(node)?;
+            Ok(KnowledgeSource {
+                id,
+                name,
+                requirements,
+            })
+        } else {
+            Err(DmnError::NoElement)
+        }
+    }
+
+    fn parse_child_elements<ElemType>(
+        &self,
+        node: Node,
+        local_name: &str,
+        child_fn: fn(&Self, node: Node) -> Result<ElemType, DmnError>,
+    ) -> Result<Vec<ElemType>, DmnError> {
+        let mut elements: Vec<ElemType> = vec![];
+        for child_node in self.get_child_element_nodes(node, local_name) {
+            elements.push(child_fn(self, child_node)?);
+        }
+        Ok(elements)
+    }
+
+    fn parse_diagram(&self, node: Node) -> Result<Diagram, DmnError> {
+        if let Node::Element(_) = node {
+            let id = self.get_attribute(node, "id")?;
+
+            let dicisions = self.parse_child_elements(node, "dicision", Parser::parse_dicision)?;
+            let input_datas =
+                self.parse_child_elements(node, "inputData", Parser::parse_input_data)?;
+            let business_knowledge_models = self.parse_child_elements(
+                node,
+                "businessKnowledgeModel",
+                Parser::parse_business_knowledge_model,
+            )?;
+            let knowledge_sources =
+                self.parse_child_elements(node, "knowledgeSource", Parser::parse_knowledge_source)?;
+            Ok(Diagram {
+                id,
+                dicisions,
+                input_datas,
+                business_knowledge_models,
+                knowledge_sources,
+            })
+        } else {
+            Err(DmnError::NoElement)
+        }
+    }
+
     pub fn parse_file(&self, path: &str) -> Result<DicisionTable, DmnError> {
         let contents =
             fs::read_to_string(path).or_else(|e| Err(DmnError::IOError(e.to_string())))?;

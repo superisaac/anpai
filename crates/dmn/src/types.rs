@@ -100,3 +100,47 @@ pub struct DicisionTable {
     pub outputs: Vec<Output>,
     pub rules: Vec<Rule>,
 }
+
+#[derive(Clone, Debug)]
+pub struct Requirements {
+    pub required_inputs: Vec<String>,
+    pub required_dicisions: Vec<String>,
+    pub required_authorities: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct InputData {
+    pub id: String,
+    pub name: String,
+    pub requirements: Requirements,
+}
+
+#[derive(Clone, Debug)]
+pub struct BusinessKnowledgeModel {
+    pub id: String,
+    pub name: String,
+    pub requirements: Requirements,
+}
+
+#[derive(Clone, Debug)]
+pub struct KnowledgeSource {
+    pub id: String,
+    pub name: String,
+    pub requirements: Requirements,
+}
+
+#[derive(Clone, Debug)]
+pub struct Dicision {
+    pub id: String,
+    pub dicision_table: Option<DicisionTable>,
+    pub requirements: Requirements,
+}
+
+#[derive(Clone, Debug)]
+pub struct Diagram {
+    pub id: String,
+    pub dicisions: Vec<Dicision>,
+    pub input_datas: Vec<InputData>,
+    pub business_knowledge_models: Vec<BusinessKnowledgeModel>,
+    pub knowledge_sources: Vec<KnowledgeSource>,
+}
