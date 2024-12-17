@@ -149,39 +149,25 @@ impl Parser<'_> {
     }
     fn parse_rule_input_entry(&self, node: Node) -> Result<RuleInputEntry, DmnError> {
         let id = self.get_attribute(node, "id")?;
-        let text = self
-                .get_text(node, "ns:text")
-                .unwrap_or("".to_owned());
-        Ok(RuleInputEntry {
-            id,
-            text,
-        })
+        let text = self.get_text(node, "ns:text").unwrap_or("".to_owned());
+        Ok(RuleInputEntry { id, text })
     }
 
     fn parse_rule_output_entry(&self, node: Node) -> Result<RuleOutputEntry, DmnError> {
         let id = self.get_attribute(node, "id")?;
-        let text = self
-                .get_text(node, "ns:text")
-                .unwrap_or("".to_owned());
-        Ok(RuleOutputEntry {
-            id,
-            text,
-        })
+        let text = self.get_text(node, "ns:text").unwrap_or("".to_owned());
+        Ok(RuleOutputEntry { id, text })
     }
 
     fn parse_rule(&self, n: Node) -> Result<Rule, DmnError> {
         let id: String = self.get_attribute(n, "id")?;
         let description = self.get_text(n, "ns:description").unwrap_or("".to_owned());
 
-        let input_entries = self.parse_child_elements(
-            n, 
-            "inputEntry", 
-            Parser::parse_rule_input_entry)?;
+        let input_entries =
+            self.parse_child_elements(n, "inputEntry", Parser::parse_rule_input_entry)?;
 
-        let output_entries = self.parse_child_elements(
-            n, 
-            "outputEntry", 
-            Parser::parse_rule_output_entry)?;
+        let output_entries =
+            self.parse_child_elements(n, "outputEntry", Parser::parse_rule_output_entry)?;
 
         Ok(Rule {
             id,
@@ -244,18 +230,30 @@ impl Parser<'_> {
             required_dicisions: vec![],
         };
 
-        for node in self.get_element_nodes(parent_node, "ns:informationRequirement/ns:requiredDecision")? {
-            requirements.required_dicisions.push(self.get_attribute(node, "href")?);
+        for node in
+            self.get_element_nodes(parent_node, "ns:informationRequirement/ns:requiredDecision")?
+        {
+            requirements
+                .required_dicisions
+                .push(self.get_attribute(node, "href")?);
         }
 
-        for node in self.get_element_nodes(parent_node, "ns:informationRequirement/ns:requiredInput")? {
-            requirements.required_inputs.push(self.get_attribute(node, "href")?);
+        for node in
+            self.get_element_nodes(parent_node, "ns:informationRequirement/ns:requiredInput")?
+        {
+            requirements
+                .required_inputs
+                .push(self.get_attribute(node, "href")?);
         }
 
-        for node in self.get_element_nodes(parent_node, "ns:authorityRequirement/ns:requiredAuthority")? {
-            requirements.required_authorities.push(self.get_attribute(node, "href")?);
+        for node in
+            self.get_element_nodes(parent_node, "ns:authorityRequirement/ns:requiredAuthority")?
+        {
+            requirements
+                .required_authorities
+                .push(self.get_attribute(node, "href")?);
         }
-        
+
         Ok(requirements)
     }
 

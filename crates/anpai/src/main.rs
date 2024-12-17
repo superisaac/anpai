@@ -65,11 +65,11 @@ impl AnpaiCommands {
             let mut data_file = File::open(context_varsfile.as_str()).unwrap();
             let mut content = String::new();
             data_file.read_to_string(&mut content).unwrap();
-            eng.load_context(&content)?;
+            eng.load_context_string(&content)?;
         }
 
         if let Some(context_vars) = vars {
-            eng.load_context(&context_vars)?;
+            eng.load_context_string(&context_vars)?;
         }
         let n = feel_parse::parse(code, eng.clone(), Default::default())?;
 
@@ -99,7 +99,7 @@ impl AnpaiCommands {
             let mut data_file = File::open(context_varsfile.as_str()).unwrap();
             let mut content = String::new();
             data_file.read_to_string(&mut content).unwrap();
-            match eng.load_context(&content) {
+            match eng.load_context_string(&content) {
                 Ok(_) => (),
                 Err(err) => {
                     return Err(DmnError::FEELEvalError(
@@ -113,7 +113,7 @@ impl AnpaiCommands {
 
         if let Some(context_vars) = vars {
             //eng.load_context(&context_vars)?;
-            match eng.load_context(&context_vars) {
+            match eng.load_context_string(&context_vars) {
                 Ok(_) => (),
                 Err(err) => {
                     return Err(DmnError::FEELEvalError(

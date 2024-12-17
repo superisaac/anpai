@@ -228,7 +228,7 @@ impl Engine {
         return Box::new(self.clone());
     }
 
-    pub fn load_context(&mut self, ctx_input: &str) -> EvalResult {
+    pub fn load_context_string(&mut self, ctx_input: &str) -> EvalResult {
         let node = parse(ctx_input, Box::new(self.clone()), Default::default())?;
         let ctx_value = self.eval(node)?;
         return match ctx_value {
@@ -1142,7 +1142,7 @@ mod test {
             let mut eng = super::Engine::new();
             //println!("parse input {input}");
             if let Some(ctx_input) = ctx {
-                eng.load_context(ctx_input).unwrap();
+                eng.load_context_string(ctx_input).unwrap();
             }
             let node = parse(input, Box::new(eng.clone()), Default::default()).unwrap();
             let v = eng.eval(node).unwrap();
@@ -1162,7 +1162,7 @@ mod test {
             let mut eng = super::Engine::new();
             //println!("parse input {input}");
             if let Some(ctx_input) = ctx {
-                eng.load_context(ctx_input).unwrap();
+                eng.load_context_string(ctx_input).unwrap();
             }
             let node = parse(
                 input,
@@ -1192,7 +1192,7 @@ mod test {
     #[test]
     fn test_native_func_set() {
         let mut eng = super::Engine::new();
-        eng.load_context("{hi: 5}").unwrap();
+        eng.load_context_string("{hi: 5}").unwrap();
 
         let input1 = r#"hi + 3"#;
         let node1 = parse(input1, Box::new(eng.clone()), Default::default()).unwrap();
@@ -1203,7 +1203,8 @@ mod test {
     #[test]
     fn test_func_call() {
         let mut eng = super::Engine::new();
-        eng.load_context(r#"{add2: (function(a, b) a+b)}"#).unwrap();
+        eng.load_context_string(r#"{add2: (function(a, b) a+b)}"#)
+            .unwrap();
 
         let input1 = r#"add2(4.5, 9)"#;
         let node1 = parse(input1, Box::new(eng.clone()), Default::default()).unwrap();
