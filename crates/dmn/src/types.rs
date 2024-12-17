@@ -9,7 +9,7 @@ use feel::eval::EvalError as FEELEvelError;
 pub enum DmnError {
     NoAttribute(String),
     InvalidElement(String),
-    NoElement,
+    NoElement(String),
     IOError(String),
     XMLError(String),
     XPathParserError(ParserError),
@@ -41,7 +41,7 @@ impl fmt::Display for DmnError {
         match self {
             Self::NoAttribute(name) => write!(f, "attribute {} not found", name),
             Self::InvalidElement(elem_name) => write!(f, "invalid element {}", elem_name),
-            Self::NoElement => write!(f, "no element"),
+            Self::NoElement(elem_name) => write!(f, "no element `{}`", elem_name),
             Self::IOError(error_message) => write!(f, "io error {}", error_message),
             Self::XMLError(error_message) => write!(f, "parse XML error {}", error_message),
             Self::XPathParserError(err) => write!(f, "parse xpath error {}", err),
@@ -93,7 +93,7 @@ pub struct Rule {
 }
 
 #[derive(Clone, Debug)]
-pub struct DicisionTable {
+pub struct DecisionTable {
     pub id: String,
     pub hit_policy: String,
     pub inputs: Vec<Input>,
@@ -104,7 +104,7 @@ pub struct DicisionTable {
 #[derive(Clone, Debug)]
 pub struct Requirements {
     pub required_inputs: Vec<String>,
-    pub required_dicisions: Vec<String>,
+    pub required_decisions: Vec<String>,
     pub required_authorities: Vec<String>,
 }
 
@@ -130,17 +130,33 @@ pub struct KnowledgeSource {
 }
 
 #[derive(Clone, Debug)]
-pub struct Dicision {
+pub struct Decision {
     pub id: String,
-    pub dicision_table: Option<DicisionTable>,
+    pub decision_table: Option<DecisionTable>,
     pub requirements: Requirements,
 }
 
 #[derive(Clone, Debug)]
 pub struct Diagram {
     pub id: String,
-    pub dicisions: Vec<Dicision>,
+    pub decisions: Vec<Decision>,
     pub input_datas: Vec<InputData>,
     pub business_knowledge_models: Vec<BusinessKnowledgeModel>,
     pub knowledge_sources: Vec<KnowledgeSource>,
+}
+
+impl Diagram {
+    pub fn find_decision(&self, decision_id: String) -> Result<Decision, DmnError> {
+        match self
+            .decisions
+            .iter()
+            .find(|x| format!("#{}", x.id) == decision_id)
+        {
+            Some(found) => Ok(found.clone()),
+            None => Err(DmnError::NoElement(format!(
+                "decision[@id={}]",
+                decision_id
+            ))),
+        }
+    }
 }

@@ -56,9 +56,9 @@ impl Parser<'_> {
     fn get_first_element_node<'a>(
         &'a self,
         node: Node<'a>,
-        xpath: &str,
+        xpath_str: &str,
     ) -> Result<Node<'a>, DmnError> {
-        let b = self.factory.build(xpath)?;
+        let b = self.factory.build(xpath_str)?;
         if let Some(xpath) = b {
             match xpath.evaluate(&self.context, node)? {
                 Value::Nodeset(nodeset) => {
@@ -67,12 +67,12 @@ impl Parser<'_> {
                             return Ok(n.clone());
                         }
                     }
-                    Err(DmnError::NoElement)
+                    Err(DmnError::NoElement(xpath_str.to_owned()))
                 }
-                _ => Err(DmnError::NoElement),
+                _ => Err(DmnError::NoElement(xpath_str.to_owned())),
             }
         } else {
-            Err(DmnError::NoElement)
+            Err(DmnError::NoElement(xpath_str.to_owned()))
         }
     }
 
@@ -184,7 +184,7 @@ impl Parser<'_> {
         Ok(Output { id, type_ref, name })
     }
 
-    fn parse_decision_table(&self, node: Node) -> Result<DicisionTable, DmnError> {
+    fn parse_decision_table(&self, node: Node) -> Result<DecisionTable, DmnError> {
         if let Node::Element(_) = node {
             let id = self.get_attribute(node, "id")?;
             let hit_policy = self
@@ -211,7 +211,7 @@ impl Parser<'_> {
                 }
                 rules.push(rule);
             }
-            Ok(DicisionTable {
+            Ok(DecisionTable {
                 id,
                 hit_policy,
                 inputs,
@@ -227,14 +227,14 @@ impl Parser<'_> {
         let mut requirements = Requirements {
             required_inputs: vec![],
             required_authorities: vec![],
-            required_dicisions: vec![],
+            required_decisions: vec![],
         };
 
         for node in
             self.get_element_nodes(parent_node, "ns:informationRequirement/ns:requiredDecision")?
         {
             requirements
-                .required_dicisions
+                .required_decisions
                 .push(self.get_attribute(node, "href")?);
         }
 
@@ -257,120 +257,99 @@ impl Parser<'_> {
         Ok(requirements)
     }
 
-    fn parse_dicision(&self, node: Node) -> Result<Dicision, DmnError> {
+    fn parse_decision(&self, node: Node) -> Result<Decision, DmnError> {
         if let Node::Element(_) = node {
             let id = self.get_attribute(node, "id")?;
-
-            let dicision_table = match self.get_first_element_node(node, "ns:decisionTable") {
+            let decision_table = match self.get_first_element_node(node, "ns:decisionTable") {
                 Ok(n) => Some(self.parse_decision_table(n)?),
-                Err(DmnError::NoElement) => None,
+                Err(DmnError::NoElement(_)) => None,
                 Err(err) => return Err(err),
             };
 
             let requirements = self.parse_requirements(node)?;
-            Ok(Dicision {
+            Ok(Decision {
                 id,
-                dicision_table,
+                decision_table,
                 requirements,
             })
         } else {
-            Err(DmnError::NoElement)
+            Err(DmnError::NoElement("decision".to_owned()))
         }
     }
 
     fn parse_input_data(&self, node: Node) -> Result<InputData, DmnError> {
-        if let Node::Element(_) = node {
-            let id = self.get_attribute(node, "id")?;
-            let name = self.get_attribute(node, "name")?;
-            let requirements = self.parse_requirements(node)?;
-            Ok(InputData {
-                id,
-                name,
-                requirements,
-            })
-        } else {
-            Err(DmnError::NoElement)
-        }
+        let id = self.get_attribute(node, "id")?;
+        let name = self.get_attribute(node, "name")?;
+        let requirements = self.parse_requirements(node)?;
+        Ok(InputData {
+            id,
+            name,
+            requirements,
+        })
     }
 
     fn parse_business_knowledge_model(
         &self,
         node: Node,
     ) -> Result<BusinessKnowledgeModel, DmnError> {
-        if let Node::Element(_) = node {
-            let id = self.get_attribute(node, "id")?;
-            let name = self.get_attribute(node, "name")?;
-            let requirements = self.parse_requirements(node)?;
-            Ok(BusinessKnowledgeModel {
-                id,
-                name,
-                requirements,
-            })
-        } else {
-            Err(DmnError::NoElement)
-        }
+        let id = self.get_attribute(node, "id")?;
+        let name = self.get_attribute(node, "name")?;
+        let requirements = self.parse_requirements(node)?;
+        Ok(BusinessKnowledgeModel {
+            id,
+            name,
+            requirements,
+        })
     }
 
     fn parse_knowledge_source(&self, node: Node) -> Result<KnowledgeSource, DmnError> {
-        if let Node::Element(_) = node {
-            let id = self.get_attribute(node, "id")?;
-            let name = self.get_attribute(node, "name")?;
-            let requirements = self.parse_requirements(node)?;
-            Ok(KnowledgeSource {
-                id,
-                name,
-                requirements,
-            })
-        } else {
-            Err(DmnError::NoElement)
-        }
+        let id = self.get_attribute(node, "id")?;
+        let name = self.get_attribute(node, "name")?;
+        let requirements = self.parse_requirements(node)?;
+        Ok(KnowledgeSource {
+            id,
+            name,
+            requirements,
+        })
     }
 
     pub fn parse_diagram(&self, node: Node) -> Result<Diagram, DmnError> {
-        if let Node::Element(_) = node {
-            let id = self.get_attribute(node, "id")?;
+        let id = self.get_attribute(node, "id")?;
 
-            let dicisions = self.parse_child_elements(node, "dicision", Parser::parse_dicision)?;
-            let input_datas =
-                self.parse_child_elements(node, "inputData", Parser::parse_input_data)?;
-            let business_knowledge_models = self.parse_child_elements(
-                node,
-                "businessKnowledgeModel",
-                Parser::parse_business_knowledge_model,
-            )?;
-            let knowledge_sources =
-                self.parse_child_elements(node, "knowledgeSource", Parser::parse_knowledge_source)?;
-            Ok(Diagram {
-                id,
-                dicisions,
-                input_datas,
-                business_knowledge_models,
-                knowledge_sources,
-            })
-        } else {
-            Err(DmnError::NoElement)
-        }
+        let decisions = self.parse_child_elements(node, "decision", Parser::parse_decision)?;
+        let input_datas = self.parse_child_elements(node, "inputData", Parser::parse_input_data)?;
+        let business_knowledge_models = self.parse_child_elements(
+            node,
+            "businessKnowledgeModel",
+            Parser::parse_business_knowledge_model,
+        )?;
+        let knowledge_sources =
+            self.parse_child_elements(node, "knowledgeSource", Parser::parse_knowledge_source)?;
+        Ok(Diagram {
+            id,
+            decisions,
+            input_datas,
+            business_knowledge_models,
+            knowledge_sources,
+        })
     }
 
-    pub fn parse_file(&self, path: &str) -> Result<DicisionTable, DmnError> {
+    pub fn parse_file(&self, path: &str) -> Result<Diagram, DmnError> {
         let contents =
             fs::read_to_string(path).or_else(|e| Err(DmnError::IOError(e.to_string())))?;
         let package =
             parser::parse(contents.as_str()).or_else(|e| Err(DmnError::XMLError(e.to_string())))?;
         let doc = package.as_document();
-        let dicision_table_node = self.get_first_element_node(
-            doc.root().into(),
-            "/ns:definitions/ns:decision/ns:decisionTable",
-        )?;
 
-        self.parse_decision_table(dicision_table_node)
+        let node = self.get_first_element_node(doc.root().into(), "ns:definitions")?;
+        self.parse_diagram(node)
     }
 }
 
 pub fn parse_file(path: &str) {
     let parser = Parser::new();
-    let table = parser.parse_file(path).unwrap();
-    println!("{:?}", table);
+    let diagram = parser.parse_file(path).unwrap();
+    println!("{:?}", diagram);
 }
 
 #[cfg(test)]

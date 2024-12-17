@@ -233,17 +233,21 @@ impl Engine {
         let ctx_value = self.eval(node)?;
         return match ctx_value {
             ContextV(m) => {
-                self.push_frame();
-                let ctx_entries = m.as_ref().borrow().entries();
-                for (k, v) in ctx_entries {
-                    self.set_var(k, v);
-                }
+                self.load_context(m.as_ref().borrow().entries());
                 Ok(BoolV(true))
             }
             _ => Err(EvalError::new(EvalErrorKind::ValueError(
                 "context/map required".to_owned(),
             ))),
         };
+    }
+
+    pub fn load_context(&mut self, ctx_entries: Vec<(String, Value)>) {
+        self.push_frame();
+        //let ctx_entries = context.entries();
+        for (k, v) in ctx_entries {
+            self.set_var(k, v);
+        }
     }
 
     pub fn parse_and_eval(&mut self, input: &str) -> EvalResult {
