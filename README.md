@@ -35,6 +35,10 @@ interpreter.
 ```
 
 ### DMN evaluator
-TODO
+```shell
+# evaluate dmn files, given context vars
+% ./target/debug/anpai dmn examples/dmn/simpledish.dmn --vars '{season: "Summer", guestCount: 10, guestsWithChildren: true}'
+
+```
 
 for more examples please refer to testing
