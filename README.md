@@ -14,6 +14,7 @@ interpreter.
 * run `cargo +nightly test` to run testing
 
 ## examples
+### FEE interpreter
 ```shell
 
 % ./target/debug/anpai feel -c '"hello " + "world"'
@@ -24,7 +25,7 @@ interpreter.
 
 # dump AST tree instead of evaluating the script
 % ./target/debug/anpai feel -c 'if a > 3 then "larger" else "smaller"' --vars '{a: 5}' --ast
-(expr-list (call bind ["a", 5]) (if (> a 3) "larger" "smaller"))
+(if (> a 3) "larger" "smaller")
 
 % ./target/debug/anpai feel -c 'some x in [3, 4, 8, 9] satisfies x % 2 = 0'
 4
@@ -32,5 +33,8 @@ interpreter.
 % ./target/debug/anpai feel -c 'every x in [3, 4, 8, 9] satisfies x % 2 = 0'
 [4, 8]
 ```
+
+### DMN evaluator
+TODO
 
 for more examples please refer to testing
