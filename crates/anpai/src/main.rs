@@ -46,8 +46,8 @@ enum AnpaiCommands {
         #[arg(long, help = "context variables")]
         vars: Option<String>,
 
-        #[arg(long, help = "start dicision id")]
-        start_dicision_id: Option<String>,
+        #[arg(long, help = "start decision id")]
+        start_decision_id: Option<String>,
 
         file: String,
     },
@@ -94,7 +94,7 @@ impl AnpaiCommands {
         &self,
         varsfile: Option<String>,
         vars: Option<String>,
-        start_dicision_id: Option<String>,
+        start_decision_id: Option<String>,
         file: String,
     ) -> Result<(), DmnError> {
         let mut eng = Box::new(eval::Engine::new());
@@ -126,7 +126,7 @@ impl AnpaiCommands {
         }
 
         //dmn_parse::parse_file(file.as_str());
-        let v = dmn_eval::eval_file(&mut eng, file.as_str(), start_dicision_id)?;
+        let v = dmn_eval::eval_file(&mut eng, file.as_str(), start_decision_id)?;
         println!("{}", v);
         Ok(())
     }
@@ -176,12 +176,12 @@ impl AnpaiCommands {
             Self::Dmn {
                 varsfile,
                 vars,
-                start_dicision_id,
+                start_decision_id,
                 file,
             } => match self.parse_and_eval_dmn(
                 varsfile.clone(),
                 vars.clone(),
-                start_dicision_id.clone(),
+                start_decision_id.clone(),
                 file.clone(),
             ) {
                 Ok(_) => (),
