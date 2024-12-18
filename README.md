@@ -23,6 +23,9 @@ interpreter.
 % ./target/debug/anpai feel -c '(function(a, b) a + b)(5, 8)'
 13
 
+% ./target/debug/anpai feel -c '>8,4' --vars '{"?": 32}' --top unary-tests
+true
+
 # dump AST tree instead of evaluating the script
 % ./target/debug/anpai feel -c 'if a > 3 then "larger" else "smaller"' --vars '{a: 5}' --ast
 (if (> a 3) "larger" "smaller")
@@ -38,7 +41,7 @@ interpreter.
 ```shell
 # evaluate dmn files, given context vars
 % ./target/debug/anpai dmn examples/dmn/simpledish.dmn --vars '{season: "Summer", guestCount: 10, guestsWithChildren: true}'
-
+{"Beverages":"Apple Juice"}
 ```
 
 for more examples please refer to testing

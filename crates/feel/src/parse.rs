@@ -2,6 +2,7 @@ use crate::ast::{FuncCallArg, MapNodeItem, Node, NodeSyntax::*, VarValue};
 use crate::eval::Engine;
 use crate::helpers::find_duplicate;
 use crate::scan::{ScanError, Scanner, TextPosition, Token};
+use clap::ValueEnum;
 
 use std::backtrace::Backtrace;
 use std::error::Error;
@@ -9,7 +10,7 @@ use std::fmt;
 
 /// parse FEEL refer to https://www.omg.org/spec/DMN/1.2/PDF
 
-#[derive(Default)]
+#[derive(ValueEnum, Default, Debug, Clone)]
 pub enum ParseTop {
     #[default]
     Expression,

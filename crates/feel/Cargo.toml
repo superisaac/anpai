@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+clap.workspace = true
 chrono.workspace = true
 iso8601.workspace = true
 lazy_static.workspace = true

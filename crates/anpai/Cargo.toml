@@ -7,6 +7,6 @@ edition = "2021"
 feel.workspace = true
 dmn.workspace = true
 serde.workspace = true
-clap = { version="4.5.1", features = ["derive"]}
+clap.workspace = true
 fileinput = "0.3.0"
 serde_json.workspace = true

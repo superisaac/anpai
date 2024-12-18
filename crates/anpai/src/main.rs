@@ -18,35 +18,38 @@ use std::io::Read;
     rename_all = "kebab-case"
 )]
 enum AnpaiCommands {
-    #[clap(name = "feel", about = "run FEEL language intepretor")]
+    #[clap(name = "feel", about = "Run FEEL language intepretor")]
     Feel {
-        #[arg(short, long, help = "dump AST node instead of evaluating")]
+        #[arg(long, help = "Dump AST node instead of evaluating")]
         ast: bool,
 
-        #[arg(short, long, help = "output format is JSON")]
+        #[arg(long, help = "Output format is JSON")]
         json: bool,
 
-        #[arg(long, help = "context variable file")]
+        #[arg(long, help = "Context variable file")]
         varsfile: Option<String>,
 
-        #[arg(long, help = "context variables")]
+        #[arg(long, help = "Context variables")]
         vars: Option<String>,
 
-        #[arg(short, long, help = "given input as string instead of from files")]
+        #[arg(short, long, help = "Given input as string instead of from files")]
         code: Option<String>,
+
+        #[arg(short, long, help = "Parse top policy")]
+        top: Option<feel_parse::ParseTop>,
 
         files: Vec<String>,
     },
 
     #[clap(name = "dmn", about = "DMN parser and evaluator")]
     Dmn {
-        #[arg(long, help = "context variable file")]
+        #[arg(long, help = "Context variable file")]
         varsfile: Option<String>,
 
-        #[arg(long, help = "context variables")]
+        #[arg(long, help = "Context variables")]
         vars: Option<String>,
 
-        #[arg(long, help = "start decision id")]
+        #[arg(long, short = 's', help = "Start decision id")]
         start_decision_id: Option<String>,
 
         file: String,
@@ -59,6 +62,7 @@ impl AnpaiCommands {
         code: &str,
         varsfile: Option<String>,
         vars: Option<String>,
+        top: Option<feel_parse::ParseTop>,
         dump_ast: bool,
         json_format: bool,
     ) -> Result<(), eval::EvalError> {
@@ -74,7 +78,8 @@ impl AnpaiCommands {
         if let Some(context_vars) = vars {
             eng.load_context_string(&context_vars)?;
         }
-        let n = feel_parse::parse(code, eng.clone(), Default::default())?;
+
+        let n = feel_parse::parse(code, eng.clone(), top.unwrap_or_default())?;
 
         if dump_ast {
             if json_format {
@@ -138,6 +143,7 @@ impl AnpaiCommands {
                 json,
                 varsfile,
                 vars,
+                top,
                 code,
                 files,
             } => {
@@ -158,6 +164,7 @@ impl AnpaiCommands {
                     input.as_str(),
                     varsfile.clone(),
                     vars.clone(),
+                    top.clone(),
                     *ast,
                     *json,
                 ) {

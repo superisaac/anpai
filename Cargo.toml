@@ -15,6 +15,7 @@ regex = "1.10.3"
 feel = { path="crates/feel" }
 dmn = { path="crates/dmn" }
 anpaiutils = { path="crates/anpaiutils" }
+clap = { version="4.5.1", features = ["derive"]}
 serde = {version = "1.0.197", features = ["derive"] }
 sxd-document = "0.3.2"
 sxd-xpath = "0.4.2"

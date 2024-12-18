@@ -229,6 +229,7 @@ version = "0.1.0"
 dependencies = [
  "bigdecimal",
  "chrono",
+ "clap",
  "defer",
  "iso8601",
  "lazy_static",
