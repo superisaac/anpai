@@ -106,11 +106,7 @@ impl AnpaiCommands {
             match eng.load_context_string(&content) {
                 Ok(_) => (),
                 Err(err) => {
-                    return Err(DmnError::FEELEvalError(
-                        err,
-                        "context-file".to_owned(),
-                        content,
-                    ))
+                    return Err(DmnError::FEELEval(err, "context-file".to_owned(), content))
                 }
             }
         }
@@ -120,7 +116,7 @@ impl AnpaiCommands {
             match eng.load_context_string(&context_vars) {
                 Ok(_) => (),
                 Err(err) => {
-                    return Err(DmnError::FEELEvalError(
+                    return Err(DmnError::FEELEval(
                         err,
                         "context-vars".to_owned(),
                         context_vars,
@@ -189,7 +185,7 @@ impl AnpaiCommands {
                 file.clone(),
             ) {
                 Ok(_) => (),
-                Err(DmnError::FEELEvalError(err, path, code)) => {
+                Err(DmnError::FEELEval(err, path, code)) => {
                     eprintln!(
                         "Path: {}\n{}\nPosition: {}\n\n{}",
                         path,

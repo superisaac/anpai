@@ -46,7 +46,7 @@ pub fn eval_decision(
             let path = format!("input/{}[@id={}]", input_idx, input.id);
             let input_value = match engine.parse_and_eval(input_text.as_str()) {
                 Ok(v) => v,
-                Err(err) => return Err(DmnError::FEELEvalError(err, path, input_text)),
+                Err(err) => return Err(DmnError::FEELEval(err, path, input_text)),
             };
             input_values.push(input_value);
         }
@@ -67,7 +67,7 @@ pub fn eval_decision(
                     );
                     let output_value = match engine.parse_and_eval(output_text.as_str()) {
                         Ok(v) => v,
-                        Err(err) => return Err(DmnError::FEELEvalError(err, path, output_text)),
+                        Err(err) => return Err(DmnError::FEELEval(err, path, output_text)),
                     };
                     output_context.insert(output.name.clone(), output_value);
                 }
