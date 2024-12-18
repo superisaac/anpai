@@ -2,6 +2,7 @@ use std::error;
 use std::fmt;
 use sxd_xpath::{ExecutionError, ParserError};
 
+use anpaiutils::xml::XmlError;
 use feel::eval::EvalError as FEELEvelError;
 
 // errors
@@ -11,7 +12,7 @@ pub enum DmnError {
     InvalidElement(String),
     NoElement(String),
     IOError(String),
-    XMLError(String),
+    XML(XmlError),
     XPathParserError(ParserError),
     XPathExecutionError(ExecutionError),
     FEELEvalError(FEELEvelError, String, String),
@@ -30,6 +31,12 @@ impl From<ExecutionError> for DmnError {
     }
 }
 
+impl From<XmlError> for DmnError {
+    fn from(err: XmlError) -> DmnError {
+        Self::XML(err)
+    }
+}
+
 // impl From<FEELEvelError> for DmnError {
 //     fn from(err: FEELEvelError) -> DmnError {
 //         Self::FEELEvelError(err)
@@ -43,7 +50,7 @@ impl fmt::Display for DmnError {
             Self::InvalidElement(elem_name) => write!(f, "invalid element {}", elem_name),
             Self::NoElement(elem_name) => write!(f, "no element `{}`", elem_name),
             Self::IOError(error_message) => write!(f, "io error {}", error_message),
-            Self::XMLError(error_message) => write!(f, "parse XML error {}", error_message),
+            Self::XML(err) => write!(f, "parse XML error {}", err),
             Self::XPathParserError(err) => write!(f, "parse xpath error {}", err),
             Self::XPathExecutionError(err) => write!(f, "execute xpath error {}", err),
             Self::FEELEvalError(err, path, _) => write!(f, "eval FEEL error at {}, {}", path, err),

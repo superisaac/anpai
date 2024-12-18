@@ -1,10 +1,8 @@
 [package]
-name = "dmn"
+name = "anpaiutils"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-feel.workspace = true
-anpaiutils.workspace = true
 sxd-document.workspace = true
 sxd-xpath.workspace = true

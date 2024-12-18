@@ -4,6 +4,7 @@ members = [
         "crates/feel",
         "crates/dmn",
         "crates/anpai",
+        "crates/anpaiutils",
 ]
 
 [workspace.dependencies]
@@ -13,5 +14,8 @@ lazy_static = "1.4.0"
 regex = "1.10.3"
 feel = { path="crates/feel" }
 dmn = { path="crates/dmn" }
+anpaiutils = { path="crates/anpaiutils" }
 serde = {version = "1.0.197", features = ["derive"] }
+sxd-document = "0.3.2"
+sxd-xpath = "0.4.2"
 serde_json = "1.0.114"
