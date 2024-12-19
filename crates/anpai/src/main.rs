@@ -35,7 +35,7 @@ enum AnpaiCommands {
         #[arg(short, long, help = "Given input as string instead of from files")]
         code: Option<String>,
 
-        #[arg(short, long, help = "Parse top policy")]
+        #[arg(short, long, help = "Parse top mode")]
         top: Option<feel_parse::ParseTop>,
 
         files: Vec<String>,

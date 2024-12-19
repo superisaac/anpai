@@ -240,10 +240,10 @@
         <di:waypoint x="874" y="190" />
       </dmndi:DMNEdge>
       <dmndi:DMNShape id="DMNShape_185v059" dmnElementRef="KnowledgeSource_0vxxmdt">
-        <dc:Bounds height="63" width="100" x="540" y="338" />
+        <dc:Bounds height="63" width="100" x="600" y="348" />
       </dmndi:DMNShape>
       <dmndi:DMNEdge id="DMNEdge_1x2119w" dmnElementRef="AuthorityRequirement_0bx47al">
-        <di:waypoint x="625" y="338" />
+        <di:waypoint x="685" y="348" />
         <di:waypoint x="786" y="190" />
       </dmndi:DMNEdge>
       <dmndi:DMNShape id="DMNShape_0pzk1sr" dmnElementRef="KnowledgeSource_19wpqcu">

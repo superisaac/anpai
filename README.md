@@ -10,8 +10,8 @@ other rust projects or used as command line executable as FEEL
 interpreter.
 
 ## build
-* run `cargo +nightly build` to build feel interpreter feel
-* run `cargo +nightly test` to run testing
+* run `cargo build` to build feel interpreter feel
+* run `cargo test` to run testing
 
 ## examples
 ### FEE interpreter
@@ -23,8 +23,8 @@ interpreter.
 % ./target/debug/anpai feel -c '(function(a, b) a + b)(5, 8)'
 13
 
-% ./target/debug/anpai feel -c '>8,4' --vars '{"?": 32}' --top unary-tests
-true
+% ./target/debug/anpai feel -c '>8,<4' --vars '{"?": 6}' --top unary-tests
+false
 
 # dump AST tree instead of evaluating the script
 % ./target/debug/anpai feel -c 'if a > 3 then "larger" else "smaller"' --vars '{a: 5}' --ast
