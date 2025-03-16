@@ -137,7 +137,7 @@ impl Parser<'_> {
             let op = self.scanner.current_token().kind;
             goahead!(self); // skip op
             let start_pos = self.scanner.current_token().position;
-            let right = self.parse_expression()?;
+            let right = self.parse_simple_expression()?;
             //let left = Node::new(Var(VarValue::Name("?".to_owned())), start_pos.clone());
             Ok(Node::new(
                 UnaryTest {
@@ -148,7 +148,7 @@ impl Parser<'_> {
             ))
         } else {
             let start_pos = self.scanner.current_token().position;
-            let right = self.parse_expression()?;
+            let right = self.parse_simple_expression()?;
             match *right.syntax {
                 Var(_) | Number(_) | Str(_) | Ident(_) | Null | Bool(_) | Temporal(_) | Neg(_) => {
                     Ok(Node::new(
@@ -236,7 +236,7 @@ impl Parser<'_> {
     }
 
     fn parse_funccall_or_index_or_dot(&mut self) -> NodeResult {
-        let mut node = self.parse_single_element()?;
+        let mut node = self.parse_single_expression()?;
         loop {
             match self.scanner.current_token().kind {
                 "(" => {
@@ -326,8 +326,19 @@ impl Parser<'_> {
         return Ok(Node::new(DotOp { left, attr }, start_pos));
     }
 
+    fn parse_simple_expression(&mut self) -> NodeResult {
+        match self.scanner.current_token().kind {
+            "number" => self.parse_number(),
+            "name" => self.parse_var(),
+            "backtick" => self.parse_backtick(),
+            "string" => self.parse_string(),
+            "temporal" => self.parse_temporal(),
+            _ => return Err(self.unexpect("name, number, string, temporal")),
+        }
+    }
+
     // single element
-    fn parse_single_element(&mut self) -> NodeResult {
+    fn parse_single_expression(&mut self) -> NodeResult {
         match self.scanner.current_token().kind {
             "number" => self.parse_number(),
             "name" => self.parse_var(),
@@ -350,7 +361,7 @@ impl Parser<'_> {
                     return Err(self.unexpect_keyword("true, false, if, for, some, every, function"))
                 }
             },
-            _ => return Err(self.unexpect("name, number")),
+            _ => return Err(self.unexpect("name, number, string, temporal")),
         }
     }
 
@@ -851,10 +862,7 @@ mod test {
 
     #[test]
     fn test_parse_unary_tests() {
-        let testcases = [
-            ("> 2, <= 1, a>8", "(unary-tests (> 2) (<= 1) (> a 8))"),
-            //("2>8; 9; true", "(expr-list (> 2 8) 9 true)"),
-        ];
+        let testcases = [("> 2, <= 1", "(unary-tests (> 2) (<= 1))")];
 
         for (input, output) in testcases {
             let engine = Box::new(Engine::new());
