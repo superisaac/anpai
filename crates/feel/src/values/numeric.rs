@@ -62,12 +62,17 @@ impl Numeric {
         BigDecimal::from(i32::MIN)
     }
 
-    pub fn from_str(input: &str) -> Option<Numeric> {
+    pub fn parse(input: &str) -> Option<Numeric> {
         let bign = match BigDecimal::from_str(input) {
             Ok(v) => v,
             Err(_) => return None,
         };
         Some(Self::from_decimal(bign))
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(input: &str) -> Option<Numeric> {
+        Self::parse(input)
     }
 
     pub fn from_decimal(bign: BigDecimal) -> Numeric {
@@ -87,7 +92,7 @@ impl Numeric {
     pub fn from_value(value: &Value) -> Option<Numeric> {
         match value {
             Value::NumberV(v) => Some(v.clone()),
-            Value::StrV(v) => Self::from_str(v.as_str()),
+            Value::StrV(v) => Self::parse(v.as_str()),
             _ => None,
         }
     }
@@ -123,7 +128,7 @@ impl Numeric {
     }
 
     pub fn sqrt(&self) -> Option<Numeric> {
-        self.to_decimal().sqrt().map(|n| Self::from_decimal(n))
+        self.to_decimal().sqrt().map(Self::from_decimal)
     }
 
     pub fn ln(&self) -> Option<Numeric> {
@@ -267,7 +272,6 @@ impl ops::Add for Numeric {
 impl ops::AddAssign for Numeric {
     fn add_assign(&mut self, other: Self) {
         *self = complex_op_assign!(self, other, +);
-        ()
     }
 }
 
@@ -283,7 +287,6 @@ impl ops::Sub for Numeric {
 impl ops::SubAssign for Numeric {
     fn sub_assign(&mut self, other: Self) {
         *self = complex_op_assign!(self, other, -);
-        ()
     }
 }
 
@@ -299,7 +302,6 @@ impl ops::Mul for Numeric {
 impl ops::MulAssign for Numeric {
     fn mul_assign(&mut self, other: Self) {
         *self = complex_op_assign!(self, other, *);
-        ()
     }
 }
 
@@ -315,7 +317,6 @@ impl ops::Div for Numeric {
 impl ops::DivAssign for Numeric {
     fn div_assign(&mut self, other: Self) {
         *self = Self::Decimal(self.to_decimal() / other.to_decimal());
-        ()
     }
 }
 
@@ -331,7 +332,6 @@ impl ops::Rem for Numeric {
 impl ops::RemAssign for Numeric {
     fn rem_assign(&mut self, other: Self) {
         *self = complex_op_assign!(self, other, %);
-        ()
     }
 }
 
@@ -362,12 +362,7 @@ impl cmp::Eq for Numeric {}
 
 impl cmp::PartialOrd for Numeric {
     fn partial_cmp(&self, other: &Numeric) -> Option<cmp::Ordering> {
-        if let Self::Integer(a) = *self {
-            if let Self::Integer(b) = *other {
-                return a.partial_cmp(&b);
-            }
-        }
-        self.to_decimal().partial_cmp(&other.to_decimal())
+        Some(self.cmp(other))
     }
 }
 
@@ -387,23 +382,23 @@ mod test {
 
     #[test]
     fn test_num_format() {
-        let a1 = super::Numeric::from_str("0.77890000").unwrap();
+        let a1 = super::Numeric::parse("0.77890000").unwrap();
         assert_eq!(a1.to_string(), "0.77890000");
 
-        let a2 = super::Numeric::from_str("3.7788400202").unwrap();
+        let a2 = super::Numeric::parse("3.7788400202").unwrap();
         let s2 = format!("{:.3}", a2);
         assert_eq!(s2, "3.778");
     }
 
     #[test]
     fn test_zero_num_format() {
-        let v = super::Numeric::from_str("0.00000").unwrap();
+        let v = super::Numeric::parse("0.00000").unwrap();
         assert_eq!(v.to_string(), "0");
     }
     #[test]
     fn test_max_scale() {
-        let a = super::Numeric::from_str("1.00000000000000000000000000000000005").unwrap();
-        let b = super::Numeric::from_str("1.00000000000000000000000000000000008").unwrap();
+        let a = super::Numeric::parse("1.00000000000000000000000000000000005").unwrap();
+        let b = super::Numeric::parse("1.00000000000000000000000000000000008").unwrap();
         let s = a + b;
         assert_eq!(s.to_string(), "2.0000000000000000000000000000000000"); // the last 13 was stripped
     }

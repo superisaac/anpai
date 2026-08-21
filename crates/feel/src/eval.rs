@@ -40,9 +40,9 @@ impl fmt::Display for EvalErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::VarNotFound(name) => write!(f, "VarNotFound: `{}`", name),
-            Self::KeyError => write!(f, "{}", "KeyError"),
+            Self::KeyError => write!(f, "KeyError"),
             Self::TypeError(expect) => write!(f, "TypeError: expect {}", expect),
-            Self::IndexError => write!(f, "{}", "IndexError"),
+            Self::IndexError => write!(f, "IndexError"),
             Self::Runtime(message) => write!(f, "RuntimeError: {}", message),
             Self::ValueError(message) => write!(f, "ValueError: {}", message),
             Self::Parse(parse_err) => write!(f, "{}", parse_err),
@@ -195,7 +195,7 @@ impl Engine {
 
     /// set the value of a variable by look up the stack
     pub fn set_var(&mut self, name: String, value: Value) {
-        if self.scopes.len() == 0 {
+        if self.scopes.is_empty() {
             self.push_frame();
         }
 
@@ -213,7 +213,7 @@ impl Engine {
 
     /// bind a variable to the top of stack
     pub fn bind_var(&mut self, name: String, value: Value) {
-        if self.scopes.len() == 0 {
+        if self.scopes.is_empty() {
             self.push_frame();
         }
         self.scopes
@@ -225,13 +225,13 @@ impl Engine {
     }
 
     pub fn as_box(&self) -> Box<Engine> {
-        return Box::new(self.clone());
+        Box::new(self.clone())
     }
 
     pub fn load_context_string(&mut self, ctx_input: &str) -> EvalResult {
         let node = parse(ctx_input, Box::new(self.clone()), Default::default())?;
         let ctx_value = self.eval(node)?;
-        return match ctx_value {
+        match ctx_value {
             ContextV(m) => {
                 self.load_context(m.as_ref().borrow().entries());
                 Ok(BoolV(true))
@@ -239,7 +239,7 @@ impl Engine {
             _ => Err(EvalError::new(EvalErrorKind::ValueError(
                 "context/map required".to_owned(),
             ))),
-        };
+        }
     }
 
     pub fn load_context(&mut self, ctx_entries: Vec<(String, Value)>) {
@@ -270,6 +270,7 @@ impl Engine {
         }
     }
 
+    #[allow(clippy::boxed_local)]
     pub fn eval(&mut self, node: Box<Node>) -> EvalResult {
         let start_pos = node.start_pos;
         let res = match *node.syntax {
@@ -330,13 +331,13 @@ impl Engine {
                 list_expr,
                 filter_expr,
             } => self.eval_every_expr(var_name, list_expr, filter_expr),
-            ExprList(exprs) => self.eval_expr_list(exprs),
-            UnaryTests(exprs) => self.eval_unary_tests(exprs),
+            ExprList(exprs) => self.eval_expr_list(&exprs),
+            UnaryTests(exprs) => self.eval_unary_tests(&exprs),
         };
-        return match res {
+        match res {
             Ok(v) => Ok(v),
             Err(err) => Err(err.with_pos_if_zero(start_pos)),
-        };
+        }
     }
 
     #[inline(always)]
@@ -346,7 +347,7 @@ impl Engine {
         Ok(StrV(content))
     }
 
-    pub fn is_defined(&mut self, value_node: &Box<Node>) -> EvalResult {
+    pub fn is_defined(&mut self, value_node: &Node) -> EvalResult {
         if let Var(v) = *value_node.syntax.clone() {
             return match self.resolve(v.value()) {
                 Some(_) => Ok(BoolV(true)),
@@ -354,7 +355,7 @@ impl Engine {
             };
         }
         self.push_frame();
-        let r = match self.eval(value_node.clone()) {
+        let r = match self.eval(Box::new(value_node.clone())) {
             Ok(_) => Ok(BoolV(true)),
             Err(EvalError {
                 kind: IndexError,
@@ -376,7 +377,7 @@ impl Engine {
 
     #[inline(always)]
     fn eval_number(&mut self, number_str: String) -> EvalResult {
-        let d = Numeric::from_str(number_str.as_str())
+        let d = Numeric::parse(number_str.as_str())
             .ok_or(ValueError("fail to parse numger".to_owned()))?;
         Ok(NumberV(d))
     }
@@ -391,7 +392,7 @@ impl Engine {
     }
 
     #[inline(always)]
-    fn eval_array(&mut self, elements: &Vec<Box<Node>>) -> EvalResult {
+    fn eval_array(&mut self, elements: &[Box<Node>]) -> EvalResult {
         let mut results = Vec::new();
         for elem in elements.iter() {
             let res = self.eval(elem.clone())?;
@@ -401,7 +402,7 @@ impl Engine {
     }
 
     #[inline(always)]
-    fn eval_map(&mut self, items: &Vec<MapNodeItem>) -> EvalResult {
+    fn eval_map(&mut self, items: &[MapNodeItem]) -> EvalResult {
         let mut value_map = Context::new();
         for item in items.iter() {
             let k = self.eval(item.name.clone())?;
@@ -550,7 +551,7 @@ impl Engine {
     }
 
     #[inline(always)]
-    fn eval_expr_list_in(&mut self, exprs: Vec<Box<Node>>) -> EvalResult {
+    fn eval_expr_list_in(&mut self, exprs: &[Box<Node>]) -> EvalResult {
         let left_value = self
             .resolve("?".to_owned())
             .ok_or(EvalError::new(VarNotFound("?".to_owned())))?;
@@ -566,7 +567,7 @@ impl Engine {
     }
 
     #[inline(always)]
-    fn eval_expr_list(&mut self, exprs: Vec<Box<Node>>) -> EvalResult {
+    fn eval_expr_list(&mut self, exprs: &[Box<Node>]) -> EvalResult {
         let mut last_value: Option<Value> = None;
         for expr in exprs.iter() {
             let res = self.eval(expr.clone())?;
@@ -580,7 +581,7 @@ impl Engine {
     }
 
     #[inline(always)]
-    fn eval_unary_tests(&mut self, exprs: Vec<Box<Node>>) -> EvalResult {
+    fn eval_unary_tests(&mut self, exprs: &[Box<Node>]) -> EvalResult {
         self.eval_expr_list_in(exprs)
         // //let input_value = self.resolve("?".to_owned()).ok_or(EvalError::VarNotFound)?;
         // for expr in exprs.iter() {
@@ -607,11 +608,9 @@ impl Engine {
                 macro_,
                 required_args,
             } => self.call_macro(&macro_, required_args, call_args),
-            _ => {
-                return Err(EvalError::runtime(
-                    format!("cannot call non function {}", fref.data_type()).as_str(),
-                ))
-            }
+            _ => Err(EvalError::runtime(
+                format!("cannot call non function {}", fref.data_type()).as_str(),
+            )),
         }
     }
 
@@ -756,10 +755,10 @@ impl Engine {
             }
             "or" => {
                 if left_bool_value {
-                    return Ok(BoolV(true));
+                    Ok(BoolV(true))
                 } else {
                     let right_value = self.eval(right)?;
-                    return Ok(BoolV(right_value.bool_value()));
+                    Ok(BoolV(right_value.bool_value()))
                 }
             }
             _ => Err(EvalError::new(Runtime(format!(
@@ -788,7 +787,7 @@ impl Engine {
             "=" => Ok(BoolV(left_value == right_value)),
             "[]" => self.eval_binop_index(left_value, right_value),
             //"in" => self.eval_binop_in(left_value, right_value),
-            _ => return Err(EvalError::new(Runtime(format!("unknown op {}", op)))),
+            _ => Err(EvalError::new(Runtime(format!("unknown op {}", op)))),
         }
     }
 
@@ -804,12 +803,10 @@ impl Engine {
             "!=" => Ok(BoolV(left_value != right_value)),
             "=" => Ok(BoolV(left_value == right_value)),
             //"in" => self.eval_binop_in(left_value, right_value),
-            _ => {
-                return Err(EvalError::new(Runtime(format!(
-                    "unknown unary test op {}",
-                    op
-                ))))
-            }
+            _ => Err(EvalError::new(Runtime(format!(
+                "unknown unary test op {}",
+                op
+            )))),
         }
     }
 
@@ -853,15 +850,12 @@ impl Engine {
     #[inline(always)]
     fn eval_in_op(&mut self, left: Box<Node>, right: Box<Node>) -> EvalResult {
         let left_value = self.eval(left)?;
-        match *right.syntax {
-            ExprList(items) => {
-                self.push_frame();
-                self.bind_var("?".to_owned(), left_value.clone());
-                let res = self.eval_expr_list_in(items);
-                self.pop_frame();
-                return res;
-            }
-            _ => (),
+        if let ExprList(items) = *right.syntax {
+            self.push_frame();
+            self.bind_var("?".to_owned(), left_value.clone());
+            let res = self.eval_expr_list_in(&items);
+            self.pop_frame();
+            return res;
         }
         self.push_frame();
         let right_res = self.eval(right);
@@ -903,15 +897,20 @@ impl Engine {
     }
 }
 
+impl Default for Engine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::{parse::parse, values::numeric::Numeric};
-    use core::assert_matches::assert_matches;
 
     #[test]
     fn test_number_parse() {
         let a = "2342404820143892034890".parse::<i64>();
-        assert_matches!(a, Err(_));
+        assert!(a.is_err());
     }
 
     #[test]
@@ -1184,7 +1183,7 @@ mod test {
         let mut eng = super::Engine::new();
         eng.set_var(
             "v1".to_owned(),
-            super::NumberV(Numeric::from_str("2.3").unwrap()),
+            super::NumberV(Numeric::parse("2.3").unwrap()),
         );
         let input = "v1 + 3";
         let node = parse(input, Box::new(eng.clone()), Default::default()).unwrap();

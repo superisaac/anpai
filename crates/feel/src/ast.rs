@@ -11,7 +11,7 @@ pub struct FuncCallArg {
 
 impl fmt::Display for FuncCallArg {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.arg_name == "" {
+        if self.arg_name.is_empty() {
             write!(f, "{}", self.arg)
         } else {
             write!(f, "{}:{}", self.arg_name, self.arg)
@@ -167,7 +167,7 @@ impl fmt::Display for NodeSyntax {
             Self::DotOp { left, attr } => write!(f, "(. {} {})", left, attr),
             Self::FuncCall { func_ref, args } => write!(f, "(call {} ", func_ref)
                 .and_then(|_| fmt_vec(f, args.iter(), "[", "]"))
-                .and_then(|_| write!(f, "{}", ")")),
+                .and_then(|_| write!(f, ")")),
             Self::FuncDef {
                 arg_names,
                 body,

@@ -98,7 +98,7 @@ unsafe impl Sync for Value {}
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::NullV => write!(f, "{}", "null"),
+            Self::NullV => write!(f, "null"),
             Self::BoolV(v) => write!(f, "{}", v),
             Self::NumberV(v) => write!(f, "{}", v), // .normalize
             Self::StrV(v) => write!(f, "\"{}\"", escape(v)),
@@ -119,11 +119,11 @@ impl fmt::Display for Value {
                 optional_args: _,
                 var_arg: _,
                 func: _,
-            } => write!(f, "{}", "function"),
+            } => write!(f, "function"),
             Self::MacroV {
                 required_args: _,
                 macro_: _,
-            } => write!(f, "{}", "function"),
+            } => write!(f, "function"),
             Self::FuncV { func_def: _, code } => write!(f, "{}", code),
         }
     }
@@ -134,8 +134,13 @@ impl Value {
         Self::NumberV(Numeric::from_usize(n))
     }
 
-    pub fn from_str(s: &str) -> Value {
+    pub fn from_string(s: &str) -> Value {
         Self::StrV(s.to_owned())
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(s: &str) -> Value {
+        Self::from_string(s)
     }
 
     pub fn data_type(&self) -> String {
@@ -176,9 +181,9 @@ impl Value {
             Self::NullV => false,
             Self::BoolV(v) => *v,
             Self::NumberV(v) => *v != Numeric::ZERO,
-            Self::StrV(v) => v.len() > 0,
-            Self::ArrayV(v) => v.borrow().len() > 0,
-            Self::ContextV(v) => v.borrow().len() > 0,
+            Self::StrV(v) => !v.is_empty(),
+            Self::ArrayV(v) => !v.borrow().is_empty(),
+            Self::ContextV(v) => !v.borrow().is_empty(),
             _ => true,
         }
     }
@@ -187,15 +192,16 @@ impl Value {
         match self {
             Self::StrV(v) => CompareKey::Str(v.clone()),
             Self::NumberV(v) => CompareKey::Number(v.clone()),
-            Self::BoolV(v) if *v == true => CompareKey::Number(Numeric::ONE),
+            Self::BoolV(v) if *v => CompareKey::Number(Numeric::ONE),
             _ => CompareKey::Number(Numeric::ZERO),
         }
     }
 
     pub fn parse_number(&self) -> Result<Numeric, ValueError> {
         match self {
-            Self::StrV(s) => Numeric::from_str(s)
-                .ok_or(ValueError("fail to parse number from string".to_owned())),
+            Self::StrV(s) => {
+                Numeric::parse(s).ok_or(ValueError("fail to parse number from string".to_owned()))
+            }
             Self::NumberV(n) => Ok(n.clone()),
             _ => Err(ValueError("fail to parse number".to_owned())),
         }
@@ -499,6 +505,8 @@ impl ops::Not for Value {
     }
 }
 
+// Value keeps partial ordering for values whose FEEL types are not comparable.
+#[allow(clippy::non_canonical_partial_ord_impl)]
 impl cmp::PartialOrd for Value {
     #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {

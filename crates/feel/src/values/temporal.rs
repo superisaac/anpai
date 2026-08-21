@@ -28,16 +28,18 @@ lazy_static! {
 }
 
 pub fn parse_temporal(temp_str: &str) -> Result<Value, ValueError> {
-    if temp_str.starts_with("@") {
-        let striped = &temp_str[2..temp_str.len() - 1];
-        return parse_temporal(striped);
+    if let Some(stripped) = temp_str
+        .strip_prefix("@\"")
+        .and_then(|value| value.strip_suffix('"'))
+    {
+        return parse_temporal(stripped);
     }
 
-    if temp_str.starts_with("-") {
+    if let Some(stripped) = temp_str.strip_prefix('-') {
         if let Ok(Value::DurationV {
             duration,
             negative: _,
-        }) = parse_duration(&temp_str[1..])
+        }) = parse_duration(stripped)
         {
             Ok(Value::DurationV {
                 duration,
@@ -69,7 +71,7 @@ pub(crate) fn parse_datetime(s: &str) -> Result<Value, ValueError> {
             let local_now = chrono::Local::now();
             cdt = chrono::DateTime::<chrono::FixedOffset>::from_naive_utc_and_offset(
                 cdt.naive_utc(),
-                local_now.offset().clone(),
+                *local_now.offset(),
             );
         }
         Ok(Value::DateTimeV(cdt))
@@ -173,7 +175,7 @@ pub(crate) fn datetime_add(cdt: DateTimeT, dur: iso8601::Duration) -> Result<Dat
     } = dur
     {
         let secs = second + 60 * minute + 3600 * hour;
-        let cdur = chrono::TimeDelta::new(secs as i64, millisecond * 1000_000).unwrap();
+        let cdur = chrono::TimeDelta::new(secs as i64, millisecond * 1_000_000).unwrap();
         let mut d0: DateTimeT = cdt
             .checked_add_months(chrono::Months::new(year * 12 + month))
             .unwrap();
@@ -198,7 +200,7 @@ pub(crate) fn datetime_sub(cdt: DateTimeT, dur: iso8601::Duration) -> Result<Dat
     } = dur
     {
         let secs = second + 60 * minute + 3600 * hour;
-        let cdur = chrono::TimeDelta::new(secs as i64, millisecond * 1000_000).unwrap();
+        let cdur = chrono::TimeDelta::new(secs as i64, millisecond * 1_000_000).unwrap();
         let mut d0 = cdt
             .checked_sub_months(chrono::Months::new(month + year * 12))
             .unwrap();
@@ -230,7 +232,7 @@ pub(crate) fn timedelta_to_duration(delta: chrono::TimeDelta) -> (iso8601::Durat
             hour: hour as u32,
             minute: min as u32,
             second: sec as u32,
-            millisecond: (nano / 1000_000) as u32,
+            millisecond: (nano / 1_000_000) as u32,
         },
         negative,
     )
@@ -241,7 +243,7 @@ pub(crate) fn date_to_datetime(date: iso8601::Date) -> DateTimeT {
     let ntime = chrono::NaiveTime::from_str("00:00:00").unwrap();
     let ndt = chrono::NaiveDateTime::new(ndate, ntime);
     let nowdt = chrono::Local::now();
-    let cdt: DateTimeT = chrono::DateTime::from_naive_utc_and_offset(ndt, nowdt.offset().clone());
+    let cdt: DateTimeT = chrono::DateTime::from_naive_utc_and_offset(ndt, *nowdt.offset());
     cdt
 }
 
@@ -253,25 +255,25 @@ pub(crate) fn install_temporal_prelude(prelude: &mut Prelude) {
     // temporal functions
     // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-temporal/
     prelude.add_native_func("date and time", &["from"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"from".to_owned()).unwrap();
+        let arg0 = args.get("from").unwrap();
         let s = arg0.expect_string("argument[1] `from`")?;
         Ok(parse_datetime(s.as_str())?)
     });
 
     prelude.add_native_func("date", &["from"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"from".to_owned()).unwrap();
+        let arg0 = args.get("from").unwrap();
         let s = arg0.expect_string("argument[1] `from`")?;
         Ok(parse_date(s.as_str())?)
     });
 
     prelude.add_native_func("time", &["from"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"from".to_owned()).unwrap();
+        let arg0 = args.get("from").unwrap();
         let s = arg0.expect_string("argument[1] `from`")?;
         Ok(parse_time(s.as_str())?)
     });
 
     prelude.add_native_func("duration", &["from"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"from".to_owned()).unwrap();
+        let arg0 = args.get("from").unwrap();
         let s = arg0.expect_string("argument[1] `from`")?;
         Ok(parse_duration(s.as_str())?)
     });
@@ -287,12 +289,10 @@ pub(crate) fn install_temporal_prelude(prelude: &mut Prelude) {
     });
 
     prelude.add_native_func("day of week", &["date"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"date".to_owned()).unwrap();
+        let arg0 = args.get("date").unwrap();
         match arg0 {
-            Value::DateTimeV(v) => Ok(Value::StrV(day_of_week(v.clone()).to_owned())),
-            Value::DateV(v) => Ok(Value::StrV(
-                day_of_week(date_to_datetime(v.clone())).to_owned(),
-            )),
+            Value::DateTimeV(v) => Ok(Value::StrV(day_of_week(*v).to_owned())),
+            Value::DateV(v) => Ok(Value::StrV(day_of_week(date_to_datetime(*v)).to_owned())),
             _ => Err(EvalError::new(TypeError(format!(
                 "argument[1] `date`, expect date|date and time, but {} found",
                 arg0.data_type(),
@@ -305,28 +305,27 @@ pub(crate) fn install_temporal_prelude(prelude: &mut Prelude) {
 mod test {
     use super::parse_temporal;
     use crate::values::value::Value;
-    use core::assert_matches::assert_matches;
     extern crate chrono;
     extern crate iso8601;
     use chrono::Datelike;
 
     #[test]
     fn test_parse_temp_value() {
-        assert_matches!(
+        assert!(matches!(
             parse_temporal(r#"@"2020-04-06T08:00:00@Europe/Berlin""#),
             Ok(Value::DateTimeV(_))
-        );
-        assert_matches!(
+        ));
+        assert!(matches!(
             parse_temporal("2020-04-06T08:00:00@Europe/Berlin"),
             Ok(Value::DateTimeV(_))
-        );
-        assert_matches!(
+        ));
+        assert!(matches!(
             parse_temporal("PT2H3M"),
             Ok(Value::DurationV {
                 duration: _,
                 negative: false
             })
-        );
+        ));
     }
 
     #[test]

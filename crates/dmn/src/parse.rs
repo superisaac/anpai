@@ -268,8 +268,7 @@ impl Parser<'_> {
     }
 
     pub fn parse_file(&self, path: &str) -> Result<Diagram, DmnError> {
-        let contents =
-            fs::read_to_string(path).or_else(|e| Err(DmnError::IOError(e.to_string())))?;
+        let contents = fs::read_to_string(path).map_err(|e| DmnError::IOError(e.to_string()))?;
         let package = parse_string(contents.as_str())?;
         let doc = package.as_document();
         let node = self

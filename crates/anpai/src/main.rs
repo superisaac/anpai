@@ -136,7 +136,7 @@ impl AnpaiCommands {
         Ok(())
     }
 
-    fn execute(&self) -> () {
+    fn execute(&self) {
         match self {
             Self::Feel {
                 ast,
@@ -206,8 +206,6 @@ impl AnpaiCommands {
                 }
             },
         }
-
-        ()
     }
 }
 

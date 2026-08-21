@@ -69,7 +69,7 @@ macro_rules! goahead {
 }
 
 impl Parser<'_> {
-    pub fn new<'a>(input: &str, engine: Box<Engine>) -> Parser {
+    pub fn new(input: &str, engine: Box<Engine>) -> Parser<'_> {
         let scanner = Scanner::new(input);
         Parser {
             scanner: Box::new(scanner),
@@ -79,14 +79,7 @@ impl Parser<'_> {
 
     fn unexpect(&self, expects: &str) -> ParseError {
         let bt = Backtrace::force_capture();
-        let mut stack_str = String::new();
-        for (i, frame) in bt.frames().iter().enumerate() {
-            if i > 0 {
-                stack_str.push_str("\n");
-            }
-            stack_str.push_str(format!("{:?}", frame).as_str());
-        }
-        //let stack_str = format!("{:?}", bt);
+        let stack_str = format!("{:?}", bt);
 
         ParseError::new(format!(
             "unexpected token {}, expect {}, stack {}",
@@ -286,18 +279,18 @@ impl Parser<'_> {
             if let Var(v) = *arg.syntax {
                 goahead!(self); // skip ":"
                 let arg_value = self.parse_expression()?;
-                return Ok(FuncCallArg {
+                Ok(FuncCallArg {
                     arg_name: v.value(),
                     arg: arg_value,
-                });
+                })
             } else {
-                return Err(self.unexpect("'var'"));
+                Err(self.unexpect("'var'"))
             }
         } else {
-            return Ok(FuncCallArg {
+            Ok(FuncCallArg {
                 arg_name: "".to_owned(),
                 arg,
-            });
+            })
         }
     }
 
@@ -309,21 +302,21 @@ impl Parser<'_> {
             return Err(self.unexpect("]"));
         }
         goahead!(self);
-        return Ok(Node::new(
+        Ok(Node::new(
             BinOp {
                 op: "[]".to_owned(),
                 left,
                 right: at,
             },
             start_pos,
-        ));
+        ))
     }
 
     fn parse_dot_rest(&mut self, left: Box<Node>) -> NodeResult {
         goahead!(self); // skip "."
         let start_pos = left.clone().start_pos;
         let attr = self.parse_name(None)?;
-        return Ok(Node::new(DotOp { left, attr }, start_pos));
+        Ok(Node::new(DotOp { left, attr }, start_pos))
     }
 
     fn parse_simple_expression(&mut self) -> NodeResult {
@@ -333,7 +326,7 @@ impl Parser<'_> {
             "backtick" => self.parse_backtick(),
             "string" => self.parse_string(),
             "temporal" => self.parse_temporal(),
-            _ => return Err(self.unexpect("name, number, string, temporal")),
+            _ => Err(self.unexpect("name, number, string, temporal")),
         }
     }
 
@@ -357,11 +350,9 @@ impl Parser<'_> {
                 "for" => self.parse_for_expression(),
                 "some" | "every" => self.parse_some_or_every_expression(),
                 "function" => self.parse_function_defination(),
-                _ => {
-                    return Err(self.unexpect_keyword("true, false, if, for, some, every, function"))
-                }
+                _ => Err(self.unexpect_keyword("true, false, if, for, some, every, function")),
             },
-            _ => return Err(self.unexpect("name, number, string, temporal")),
+            _ => Err(self.unexpect("name, number, string, temporal")),
         }
     }
 
@@ -375,14 +366,14 @@ impl Parser<'_> {
             let token = self.scanner.current_token();
             if let ("keyword", Some(stop_keywords)) = (token.kind, stop_keywords) {
                 let token_keyword = token.value.as_str();
-                if stop_keywords.into_iter().any(|x| *x == token_keyword) {
+                if stop_keywords.contains(&token_keyword) {
                     break;
                 }
             }
             token_stack.push(token);
             goahead!(self);
         }
-        while token_stack.len() > 0 {
+        while !token_stack.is_empty() {
             let mut name_buffer = String::new();
             let mut found_op = false;
             for (i, t) in token_stack.iter().enumerate() {
@@ -393,7 +384,7 @@ impl Parser<'_> {
                     && (token_stack[i - 1].position.chars + token_stack[i - 1].value.len()
                         < t.position.chars)
                 {
-                    name_buffer.push_str(" ");
+                    name_buffer.push(' ');
                 }
                 name_buffer.push_str(t.value.as_str());
             }
@@ -422,21 +413,21 @@ impl Parser<'_> {
             let token = self.scanner.current_token();
             if let ("keyword", Some(stop_keywords)) = (token.kind, stop_keywords) {
                 let token_keyword = token.value.as_str();
-                if stop_keywords.into_iter().any(|x| *x == token_keyword) {
+                if stop_keywords.contains(&token_keyword) {
                     break;
                 }
             }
             token_stack.push(token);
             goahead!(self);
         }
-        if token_stack.len() > 0 {
+        if !token_stack.is_empty() {
             let mut name_buffer = String::new();
             for (i, t) in token_stack.iter().enumerate() {
                 if i > 0
                     && (token_stack[i - 1].position.chars + token_stack[i - 1].value.len()
                         < t.position.chars)
                 {
-                    name_buffer.push_str(" ");
+                    name_buffer.push(' ');
                 }
                 name_buffer.push_str(t.value.as_str());
             }
@@ -548,7 +539,7 @@ impl Parser<'_> {
         } else if self.scanner.expect("string") {
             self.parse_string()
         } else {
-            return Err(self.unexpect("name or string"));
+            Err(self.unexpect("name or string"))
         }
     }
 
@@ -562,7 +553,7 @@ impl Parser<'_> {
         if self.scanner.expect(")") {
             // open end range
             goahead!(self); //skip ')'
-            return Ok(Node::new(
+            Ok(Node::new(
                 Range {
                     start_open,
                     start: start_exp,
@@ -570,11 +561,11 @@ impl Parser<'_> {
                     end: end_exp,
                 },
                 start_pos,
-            ));
+            ))
         } else if self.scanner.expect("]") {
             // close end range
             goahead!(self); //skip ')'
-            return Ok(Node::new(
+            Ok(Node::new(
                 Range {
                     start_open,
                     start: start_exp,
@@ -582,9 +573,9 @@ impl Parser<'_> {
                     end: end_exp,
                 },
                 start_pos,
-            ));
+            ))
         } else {
-            return Err(self.unexpect("')', ']'"));
+            Err(self.unexpect("')', ']'"))
         }
     }
 
@@ -595,15 +586,15 @@ impl Parser<'_> {
         if self.scanner.expect("..") {
             // is range
             goahead!(self); // skip '..'
-            return self.parse_range_given_start(true, aexp, start_pos);
+            self.parse_range_given_start(true, aexp, start_pos)
         } else if self.scanner.expect(")") {
             goahead!(self); // skip ')'
-            return Ok(aexp);
+            Ok(aexp)
         } else if self.scanner.expect(",") {
             //goahead!(self);
-            return self.parse_expr_list_given_first(aexp, start_pos);
+            self.parse_expr_list_given_first(aexp, start_pos)
         } else {
-            return Err(self.unexpect("')', ',', '..'"));
+            Err(self.unexpect("')', ',', '..'"))
         }
     }
 
@@ -624,7 +615,7 @@ impl Parser<'_> {
         }
         goahead!(self); // skip '..'
 
-        return self.parse_range_given_start(false, aexp, start_pos);
+        self.parse_range_given_start(false, aexp, start_pos)
     }
 
     fn parse_expr_list_given_first(
@@ -755,7 +746,7 @@ impl Parser<'_> {
         goahead!(self); // skip 'satisfies'
 
         let filter_expr = self.parse_expression()?;
-        if cmd == "some".to_owned() {
+        if cmd == "some" {
             Ok(Node::new(
                 SomeExpr {
                     var_name,
@@ -836,7 +827,6 @@ pub fn parse(
 #[cfg(test)]
 mod test {
     use crate::eval::Engine;
-    use core::assert_matches::assert_matches;
     #[test]
     fn test_parse_expressions() {
         let testcases = [
@@ -882,14 +872,14 @@ mod test {
         let input = "function(a, b) a + b   ";
         let engine = Box::new(Engine::new());
         let node = super::parse(input, engine, Default::default()).unwrap();
-        assert_matches!(
+        assert!(matches!(
             *(node.syntax),
             crate::ast::NodeSyntax::FuncDef {
                 arg_names: _,
                 body: _,
                 code: _
             }
-        );
+        ));
         if let crate::ast::NodeSyntax::FuncDef {
             arg_names: _,
             body: _,
@@ -904,6 +894,8 @@ mod test {
     fn test_parse_dup_arg_name() {
         let engine = Box::new(Engine::new());
         let res = super::parse("function(a, b, a) a+ b", engine, Default::default());
-        assert_matches!(res, Err((super::ParseError::Parse(x), _)) if x == "function has duplication arg name `a`".to_owned());
+        assert!(
+            matches!(res, Err((super::ParseError::Parse(x), _)) if x == "function has duplication arg name `a`")
+        );
     }
 }

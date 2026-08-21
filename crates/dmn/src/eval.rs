@@ -6,9 +6,9 @@ use feel::values::value::Value;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-fn rule_matched(rule: &Rule, engine: &mut Box<Engine>, input_values: &Vec<Value>) -> bool {
+fn rule_matched(rule: &Rule, engine: &mut Box<Engine>, input_values: &[Value]) -> bool {
     for (i, input_entry) in rule.input_entries.iter().enumerate() {
-        if input_entry.text == "" {
+        if input_entry.text.is_empty() {
             continue;
         }
         let v = input_values[i].clone();
@@ -24,7 +24,7 @@ fn rule_matched(rule: &Rule, engine: &mut Box<Engine>, input_values: &Vec<Value>
             engine.pop_frame();
         }
     }
-    return true;
+    true
 }
 
 pub fn eval_decision(
@@ -52,13 +52,13 @@ pub fn eval_decision(
         }
 
         for (rule_idx, rule) in table.rules.iter().enumerate() {
-            if rule_matched(&rule, engine, &input_values) {
+            if rule_matched(rule, engine, &input_values) {
                 // render the result
                 let mut output_context = Context::new();
                 for (i, output) in table.outputs.iter().enumerate() {
                     let output_entry = rule.output_entries[i].clone();
                     let output_text = output_entry.text;
-                    if output_text == "" {
+                    if output_text.is_empty() {
                         continue;
                     }
                     let path = format!(
@@ -92,7 +92,7 @@ pub fn eval_dmn_diagram(
     };
 
     let context = eval_decision(engine, decision, diagram)?;
-    return Ok(Value::ContextV(Rc::new(RefCell::new(context))));
+    Ok(Value::ContextV(Rc::new(RefCell::new(context))))
 }
 
 pub fn eval_file(

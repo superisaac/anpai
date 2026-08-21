@@ -119,7 +119,7 @@ fn test_string_escape_unescape() {
     assert_eq!(unescaped.as_str(), input);
 }
 
-pub fn find_duplicate<T>(elements: &Vec<T>) -> Option<T>
+pub fn find_duplicate<T>(elements: &[T]) -> Option<T>
 where
     T: Eq + Hash + Clone,
 {

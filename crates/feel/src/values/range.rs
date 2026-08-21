@@ -41,7 +41,7 @@ impl RangeT {
     }
 
     pub fn position(&self, p: &Value) -> i32 {
-        let cmp_start = Self::compare(&p, &self.start);
+        let cmp_start = Self::compare(p, &self.start);
         if self.start_open {
             if cmp_start <= 0 {
                 return -1;
@@ -52,10 +52,8 @@ impl RangeT {
             }
         }
 
-        let cmp_end = Self::compare(&p, &self.end);
-        if self.end_open && cmp_end >= 0 {
-            1
-        } else if !self.end_open && cmp_end > 0 {
+        let cmp_end = Self::compare(p, &self.end);
+        if (self.end_open && cmp_end >= 0) || (!self.end_open && cmp_end > 0) {
             1
         } else {
             0
@@ -109,7 +107,7 @@ impl RangeT {
         if !(cmp_end > 0 || !self.end_open || other.end_open) {
             return false;
         }
-        return true;
+        true
     }
 
     pub fn overlaps_before(&self, other: &RangeT) -> bool {
@@ -141,47 +139,23 @@ impl RangeT {
     }
 
     pub fn finished_by(&self, v: &Value) -> bool {
-        if Self::compare(self.end.as_ref(), v) != 0 {
-            false
-        } else if self.end_open {
-            false
-        } else {
-            true
-        }
+        Self::compare(self.end.as_ref(), v) == 0 && !self.end_open
     }
 
     pub fn finished_by_range(&self, other: &RangeT) -> bool {
-        if Self::compare(self.end.as_ref(), other.end.as_ref()) != 0 {
-            false
-        } else if self.end_open != other.end_open {
-            false
-        } else if !self.includes(other) {
-            false
-        } else {
-            true
-        }
+        Self::compare(self.end.as_ref(), other.end.as_ref()) == 0
+            && self.end_open == other.end_open
+            && self.includes(other)
     }
 
     pub fn started_by(&self, v: &Value) -> bool {
-        if Self::compare(self.start.as_ref(), v) != 0 {
-            false
-        } else if self.start_open {
-            false
-        } else {
-            true
-        }
+        Self::compare(self.start.as_ref(), v) == 0 && !self.start_open
     }
 
     pub fn started_by_range(&self, other: &RangeT) -> bool {
-        if Self::compare(self.start.as_ref(), other.start.as_ref()) != 0 {
-            false
-        } else if self.start_open != other.start_open {
-            false
-        } else if !self.includes(other) {
-            false
-        } else {
-            true
-        }
+        Self::compare(self.start.as_ref(), other.start.as_ref()) == 0
+            && self.start_open == other.start_open
+            && self.includes(other)
     }
 }
 
@@ -189,8 +163,8 @@ pub(crate) fn install_range_prelude(prelude: &mut Prelude) {
     // refer to https://docs.camunda.io/docs/components/modeler/feel/builtin-functions/feel-built-in-functions-range/
 
     prelude.add_native_func("before", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         match arg0 {
             Value::RangeV(rng_a) => match arg1 {
                 Value::RangeV(rng_b) => Ok(Value::BoolV(rng_a.before(rng_b))),
@@ -204,8 +178,8 @@ pub(crate) fn install_range_prelude(prelude: &mut Prelude) {
     });
 
     prelude.add_native_func("after", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         match arg0 {
             Value::RangeV(rng_a) => match arg1 {
                 Value::RangeV(rng_b) => Ok(Value::BoolV(rng_a.after(rng_b))),
@@ -219,24 +193,24 @@ pub(crate) fn install_range_prelude(prelude: &mut Prelude) {
     });
 
     prelude.add_native_func("meets", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         let rng0 = arg0.expect_range("argument[1] `a`")?;
         let rng1 = arg1.expect_range("argument[2] `b`")?;
         Ok(Value::BoolV(rng0.meets(rng1)))
     });
 
     prelude.add_native_func("met by", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         let rng0 = arg0.expect_range("argument[1] `a`")?;
         let rng1 = arg1.expect_range("argument[2] `b`")?;
         Ok(Value::BoolV(rng1.meets(rng0)))
     });
 
     prelude.add_native_func("overlaps", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         let rng0 = arg0.expect_range("argument[1] `a`")?;
         let rng1 = arg1.expect_range("argument[2] `b`")?;
         Ok(Value::BoolV(
@@ -245,24 +219,24 @@ pub(crate) fn install_range_prelude(prelude: &mut Prelude) {
     });
 
     prelude.add_native_func("overlaps before", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         let rng0 = arg0.expect_range("argument[1] `a`")?;
         let rng1 = arg1.expect_range("argument[2] `b`")?;
         Ok(Value::BoolV(rng0.overlaps_before(rng1)))
     });
 
     prelude.add_native_func("overlaps after", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         let rng0 = arg0.expect_range("argument[1] `a`")?;
         let rng1 = arg1.expect_range("argument[2] `b`")?;
         Ok(Value::BoolV(rng0.overlaps_after(rng1)))
     });
 
     prelude.add_native_func("starts", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         let rng1 = arg1.expect_range("argument[2] `b`")?;
         match arg0 {
             Value::RangeV(rng0) => Ok(Value::BoolV(rng1.started_by_range(rng0))),
@@ -271,8 +245,8 @@ pub(crate) fn install_range_prelude(prelude: &mut Prelude) {
     });
 
     prelude.add_native_func("started by", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         let rng0 = arg0.expect_range("argument[1] `a`")?;
         match arg1 {
             Value::RangeV(rng1) => Ok(Value::BoolV(rng0.started_by_range(rng1))),
@@ -281,8 +255,8 @@ pub(crate) fn install_range_prelude(prelude: &mut Prelude) {
     });
 
     prelude.add_native_func("finishes", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         let rng1 = arg1.expect_range("argument[2] `b`")?;
         match arg0 {
             Value::RangeV(rng0) => Ok(Value::BoolV(rng1.finished_by_range(rng0))),
@@ -291,8 +265,8 @@ pub(crate) fn install_range_prelude(prelude: &mut Prelude) {
     });
 
     prelude.add_native_func("finished by", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         let rng0 = arg0.expect_range("argument[1] `a`")?;
         match arg1 {
             Value::RangeV(rng1) => Ok(Value::BoolV(rng0.finished_by_range(rng1))),
@@ -301,8 +275,8 @@ pub(crate) fn install_range_prelude(prelude: &mut Prelude) {
     });
 
     prelude.add_native_func("includes", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         let rng0 = arg0.expect_range("argument[1] `a`")?;
         match arg1 {
             Value::RangeV(rng1) => Ok(Value::BoolV(rng0.includes(rng1))),
@@ -311,8 +285,8 @@ pub(crate) fn install_range_prelude(prelude: &mut Prelude) {
     });
 
     prelude.add_native_func("during", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         let rng1 = arg1.expect_range("argument[1] `a`")?;
         match arg0 {
             Value::RangeV(rng0) => Ok(Value::BoolV(rng1.includes(rng0))),
@@ -321,8 +295,8 @@ pub(crate) fn install_range_prelude(prelude: &mut Prelude) {
     });
 
     prelude.add_native_func("coincides", &["a", "b"], |_, args| -> EvalResult {
-        let arg0 = args.get(&"a".to_owned()).unwrap();
-        let arg1 = args.get(&"b".to_owned()).unwrap();
+        let arg0 = args.get("a").unwrap();
+        let arg1 = args.get("b").unwrap();
         let rng0 = arg0.expect_range("argument[1] `a`")?;
         let rng1 = arg1.expect_range("argument[2] `b`")?;
         Ok(Value::BoolV(*rng0 == *rng1))

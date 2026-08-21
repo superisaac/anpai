@@ -19,10 +19,15 @@ impl fmt::Display for ScanError {
 impl Error for ScanError {}
 
 impl ScanError {
-    pub fn from_str(message: &str) -> ScanError {
+    pub fn new(message: &str) -> ScanError {
         ScanError {
             message: message.to_owned(),
         }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(message: &str) -> ScanError {
+        Self::new(message)
     }
 }
 
@@ -53,12 +58,12 @@ impl TextPosition {
     }
 
     pub fn is_zero(&self) -> bool {
-        return self.chars == 0 && self.lines == 0 && self.cols == 0;
+        self.chars == 0 && self.lines == 0 && self.cols == 0
     }
 
     pub fn increase(&self, chunk: &str) -> TextPosition {
         let lines: Vec<&str> = chunk.split("\n").collect();
-        if lines.len() == 0 {
+        if lines.is_empty() {
             return self.clone();
         }
         let delta_cols = if lines.len() == 1 {
@@ -112,7 +117,7 @@ impl Token {
     }
 
     pub fn expect_kinds(&self, kinds: &[&str]) -> bool {
-        kinds.into_iter().any(|kind| self.expect(*kind))
+        kinds.iter().any(|kind| self.expect(kind))
     }
 
     pub fn expect_keyword(&self, keyword: &str) -> bool {
@@ -127,7 +132,7 @@ impl Token {
             return false;
         }
         let self_keyword = self.value.as_str();
-        keywords.into_iter().any(|kw| self_keyword == *kw)
+        keywords.contains(&self_keyword)
     }
 }
 
@@ -191,41 +196,37 @@ struct TokenPattern {
 
 lazy_static! {
     static ref TOKEN_PATTERNS: Vec<TokenPattern> = {
-        let mut patterns: Vec<TokenPattern> = Vec::new();
-        patterns.push(TokenPattern {
+        let mut patterns: Vec<TokenPattern> = vec![
+            TokenPattern {
             token: "space",
             reg: Some(Regex::new(r"^\s+").unwrap()),
-        });
-        patterns.push(TokenPattern {
+            },
+            TokenPattern {
             token: "comment_singleline",
             reg: Some(Regex::new(r"^//.*\n").unwrap()),
-        });
-
-        patterns.push(TokenPattern {
+            },
+            TokenPattern {
             token: "comment_multiline",
             reg: Some(Regex::new(r"^/\*(.|\n)*\*/").unwrap()),
-        });
-
-        patterns.push(TokenPattern{
-            token: "keyword",
-            reg: Some(Regex::new(r"^\b(true|false|and|or|null|function|if|then|else|loop|for|some|every|in|return|satisfies)\b").unwrap()),
-        });
-
-        patterns.push(TokenPattern {
+            },
+            TokenPattern {
+                token: "keyword",
+                reg: Some(Regex::new(r"^\b(true|false|and|or|null|function|if|then|else|loop|for|some|every|in|return|satisfies)\b").unwrap()),
+            },
+            TokenPattern {
             token: "temporal",
             reg: Some(Regex::new(r#"^@"(\\.|[^"])*""#).unwrap()),
-        });
-
-        patterns.push(TokenPattern {
+            },
+            TokenPattern {
             token: "string",
             reg: Some(Regex::new(r#"^"(\\.|[^"])*""#).unwrap()),
-        });
-
-        patterns.push(TokenPattern {
+            },
+            TokenPattern {
             token: "backtick",
             reg: Some(Regex::new(r#"^`[^`]*`"#).unwrap()),
             // backtick string is in camunda dialets
-        });
+            },
+        ];
 
         let ops = [
             "..", ".", ",", ";", ">=", ">", "=", "<=", "<", "!=", "!", "(", ")", "[", "]",
@@ -268,7 +269,7 @@ pub struct Scanner<'a> {
 
 impl Scanner<'_> {
     // constructor
-    pub fn new(input: &str) -> Scanner {
+    pub fn new(input: &str) -> Scanner<'_> {
         Scanner {
             cursor: TextPosition::zero(),
             current: None,
@@ -374,7 +375,7 @@ impl Scanner<'_> {
                 return Ok(token);
             }
         }
-        Err(ScanError::from_str("fail to find token"))
+        Err(ScanError::new("fail to find token"))
     }
 
     pub fn rewind(&mut self, token: Token) {

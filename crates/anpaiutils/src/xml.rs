@@ -68,7 +68,7 @@ impl XMLQuery<'_> {
                     for n in nodeset.iter() {
                         buf.push_str(n.string_value().as_str());
                     }
-                    return Ok(buf.trim().to_owned());
+                    Ok(buf.trim().to_owned())
                 }
                 Value::Boolean(b) => Ok(b.to_string()),
                 Value::Number(n) => Ok(n.to_string()),
@@ -84,7 +84,7 @@ impl XMLQuery<'_> {
                 return Ok(v.value().to_owned());
             }
         }
-        return Err(XmlError::NoAttribute(attr_name.to_owned()));
+        Err(XmlError::NoAttribute(attr_name.to_owned()))
     }
 
     pub fn get_first_element_node<'a>(
@@ -98,7 +98,7 @@ impl XMLQuery<'_> {
                 Value::Nodeset(nodeset) => {
                     for n in nodeset.iter() {
                         if let Node::Element(_) = n {
-                            return Ok(n.clone());
+                            return Ok(n);
                         }
                     }
                     Err(XmlError::NoElement(xpath_str.to_owned()))
@@ -119,15 +119,12 @@ impl XMLQuery<'_> {
         let mut nodes: Vec<Node> = vec![];
         if let Some(xpath) = b {
             let value = xpath.evaluate(&self.context, node)?;
-            match value {
-                Value::Nodeset(nodeset) => {
-                    for n in nodeset.iter() {
-                        if let Node::Element(_) = n {
-                            nodes.push(n.clone());
-                        }
+            if let Value::Nodeset(nodeset) = value {
+                for n in nodeset.iter() {
+                    if let Node::Element(_) = n {
+                        nodes.push(n);
                     }
                 }
-                _ => (),
             }
         }
         Ok(nodes)
@@ -151,7 +148,6 @@ impl XMLQuery<'_> {
 }
 
 pub fn parse_string(xml_content: &str) -> Result<Package, XmlError> {
-    let package =
-        parser::parse(xml_content).or_else(|e| Err(XmlError::ParseError(e.to_string())))?;
-    return Ok(package);
+    let package = parser::parse(xml_content).map_err(|e| XmlError::ParseError(e.to_string()))?;
+    Ok(package)
 }

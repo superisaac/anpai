@@ -32,8 +32,12 @@ impl Context {
         self.0.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn get(&self, key: String) -> Option<Value> {
-        self.0.get(&key).map(|v| v.clone())
+        self.0.get(&key).cloned()
     }
 
     pub fn get_mut(&mut self, key: String) -> Option<&mut Value> {
@@ -100,6 +104,14 @@ impl Context {
     }
 }
 
+impl Default for Context {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub type ContextRef = Rc<RefCell<Context>>;
+
 #[cfg(test)]
 mod test {
     use super::super::value::Value;
@@ -123,5 +135,3 @@ mod test {
         assert_eq!(cell.borrow().len(), 2);
     }
 }
-
-pub type ContextRef = Rc<RefCell<Context>>;
