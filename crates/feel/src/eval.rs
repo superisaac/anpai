@@ -478,10 +478,7 @@ impl Engine {
                     self.set_var(var_name.clone(), item.clone());
                     let result = self.eval(return_expr.clone());
                     self.pop_frame();
-                    match result {
-                        Ok(v) => results.push(v),
-                        Err(err) => return Err(err),
-                    }
+                    results.push(result?);
                 }
                 Ok(ArrayV(Rc::new(RefCell::new(results))))
             }
@@ -504,13 +501,8 @@ impl Engine {
                     self.set_var(var_name.clone(), item.clone());
                     let result = self.eval(filter_expr.clone());
                     self.pop_frame();
-                    match result {
-                        Ok(v) => {
-                            if v.bool_value() {
-                                return Ok(item.clone());
-                            }
-                        }
-                        Err(err) => return Err(err),
+                    if result?.bool_value() {
+                        return Ok(item.clone());
                     }
                 }
                 Ok(NullV)
@@ -535,13 +527,8 @@ impl Engine {
                     self.set_var(var_name.clone(), item.clone());
                     let result = self.eval(filter_expr.clone());
                     self.pop_frame();
-                    match result {
-                        Ok(v) => {
-                            if v.bool_value() {
-                                results.push(item.clone());
-                            }
-                        }
-                        Err(err) => return Err(err),
+                    if result?.bool_value() {
+                        results.push(item.clone());
                     }
                 }
                 Ok(ArrayV(Rc::new(RefCell::new(results))))
