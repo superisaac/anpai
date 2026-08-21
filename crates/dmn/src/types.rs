@@ -13,6 +13,7 @@ pub enum DmnError {
     IOError(String),
     XML(XmlError),
     FEELEval(FEELEvelError, String, String),
+    HitPolicy(String),
 }
 impl error::Error for DmnError {}
 
@@ -37,6 +38,7 @@ impl fmt::Display for DmnError {
             Self::IOError(error_message) => write!(f, "io error {}", error_message),
             Self::XML(err) => write!(f, "parse XML error {}", err),
             Self::FEELEval(err, path, _) => write!(f, "eval FEEL error at {}, {}", path, err),
+            Self::HitPolicy(message) => write!(f, "hit policy error {}", message),
         }
     }
 }
@@ -60,6 +62,7 @@ pub struct Output {
     pub id: String,
     pub name: String,
     pub type_ref: String,
+    pub allowed_values: Vec<String>,
 }
 
 #[derive(Clone, Debug)]

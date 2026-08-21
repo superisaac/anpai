@@ -326,7 +326,13 @@ impl Parser<'_> {
             "backtick" => self.parse_backtick(),
             "string" => self.parse_string(),
             "temporal" => self.parse_temporal(),
-            _ => Err(self.unexpect("name, number, string, temporal")),
+            "-" => self.parse_neg(),
+            "keyword" => match self.scanner.current_token().value.as_str() {
+                "true" | "false" => self.parse_bool(),
+                "null" => self.parse_null(),
+                _ => Err(self.unexpect_keyword("true, false, null")),
+            },
+            _ => Err(self.unexpect("name, number, string, temporal, boolean, null")),
         }
     }
 
@@ -852,7 +858,13 @@ mod test {
 
     #[test]
     fn test_parse_unary_tests() {
-        let testcases = [("> 2, <= 1", "(unary-tests (> 2) (<= 1))")];
+        let testcases = [
+            ("> 2, <= 1", "(unary-tests (> 2) (<= 1))"),
+            (
+                "true, false, null",
+                "(unary-tests (= true) (= false) (= null))",
+            ),
+        ];
 
         for (input, output) in testcases {
             let engine = Box::new(Engine::new());

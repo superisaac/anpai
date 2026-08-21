@@ -8,12 +8,43 @@ use sxd_xpath::nodeset::Node;
 use crate::types::*;
 
 use anpaiutils::xml::{parse_string, XMLQuery, XmlError};
+use feel::ast::NodeSyntax;
+use feel::eval::Engine;
+use feel::parse::{parse, ParseTop};
 
 pub struct Parser<'a> {
     xml_query: XMLQuery<'a>,
 }
 
 static DEFAULT_NAMESPACE: &str = "https://www.omg.org/spec/DMN/20191111/MODEL/";
+
+fn parse_allowed_values(text: &str) -> Result<Vec<String>, DmnError> {
+    if text.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let node = parse(text, Box::new(Engine::new()), ParseTop::UnaryTests).map_err(|(err, _)| {
+        DmnError::FEELEval(
+            err.into(),
+            "output/allowedValues".to_owned(),
+            text.to_owned(),
+        )
+    })?;
+    match node.syntax.as_ref() {
+        NodeSyntax::UnaryTests(elements) => elements
+            .iter()
+            .map(|element| match element.syntax.as_ref() {
+                NodeSyntax::UnaryTest { op, right } if op == "=" => Ok(right.to_string()),
+                _ => Err(DmnError::InvalidElement(
+                    "output.allowedValues must contain literal values".to_owned(),
+                )),
+            })
+            .collect(),
+        _ => Err(DmnError::InvalidElement(
+            "output.allowedValues must contain literal values".to_owned(),
+        )),
+    }
+}
 
 impl Parser<'_> {
     pub fn new<'a>() -> Parser<'a> {
@@ -106,7 +137,20 @@ impl Parser<'_> {
             .get_attribute(n, "typeRef")
             .unwrap_or_default();
         let name = self.xml_query.get_attribute(n, "name").unwrap_or_default();
-        Ok(Output { id, type_ref, name })
+        let allowed_values = match self.xml_query.get_first_element_node(n, "ns:allowedValues") {
+            Ok(allowed_values_node) => {
+                let text = self.xml_query.get_text(allowed_values_node, "ns:text")?;
+                parse_allowed_values(&text)?
+            }
+            Err(XmlError::NoElement(_)) => vec![],
+            Err(err) => return Err(err.into()),
+        };
+        Ok(Output {
+            id,
+            type_ref,
+            name,
+            allowed_values,
+        })
     }
 
     fn parse_decision_table(&self, node: Node) -> Result<DecisionTable, DmnError> {
@@ -115,7 +159,7 @@ impl Parser<'_> {
             let hit_policy = self
                 .xml_query
                 .get_attribute(node, "hitPolicy")
-                .unwrap_or("UNIQUE".to_owned());
+                .unwrap_or("FIRST".to_owned());
 
             let inputs = self.parse_child_elements(node, "input", Parser::parse_input)?;
             let outputs = self.parse_child_elements(node, "output", Parser::parse_output)?;
@@ -290,5 +334,34 @@ mod test {
     #[test]
     fn test_parse_simple_dmn() {
         super::parse_file("src/fixtures/dmn/simpledish.dmn");
+    }
+
+    #[test]
+    fn test_parse_output_allowed_values() {
+        let package = anpaiutils::xml::parse_string(
+            r#"<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions-1">
+                <decision id="decision-1">
+                    <decisionTable id="table-1" hitPolicy="PRIORITY">
+                        <output id="output-1" name="result" typeRef="string">
+                            <allowedValues><text>"high", "low"</text></allowedValues>
+                        </output>
+                    </decisionTable>
+                </decision>
+            </definitions>"#,
+        )
+        .unwrap();
+        let parser = super::Parser::new();
+        let definitions = parser
+            .xml_query
+            .get_first_element_node(package.as_document().root().into(), "ns:definitions")
+            .unwrap();
+        let diagram = parser.parse_diagram(definitions).unwrap();
+        let output = &diagram.decisions[0]
+            .decision_table
+            .as_ref()
+            .unwrap()
+            .outputs[0];
+
+        assert_eq!(output.allowed_values, vec![r#""high""#, r#""low""#]);
     }
 }
