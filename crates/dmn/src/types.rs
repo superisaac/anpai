@@ -14,6 +14,9 @@ pub enum DmnError {
     XML(XmlError),
     FEELEval(FEELEvelError, String, String),
     HitPolicy(String),
+    TypeError(String),
+    Context(String, Box<DmnError>),
+    File(String, Box<DmnError>),
 }
 impl error::Error for DmnError {}
 
@@ -37,8 +40,15 @@ impl fmt::Display for DmnError {
             Self::NoElement(elem_name) => write!(f, "no element `{}`", elem_name),
             Self::IOError(error_message) => write!(f, "io error {}", error_message),
             Self::XML(err) => write!(f, "parse XML error {}", err),
-            Self::FEELEval(err, path, _) => write!(f, "eval FEEL error at {}, {}", path, err),
+            Self::FEELEval(err, location, expression) => write!(
+                f,
+                "{} expression={:?} position={} error={}",
+                location, expression, err.pos, err.kind
+            ),
             Self::HitPolicy(message) => write!(f, "hit policy error {}", message),
+            Self::TypeError(message) => write!(f, "type error {}", message),
+            Self::Context(location, err) => write!(f, "{} error={}", location, err),
+            Self::File(path, err) => write!(f, "file={:?} {}", path, err),
         }
     }
 }
@@ -63,6 +73,32 @@ pub struct Output {
     pub name: String,
     pub type_ref: String,
     pub allowed_values: Vec<String>,
+}
+
+impl Output {
+    pub fn value_type(&self) -> Result<Option<&'static str>, DmnError> {
+        let type_ref = self.type_ref.trim();
+        if type_ref.is_empty() || type_ref.eq_ignore_ascii_case("any") {
+            return Ok(None);
+        }
+
+        let type_name = type_ref.rsplit(':').next().unwrap_or(type_ref);
+        match type_name {
+            "string" => Ok(Some("string")),
+            "number" | "integer" | "long" | "double" => Ok(Some("number")),
+            "boolean" => Ok(Some("boolean")),
+            "date" => Ok(Some("date")),
+            "time" => Ok(Some("time")),
+            "dateTime" | "date time" => Ok(Some("date time")),
+            "duration" | "dayTimeDuration" | "yearsAndMonthsDuration" => Ok(Some("duration")),
+            "array" => Ok(Some("array")),
+            "context" | "map" => Ok(Some("map")),
+            _ => Err(DmnError::InvalidElement(format!(
+                "output `{}` has unsupported typeRef `{}`",
+                self.name, self.type_ref
+            ))),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

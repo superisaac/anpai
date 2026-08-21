@@ -1,13 +1,36 @@
 use crate::parse::Parser;
-use crate::types::{Decision, DecisionTable, Diagram, DmnError, Rule};
+use crate::types::{Decision, DecisionTable, Diagram, DmnError, Output, Rule};
 use feel::eval::Engine;
 use feel::values::context::Context;
 use feel::values::value::Value;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+fn input_name(input: &crate::types::Input) -> &str {
+    if !input.label.is_empty() {
+        &input.label
+    } else if !input.expression.text.is_empty() {
+        &input.expression.text
+    } else {
+        &input.id
+    }
+}
+
+fn output_name(output: &Output) -> &str {
+    if output.name.is_empty() {
+        &output.id
+    } else {
+        &output.name
+    }
+}
+
+fn table_location(decision_id: &str, table: &DecisionTable) -> String {
+    format!("decision={} table={}", decision_id, table.id)
+}
+
 fn rule_matched(
-    rule_idx: usize,
+    decision_id: &str,
+    table: &DecisionTable,
     rule: &Rule,
     engine: &mut Box<Engine>,
     input_values: &[Value],
@@ -24,8 +47,13 @@ fn rule_matched(
         engine.pop_frame();
 
         let evaluated = evaluated.map_err(|err| {
-            let path = format!("rule/{}/inputEntry/{}[@id={}]", rule_idx, i, input_entry.id);
-            DmnError::FEELEval(err, path, input_entry.text.clone())
+            let location = format!(
+                "{} rule={} input={}",
+                table_location(decision_id, table),
+                rule.id,
+                input_name(&table.inputs[i])
+            );
+            DmnError::FEELEval(err, location, input_entry.text.clone())
         })?;
         if !evaluated.bool_value() {
             return Ok(false);
@@ -36,8 +64,8 @@ fn rule_matched(
 
 fn eval_rule_output(
     engine: &mut Box<Engine>,
+    decision_id: &str,
     table: &DecisionTable,
-    rule_idx: usize,
     rule: &Rule,
 ) -> Result<Context, DmnError> {
     let mut output_context = Context::new();
@@ -47,27 +75,47 @@ fn eval_rule_output(
         if output_text.is_empty() {
             continue;
         }
-        let path = format!(
-            "rule/{}/outputEntry/{}[@id={}]",
-            rule_idx, i, output_entry.id
+        let location = format!(
+            "{} rule={} output={}",
+            table_location(decision_id, table),
+            rule.id,
+            output_name(output)
         );
         let output_value = match engine.parse_and_eval(output_text.as_str()) {
             Ok(v) => v,
-            Err(err) => return Err(DmnError::FEELEval(err, path, output_text)),
+            Err(err) => return Err(DmnError::FEELEval(err, location.clone(), output_text)),
         };
+        validate_output_type(output, &output_value, &location)?;
         output_context.insert(output.name.clone(), output_value);
     }
     Ok(output_context)
 }
 
+fn validate_output_type(output: &Output, value: &Value, path: &str) -> Result<(), DmnError> {
+    let actual_type = value.data_type();
+    let Some(expected_type) = output.value_type()? else {
+        return Ok(());
+    };
+
+    if actual_type == expected_type {
+        Ok(())
+    } else {
+        Err(DmnError::TypeError(format!(
+            "{} typeRef={:?} actualType={} error=output value type mismatch (expected `{}`, got `{}`)",
+            path, output.type_ref, actual_type, output.type_ref, actual_type
+        )))
+    }
+}
+
 fn eval_first(
     engine: &mut Box<Engine>,
+    decision_id: &str,
     table: &DecisionTable,
     input_values: &[Value],
 ) -> Result<Context, DmnError> {
-    for (rule_idx, rule) in table.rules.iter().enumerate() {
-        if rule_matched(rule_idx, rule, engine, input_values)? {
-            return eval_rule_output(engine, table, rule_idx, rule);
+    for rule in &table.rules {
+        if rule_matched(decision_id, table, rule, engine, input_values)? {
+            return eval_rule_output(engine, decision_id, table, rule);
         }
     }
     Ok(Context::new())
@@ -75,16 +123,19 @@ fn eval_first(
 
 fn eval_unique(
     engine: &mut Box<Engine>,
+    decision_id: &str,
     table: &DecisionTable,
     input_values: &[Value],
 ) -> Result<Context, DmnError> {
     let mut matched_rule: Option<usize> = None;
     for (rule_idx, rule) in table.rules.iter().enumerate() {
-        if rule_matched(rule_idx, rule, engine, input_values)? {
+        if rule_matched(decision_id, table, rule, engine, input_values)? {
             if let Some(first_rule_idx) = matched_rule {
                 return Err(DmnError::HitPolicy(format!(
-                    "UNIQUE matched multiple rules ({}, {})",
-                    first_rule_idx, rule_idx
+                    "{} error=UNIQUE matched multiple rules ({}, {})",
+                    table_location(decision_id, table),
+                    table.rules[first_rule_idx].id,
+                    rule.id
                 )));
             }
             matched_rule = Some(rule_idx);
@@ -92,24 +143,25 @@ fn eval_unique(
     }
 
     match matched_rule {
-        Some(rule_idx) => eval_rule_output(engine, table, rule_idx, &table.rules[rule_idx]),
+        Some(rule_idx) => eval_rule_output(engine, decision_id, table, &table.rules[rule_idx]),
         None => Ok(Context::new()),
     }
 }
 
 fn eval_collect(
     engine: &mut Box<Engine>,
+    decision_id: &str,
     table: &DecisionTable,
     input_values: &[Value],
 ) -> Result<Context, DmnError> {
     let mut collected: Vec<Vec<Value>> = (0..table.outputs.len()).map(|_| Vec::new()).collect();
 
-    for (rule_idx, rule) in table.rules.iter().enumerate() {
-        if !rule_matched(rule_idx, rule, engine, input_values)? {
+    for rule in &table.rules {
+        if !rule_matched(decision_id, table, rule, engine, input_values)? {
             continue;
         }
 
-        let output_context = eval_rule_output(engine, table, rule_idx, rule)?;
+        let output_context = eval_rule_output(engine, decision_id, table, rule)?;
         for (output_idx, output) in table.outputs.iter().enumerate() {
             let value = output_context
                 .get(output.name.clone())
@@ -130,22 +182,25 @@ fn eval_collect(
 
 fn eval_any(
     engine: &mut Box<Engine>,
+    decision_id: &str,
     table: &DecisionTable,
     input_values: &[Value],
 ) -> Result<Context, DmnError> {
     let mut matched_output: Option<(usize, Context)> = None;
 
     for (rule_idx, rule) in table.rules.iter().enumerate() {
-        if !rule_matched(rule_idx, rule, engine, input_values)? {
+        if !rule_matched(decision_id, table, rule, engine, input_values)? {
             continue;
         }
 
-        let output_context = eval_rule_output(engine, table, rule_idx, rule)?;
+        let output_context = eval_rule_output(engine, decision_id, table, rule)?;
         if let Some((first_rule_idx, first_output)) = &matched_output {
             if first_output != &output_context {
                 return Err(DmnError::HitPolicy(format!(
-                    "ANY matched rules {} and {} with different outputs",
-                    first_rule_idx, rule_idx
+                    "{} error=ANY matched rules {} and {} with different outputs",
+                    table_location(decision_id, table),
+                    table.rules[*first_rule_idx].id,
+                    rule.id
                 )));
             }
         } else {
@@ -161,21 +216,28 @@ fn eval_any(
 
 fn output_priority(
     engine: &mut Box<Engine>,
+    decision_id: &str,
+    table: &DecisionTable,
     output: &crate::types::Output,
-    output_idx: usize,
     value: &Value,
 ) -> Result<usize, DmnError> {
     if output.allowed_values.is_empty() {
         return Err(DmnError::HitPolicy(format!(
-            "PRIORITY output `{}` has no allowed values",
-            output.name
+            "{} output={} error=PRIORITY output has no allowed values",
+            table_location(decision_id, table),
+            output_name(output)
         )));
     }
 
     for (priority, allowed_value_text) in output.allowed_values.iter().enumerate() {
         let allowed_value = engine.parse_and_eval(allowed_value_text).map_err(|err| {
-            let path = format!("output/{}/allowedValues/{}", output_idx, priority);
-            DmnError::FEELEval(err, path, allowed_value_text.clone())
+            let location = format!(
+                "{} output={} allowed_value={}",
+                table_location(decision_id, table),
+                output_name(output),
+                priority
+            );
+            DmnError::FEELEval(err, location, allowed_value_text.clone())
         })?;
         if &allowed_value == value {
             return Ok(priority);
@@ -183,30 +245,33 @@ fn output_priority(
     }
 
     Err(DmnError::HitPolicy(format!(
-        "PRIORITY output `{}` value `{}` is not in allowed values",
-        output.name, value
+        "{} output={} error=PRIORITY value `{}` is not in allowed values",
+        table_location(decision_id, table),
+        output_name(output),
+        value
     )))
 }
 
 fn eval_priority(
     engine: &mut Box<Engine>,
+    decision_id: &str,
     table: &DecisionTable,
     input_values: &[Value],
 ) -> Result<Context, DmnError> {
     let mut selected: Option<(Vec<usize>, Context)> = None;
 
-    for (rule_idx, rule) in table.rules.iter().enumerate() {
-        if !rule_matched(rule_idx, rule, engine, input_values)? {
+    for rule in &table.rules {
+        if !rule_matched(decision_id, table, rule, engine, input_values)? {
             continue;
         }
 
-        let output_context = eval_rule_output(engine, table, rule_idx, rule)?;
+        let output_context = eval_rule_output(engine, decision_id, table, rule)?;
         let mut priorities = Vec::with_capacity(table.outputs.len());
-        for (output_idx, output) in table.outputs.iter().enumerate() {
+        for output in &table.outputs {
             let value = output_context
                 .get(output.name.clone())
                 .unwrap_or(Value::NullV);
-            priorities.push(output_priority(engine, output, output_idx, &value)?);
+            priorities.push(output_priority(engine, decision_id, table, output, &value)?);
         }
 
         let should_select = selected
@@ -225,17 +290,19 @@ fn eval_priority(
 
 fn eval_decision_table(
     engine: &mut Box<Engine>,
+    decision_id: &str,
     table: &DecisionTable,
     input_values: &[Value],
 ) -> Result<Context, DmnError> {
     match table.hit_policy.as_str() {
-        "FIRST" => eval_first(engine, table, input_values),
-        "UNIQUE" => eval_unique(engine, table, input_values),
-        "COLLECT" => eval_collect(engine, table, input_values),
-        "ANY" => eval_any(engine, table, input_values),
-        "PRIORITY" => eval_priority(engine, table, input_values),
+        "FIRST" => eval_first(engine, decision_id, table, input_values),
+        "UNIQUE" => eval_unique(engine, decision_id, table, input_values),
+        "COLLECT" => eval_collect(engine, decision_id, table, input_values),
+        "ANY" => eval_any(engine, decision_id, table, input_values),
+        "PRIORITY" => eval_priority(engine, decision_id, table, input_values),
         policy => Err(DmnError::HitPolicy(format!(
-            "unsupported hit policy `{}`",
+            "{} error=unsupported hit policy {:?}",
+            table_location(decision_id, table),
             policy
         ))),
     }
@@ -253,19 +320,24 @@ pub fn eval_decision(
         engine.load_context(req_context.entries());
     }
 
+    let decision_id = decision.id;
     if let Some(table) = decision.decision_table {
         let mut input_values: Vec<Value> = vec![];
-        for (input_idx, input) in table.inputs.iter().enumerate() {
+        for input in &table.inputs {
             let input_text = input.expression.text.clone();
-            let path = format!("input/{}[@id={}]", input_idx, input.id);
+            let location = format!(
+                "{} input={}",
+                table_location(&decision_id, &table),
+                input_name(input)
+            );
             let input_value = match engine.parse_and_eval(input_text.as_str()) {
                 Ok(v) => v,
-                Err(err) => return Err(DmnError::FEELEval(err, path, input_text)),
+                Err(err) => return Err(DmnError::FEELEval(err, location, input_text)),
             };
             input_values.push(input_value);
         }
 
-        return eval_decision_table(engine, &table, &input_values);
+        return eval_decision_table(engine, &decision_id, &table, &input_values);
     }
     Ok(Context::new())
 }
@@ -287,6 +359,13 @@ pub fn eval_dmn_diagram(
     Ok(Value::ContextV(Rc::new(RefCell::new(context))))
 }
 
+/// Evaluate the default decision in a parsed diagram with an in-memory context.
+pub fn eval_diagram(diagram: &Diagram, context: Context) -> Result<Value, DmnError> {
+    let mut engine = Box::new(Engine::new());
+    engine.load_context(context.entries());
+    eval_dmn_diagram(&mut engine, diagram, None)
+}
+
 pub fn eval_file(
     engine: &mut Box<Engine>,
     dmn_path: &str,
@@ -296,6 +375,7 @@ pub fn eval_file(
     let diagram = parser.parse_file(dmn_path)?;
     //println!("diagram {:?}", diagram);
     eval_dmn_diagram(engine, &diagram, start_decision_id)
+        .map_err(|err| DmnError::File(dmn_path.to_owned(), Box::new(err)))
 }
 
 #[cfg(test)]
@@ -387,9 +467,28 @@ mod test {
     fn rule_condition_true_matches_and_false_does_not_match() {
         let mut engine = Box::new(Engine::new());
         let input_values = [Value::NumberV(Numeric::from_i32(5))];
+        let decision = decision_with_rules(
+            "FIRST",
+            vec![rule_with_condition("> 3"), rule_with_condition("< 3")],
+        );
+        let table = decision.decision_table.as_ref().unwrap();
 
-        assert!(rule_matched(0, &rule_with_condition("> 3"), &mut engine, &input_values).unwrap());
-        assert!(!rule_matched(0, &rule_with_condition("< 3"), &mut engine, &input_values).unwrap());
+        assert!(rule_matched(
+            &decision.id,
+            table,
+            &table.rules[0],
+            &mut engine,
+            &input_values
+        )
+        .unwrap());
+        assert!(!rule_matched(
+            &decision.id,
+            table,
+            &table.rules[1],
+            &mut engine,
+            &input_values
+        )
+        .unwrap());
     }
 
     #[test]
@@ -427,7 +526,10 @@ mod test {
 
         match error {
             DmnError::FEELEval(_, path, text) => {
-                assert_eq!(path, "rule/0/inputEntry/0[@id=input-entry-1]");
+                assert_eq!(
+                    path,
+                    "decision=decision-1 table=table-1 rule=rule-1 input=5"
+                );
                 assert_eq!(text, ">");
             }
             other => panic!("expected FEEL evaluation error, got {other:?}"),
@@ -541,7 +643,7 @@ mod test {
         let error = eval_decision(&mut engine, decision, &empty_diagram()).unwrap_err();
 
         assert!(
-            matches!(error, DmnError::HitPolicy(message) if message.contains("ANY matched rules 0 and 1 with different outputs"))
+            matches!(error, DmnError::HitPolicy(message) if message.contains("ANY matched rules rule-1 and rule-1 with different outputs"))
         );
     }
 
@@ -573,6 +675,22 @@ mod test {
 
         assert!(
             matches!(error, DmnError::HitPolicy(message) if message.contains("value `\"medium\"` is not in allowed values"))
+        );
+    }
+
+    #[test]
+    fn output_value_must_match_declared_type() {
+        let mut decision = decision_with_rules(
+            "FIRST",
+            vec![rule_with_condition_and_output("> 3", r#""text""#)],
+        );
+        decision.decision_table.as_mut().unwrap().outputs[0].type_ref = "number".to_owned();
+        let mut engine = Box::new(Engine::new());
+
+        let error = eval_decision(&mut engine, decision, &empty_diagram()).unwrap_err();
+
+        assert!(
+            matches!(error, DmnError::TypeError(message) if message.contains("expected `number`, got `string`"))
         );
     }
 }

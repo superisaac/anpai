@@ -192,17 +192,8 @@ impl AnpaiCommands {
                 file.clone(),
             ) {
                 Ok(_) => (),
-                Err(DmnError::FEELEval(err, path, code)) => {
-                    eprintln!(
-                        "Path: {}\n{}\nPosition: {}\n\n{}",
-                        path,
-                        err.kind,
-                        err.pos,
-                        err.pos.line_pointers(code.as_str()),
-                    );
-                }
                 Err(err) => {
-                    eprintln!("Error {}", err);
+                    eprintln!("{}", err);
                 }
             },
         }

@@ -44,4 +44,17 @@ false
 {"Beverages":"Apple Juice"}
 ```
 
+DMN documents can also be parsed and evaluated entirely in memory:
+
+```rust
+use dmn::{eval_diagram, parse_string, Context, DmnError, Value};
+
+fn evaluate(xml: &str) -> Result<Value, DmnError> {
+    let diagram = parse_string(xml)?;
+    let mut context = Context::new();
+    context.insert("season".to_owned(), Value::StrV("Summer".to_owned()));
+    eval_diagram(&diagram, context)
+}
+```
+
 for more examples please refer to testing

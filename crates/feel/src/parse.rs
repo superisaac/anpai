@@ -4,7 +4,6 @@ use crate::helpers::find_duplicate;
 use crate::scan::{ScanError, Scanner, TextPosition, Token};
 use clap::ValueEnum;
 
-use std::backtrace::Backtrace;
 use std::error::Error;
 use std::fmt;
 
@@ -78,14 +77,10 @@ impl Parser<'_> {
     }
 
     fn unexpect(&self, expects: &str) -> ParseError {
-        let bt = Backtrace::force_capture();
-        let stack_str = format!("{:?}", bt);
-
         ParseError::new(format!(
-            "unexpected token {}, expect {}, stack {}",
+            "unexpected token {}, expect {}",
             self.scanner.current_token().kind,
             expects,
-            stack_str,
         ))
     }
 
@@ -327,6 +322,9 @@ impl Parser<'_> {
             "string" => self.parse_string(),
             "temporal" => self.parse_temporal(),
             "-" => self.parse_neg(),
+            "{" => self.parse_map(),
+            "(" => self.parse_bracket_or_range(),
+            "[" => self.parse_range_or_array(),
             "keyword" => match self.scanner.current_token().value.as_str() {
                 "true" | "false" => self.parse_bool(),
                 "null" => self.parse_null(),

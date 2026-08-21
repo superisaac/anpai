@@ -544,9 +544,12 @@ impl Engine {
             .ok_or(EvalError::new(VarNotFound("?".to_owned())))?;
         for expr in exprs.iter() {
             let res = self.eval(expr.clone())?;
-            if let BoolV(true) = res {
-                return Ok(BoolV(true));
-            } else if left_value == res {
+            let matches = match &res {
+                BoolV(value) => *value,
+                RangeV(range) => range.position(&left_value) == 0,
+                _ => left_value == res,
+            };
+            if matches {
                 return Ok(BoolV(true));
             }
         }
