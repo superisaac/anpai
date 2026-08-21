@@ -313,35 +313,64 @@ pub fn eval_decision(
     decision: Decision,
     diagram: &Diagram,
 ) -> Result<Context, DmnError> {
-    // recursively call required decisions
-    for decision_id in decision.requirements.required_decisions.iter() {
-        let required = diagram.find_decision(decision_id.clone())?;
-        let req_context = eval_decision(engine, required, diagram)?;
-        engine.load_context(req_context.entries());
-    }
-
-    let decision_id = decision.id;
-    if let Some(table) = decision.decision_table {
-        let mut input_values: Vec<Value> = vec![];
-        for input in &table.inputs {
-            let input_text = input.expression.text.clone();
-            let location = format!(
-                "{} input={}",
-                table_location(&decision_id, &table),
-                input_name(input)
-            );
-            let input_value = match engine.parse_and_eval(input_text.as_str()) {
-                Ok(v) => v,
-                Err(err) => return Err(DmnError::FEELEval(err, location, input_text)),
-            };
-            input_values.push(input_value);
-        }
-
-        return eval_decision_table(engine, &decision_id, &table, &input_values);
-    }
-    Ok(Context::new())
+    eval_decision_inner(engine, decision, diagram, &mut Vec::new())
 }
 
+fn eval_decision_inner(
+    engine: &mut Box<Engine>,
+    decision: Decision,
+    diagram: &Diagram,
+    stack: &mut Vec<String>,
+) -> Result<Context, DmnError> {
+    if stack.iter().any(|id| id == &decision.id) {
+        let mut cycle = stack.clone();
+        cycle.push(decision.id.clone());
+        return Err(DmnError::Dependency(format!(
+            "decision={} error=cyclic dependency path={}",
+            decision.id,
+            cycle.join(" -> ")
+        )));
+    }
+
+    stack.push(decision.id.clone());
+    let result = (|| {
+        // Recursively evaluate required decisions before the current table.
+        for decision_id in decision.requirements.required_decisions.iter() {
+            let required = diagram.find_decision(decision_id.clone())?;
+            let req_context = eval_decision_inner(engine, required, diagram, stack)?;
+            engine.load_context(req_context.entries());
+        }
+
+        let decision_id = decision.id.clone();
+        if let Some(table) = decision.decision_table {
+            let mut input_values: Vec<Value> = vec![];
+            for input in &table.inputs {
+                let input_text = input.expression.text.clone();
+                let location = format!(
+                    "{} input={}",
+                    table_location(&decision_id, &table),
+                    input_name(input)
+                );
+                let input_value = match engine.parse_and_eval(input_text.as_str()) {
+                    Ok(v) => v,
+                    Err(err) => return Err(DmnError::FEELEval(err, location, input_text)),
+                };
+                input_values.push(input_value);
+            }
+
+            return eval_decision_table(engine, &decision_id, &table, &input_values);
+        }
+        Ok(Context::new())
+    })();
+    stack.pop();
+    result
+}
+
+/*
+ * The recursive implementation above keeps the active decision path local to
+ * one evaluation, so repeated evaluations and independent threads do not share
+ * dependency state.
+ */
 pub fn eval_dmn_diagram(
     engine: &mut Box<Engine>,
     diagram: &Diagram,
@@ -385,7 +414,9 @@ mod test {
         Decision, DecisionTable, Diagram, DmnError, Input, InputExpression, Output, Requirements,
         Rule, RuleInputEntry, RuleOutputEntry,
     };
+    use crate::{eval_diagram, parse_string};
     use feel::eval::Engine;
+    use feel::values::context::Context;
     use feel::values::numeric::Numeric;
     use feel::values::value::Value;
 
@@ -461,6 +492,32 @@ mod test {
             business_knowledge_models: vec![],
             knowledge_sources: vec![],
         }
+    }
+
+    fn number_context(value: i32) -> Context {
+        let mut context = Context::new();
+        context.insert("value".to_owned(), Value::NumberV(Numeric::from_i32(value)));
+        context
+    }
+
+    fn single_rule_diagram(hit_policy: &str, condition: &str, output: &str) -> Diagram {
+        let xml = format!(
+            r#"<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions-1">
+                <decision id="decision-1">
+                    <decisionTable id="table-1" hitPolicy="{hit_policy}">
+                        <input id="input-1" label="value">
+                            <inputExpression id="input-expression-1" typeRef="number"><text>value</text></inputExpression>
+                        </input>
+                        <output id="output-1" name="result" typeRef="string" />
+                        <rule id="rule-1">
+                            <inputEntry id="input-entry-1"><text>{condition}</text></inputEntry>
+                            <outputEntry id="output-entry-1"><text>{output}</text></outputEntry>
+                        </rule>
+                    </decisionTable>
+                </decision>
+            </definitions>"#
+        );
+        parse_string(&xml).unwrap()
     }
 
     #[test]
@@ -563,6 +620,51 @@ mod test {
         let result = eval_decision(&mut engine, decision, &empty_diagram()).unwrap();
 
         assert_eq!(result.to_string(), r#"{"result":"first"}"#);
+    }
+
+    #[test]
+    fn empty_condition_matches_and_no_rule_match_returns_empty_context() {
+        let wildcard = single_rule_diagram("FIRST", "", r#""wildcard""#);
+        let wildcard_result = eval_diagram(&wildcard, number_context(0)).unwrap();
+        assert_eq!(wildcard_result.to_string(), r#"{"result":"wildcard"}"#);
+
+        let no_match = single_rule_diagram("FIRST", "> 100", r#""unreachable""#);
+        let no_match_result = eval_diagram(&no_match, number_context(5)).unwrap();
+        assert_eq!(no_match_result.to_string(), "{}");
+    }
+
+    #[test]
+    fn multiple_conditions_are_combined() {
+        let diagram = parse_string(
+            r#"<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions-1">
+                <decision id="decision-1">
+                    <decisionTable id="table-1">
+                        <input id="season-input" label="season">
+                            <inputExpression id="season-expression" typeRef="string"><text>season</text></inputExpression>
+                        </input>
+                        <input id="count-input" label="guestCount">
+                            <inputExpression id="count-expression" typeRef="number"><text>guestCount</text></inputExpression>
+                        </input>
+                        <output id="output-1" name="result" typeRef="string" />
+                        <rule id="rule-1">
+                            <inputEntry id="season-entry"><text>"Summer"</text></inputEntry>
+                            <inputEntry id="count-entry"><text>&gt; 5</text></inputEntry>
+                            <outputEntry id="output-entry-1"><text>"combined"</text></outputEntry>
+                        </rule>
+                    </decisionTable>
+                </decision>
+            </definitions>"#,
+        )
+        .unwrap();
+        let mut context = Context::new();
+        context.insert("season".to_owned(), Value::StrV("Summer".to_owned()));
+        context.insert(
+            "guestCount".to_owned(),
+            Value::NumberV(Numeric::from_i32(10)),
+        );
+
+        let result = eval_diagram(&diagram, context).unwrap();
+        assert_eq!(result.to_string(), r#"{"result":"combined"}"#);
     }
 
     #[test]
@@ -692,5 +794,88 @@ mod test {
         assert!(
             matches!(error, DmnError::TypeError(message) if message.contains("expected `number`, got `string`"))
         );
+    }
+
+    #[test]
+    fn decision_dependencies_are_evaluated_before_dependents() {
+        let diagram = parse_string(
+            r##"<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions-1">
+                <decision id="base">
+                    <decisionTable id="base-table">
+                        <output id="base-output" name="baseValue" typeRef="number" />
+                        <rule id="base-rule">
+                            <outputEntry id="base-entry"><text>42</text></outputEntry>
+                        </rule>
+                    </decisionTable>
+                </decision>
+                <decision id="dependent">
+                    <informationRequirement id="requirement-1"><requiredDecision href="#base" /></informationRequirement>
+                    <decisionTable id="dependent-table">
+                        <input id="base-input" label="baseValue">
+                            <inputExpression id="base-expression" typeRef="number"><text>baseValue</text></inputExpression>
+                        </input>
+                        <output id="dependent-output" name="result" typeRef="string" />
+                        <rule id="dependent-rule">
+                            <inputEntry id="dependent-condition"><text>&gt; 40</text></inputEntry>
+                            <outputEntry id="dependent-entry"><text>"dependent"</text></outputEntry>
+                        </rule>
+                    </decisionTable>
+                </decision>
+            </definitions>"##,
+        )
+        .unwrap();
+
+        let result = eval_diagram(&diagram, Context::new()).unwrap();
+        assert_eq!(result.to_string(), r#"{"result":"dependent"}"#);
+    }
+
+    #[test]
+    fn circular_decision_dependencies_return_an_error() {
+        let diagram = parse_string(
+            r##"<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" id="definitions-1">
+                <decision id="a">
+                    <informationRequirement id="a-requirement"><requiredDecision href="#b" /></informationRequirement>
+                </decision>
+                <decision id="b">
+                    <informationRequirement id="b-requirement"><requiredDecision href="#a" /></informationRequirement>
+                </decision>
+            </definitions>"##,
+        )
+        .unwrap();
+
+        let error = eval_diagram(&diagram, Context::new()).unwrap_err();
+        assert!(matches!(error, DmnError::Dependency(message) if message.contains("b -> a -> b")));
+    }
+
+    #[test]
+    fn repeated_and_concurrent_evaluations_are_consistent() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let diagram = Arc::new(single_rule_diagram("FIRST", "= 5", r#""stable""#));
+        let expected = r#"{"result":"stable"}"#;
+
+        for _ in 0..10 {
+            assert_eq!(
+                eval_diagram(&diagram, number_context(5))
+                    .unwrap()
+                    .to_string(),
+                expected
+            );
+        }
+
+        let handles: Vec<_> = (0..8)
+            .map(|_| {
+                let diagram = Arc::clone(&diagram);
+                thread::spawn(move || {
+                    eval_diagram(&diagram, number_context(5))
+                        .unwrap()
+                        .to_string()
+                })
+            })
+            .collect();
+        for handle in handles {
+            assert_eq!(handle.join().unwrap(), expected);
+        }
     }
 }

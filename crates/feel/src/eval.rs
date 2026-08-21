@@ -1204,4 +1204,38 @@ mod test {
         let v = eng.eval(node1).unwrap();
         assert_eq!(v.to_string(), "13.5");
     }
+
+    #[test]
+    fn test_comparison_interval_list_and_temporal_expressions() {
+        let cases = [
+            (r#""Summer" = "Summer""#, "true"),
+            ("8 > 3", "true"),
+            ("3 < 8", "true"),
+            ("8 >= 8", "true"),
+            ("8 <= 8", "true"),
+            ("5 in [3..5]", "true"),
+            ("5 in [1, 3, 5]", "true"),
+            (
+                r#"@"2024-01-01T10:00:00+00:00" < @"2024-01-01T11:00:00+00:00""#,
+                "true",
+            ),
+            (r#"@"2024-01-01" <= @"2024-01-02""#, "true"),
+            (r#"@"10:00:00" < @"11:00:00""#, "true"),
+            (r#"@"10:00:00+05:00" < @"09:00:00+00:00""#, "true"),
+        ];
+
+        for (expression, expected) in cases {
+            let mut engine = super::Engine::new();
+            let value = engine.parse_and_eval(expression).unwrap();
+            assert_eq!(value.to_string(), expected, "expression: {expression}");
+        }
+    }
+
+    #[test]
+    fn test_expression_parse_failure_is_reported() {
+        let mut engine = super::Engine::new();
+        let error = engine.parse_and_eval("8 >").unwrap_err();
+
+        assert!(error.to_string().contains("ParseError"));
+    }
 }

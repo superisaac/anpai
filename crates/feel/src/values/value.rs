@@ -527,6 +527,22 @@ impl cmp::PartialOrd for Value {
                 Self::DateV(b) => compare_date(a, b),
                 _ => None,
             },
+            Self::TimeV(a) => match other {
+                Self::TimeV(b) => {
+                    let to_millis = |time: &iso8601::Time| {
+                        let local = (((time.hour as i64 * 60 + time.minute as i64) * 60
+                            + time.second as i64)
+                            * 1000)
+                            + time.millisecond as i64;
+                        let offset = (time.tz_offset_hours as i64 * 3600
+                            + time.tz_offset_minutes as i64 * 60)
+                            * 1000;
+                        local - offset
+                    };
+                    Some(compare_value(to_millis(a), to_millis(b)))
+                }
+                _ => None,
+            },
             _ => None,
         }
     }

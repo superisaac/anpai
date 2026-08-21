@@ -15,6 +15,7 @@ pub enum DmnError {
     FEELEval(FEELEvelError, String, String),
     HitPolicy(String),
     TypeError(String),
+    Dependency(String),
     Context(String, Box<DmnError>),
     File(String, Box<DmnError>),
 }
@@ -47,6 +48,7 @@ impl fmt::Display for DmnError {
             ),
             Self::HitPolicy(message) => write!(f, "hit policy error {}", message),
             Self::TypeError(message) => write!(f, "type error {}", message),
+            Self::Dependency(message) => write!(f, "dependency error {}", message),
             Self::Context(location, err) => write!(f, "{} error={}", location, err),
             Self::File(path, err) => write!(f, "file={:?} {}", path, err),
         }
